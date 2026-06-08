@@ -1,5 +1,15 @@
 import os
 
+# ローカル開発用に backend/.env を読み込む（本番=Render では実 env が既に設定済みで、
+# load_dotenv は既存の環境変数を上書きしないため無害。dotenv 未導入でも握り潰す）。
+# auth/database が import 時に os.environ を読むので、それらの import より前で実行する。
+try:
+    from dotenv import load_dotenv
+
+    load_dotenv(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".env"))
+except ImportError:
+    pass
+
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse

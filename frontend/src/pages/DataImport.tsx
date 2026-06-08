@@ -1,12 +1,14 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import {
-  Upload, ClipboardPaste, CheckCircle, XCircle, Sparkles, Eye,
+  Upload, ClipboardPaste, CheckCircle, Sparkles, Eye,
   Package, ChevronDown, ChevronRight, HelpCircle, Megaphone, BarChart3,
   Trash2, ArrowRight, ExternalLink,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Header from '../components/layout/Header'
+import ErrorBanner from '../components/ErrorBanner'
+import { supabase, authEnabled } from '../lib/supabase'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent } from '../lib/utils'
 import type { DataStatus, RppPeriods, RppImportResult } from '../types'
@@ -16,6 +18,11 @@ const RPP_TEMPLATE = `計測期間,商品URL,管理番号,商品名,ジャンル
 2024-01-07,https://item.rakuten.co.jp/shop/item002/,ITEM-002,サンプル商品B,スポーツ/ウェア,80000,48000,10000,20,800,1.2,125`
 
 type StatusType = { type: 'success' | 'error'; message: string; detail?: RppImportResult } | null
+
+/** バックエンドの認証系エラーメッセージかどうか（再ログインCTAの出し分けに使う）。 */
+function isAuthError(msg: string): boolean {
+  return /認証|再ログイン|トークン|ログインしてください/.test(msg)
+}
 
 interface MonthlyItemsPreview {
   year_month: string
@@ -396,6 +403,9 @@ export default function DataImport() {
     }
   }
 
+  /** 再ログイン: サインアウトすると App 側が未ログインを検知してログイン画面に切り替わる。 */
+  const handleRelogin = () => { supabase?.auth.signOut() }
+
   const hasData = dataStatus?.has_data ?? false
 
   return (
@@ -403,17 +413,21 @@ export default function DataImport() {
       <Header title="データ取込み" subtitle="楽天RMSのCSVをアップロードするだけで分析が始まります" />
 
       <div className="flex-1 overflow-auto p-6 bg-gray-50 space-y-5 max-w-5xl">
-        {/* ステータスメッセージ */}
-        {status && (
-          <div className={`rounded-lg border px-4 py-3 text-sm ${
-            status.type === 'success'
-              ? 'border-green-200 bg-green-50 text-green-800'
-              : 'border-red-200 bg-red-50 text-red-800'
-          }`}>
+        {/* エラー: 認証エラーなら「再ログイン」CTA、常に「✕閉じる」を表示 */}
+        {status && status.type === 'error' && (
+          <ErrorBanner
+            message={status.message}
+            onClose={() => setStatus(null)}
+            actionLabel={authEnabled && isAuthError(status.message) ? '再ログイン' : undefined}
+            onAction={authEnabled && isAuthError(status.message) ? handleRelogin : undefined}
+          />
+        )}
+
+        {/* 成功メッセージ */}
+        {status && status.type === 'success' && (
+          <div className="rounded-lg border px-4 py-3 text-sm border-green-200 bg-green-50 text-green-800">
             <div className="flex items-center gap-2.5">
-              {status.type === 'success'
-                ? <CheckCircle size={16} className="text-green-500 shrink-0" />
-                : <XCircle size={16} className="text-red-500 shrink-0" />}
+              <CheckCircle size={16} className="text-green-500 shrink-0" />
               <span className="flex-1">{status.message}</span>
               {status.type === 'success' && hasData && (
                 <button

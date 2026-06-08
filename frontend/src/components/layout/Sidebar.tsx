@@ -1,4 +1,5 @@
 import { NavLink } from 'react-router-dom'
+import { maskEmail } from '../../lib/utils'
 import {
   LayoutDashboard,
   TrendingUp,
@@ -63,13 +64,13 @@ export default function Sidebar({ onOpenHelp, userEmail, onSignOut }: SidebarPro
           <button
             onClick={onSignOut}
             className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            title={userEmail}
+            title={maskEmail(userEmail)}
           >
             <LogOut size={16} />
             <span className="truncate">ログアウト</span>
           </button>
         )}
-        {userEmail && <p className="text-[11px] text-gray-600 px-3 truncate" title={userEmail}>{userEmail}</p>}
+        {userEmail && <p className="text-[11px] text-gray-600 px-3 truncate" title={maskEmail(userEmail)}>{maskEmail(userEmail)}</p>}
         <p className="text-xs text-gray-600 px-3">v1.0.0</p>
       </div>
     </aside>

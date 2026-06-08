@@ -22,6 +22,20 @@ export function formatChange(value: number | null | undefined): { text: string; 
   }
 }
 
+/**
+ * メールアドレスをマスクして表示する。ローカル部の先頭数文字だけ残して伏せる。
+ * 例: k11mm121@gmail.com → k11m***@gmail.com / ab@x.com → a***@x.com
+ */
+export function maskEmail(email: string | null | undefined): string {
+  if (!email) return ''
+  const at = email.lastIndexOf('@')
+  if (at <= 0) return email // @ が無い/先頭にある場合はそのまま
+  const local = email.slice(0, at)
+  const domain = email.slice(at) // '@' を含むドメイン部
+  const keep = Math.min(4, Math.max(1, local.length - 1))
+  return `${local.slice(0, keep)}***${domain}`
+}
+
 export function getWeekSunday(d: Date = new Date()): Date {
   const day = d.getDay() // 0=Sun
   const diff = d.getDate() - day

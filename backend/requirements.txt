@@ -7,5 +7,11 @@ pydantic
 # 外部Postgres(Supabase/Neon等)を使う構成で必要。SQLiteのみなら未使用でも害なし。
 # DATABASE_URL は postgresql+psycopg://... の形式で指定する。
 psycopg[binary]
-# Supabase JWT(HS256) 検証用。SUPABASE_JWT_SECRET 設定時に認証を有効化する。
+# Supabase JWT 検証用。SUPABASE_JWT_SECRET（HS256）または SUPABASE_URL/JWKS（ES256/RS256）で
+# 認証を有効化する。
 PyJWT
+# 非対称署名（ES256/RS256 = Supabase 新方式の署名鍵）の検証に必須。未導入だと ES256 トークンが
+# InvalidAlgorithmError で弾かれる。
+cryptography
+# ローカル開発で backend/.env を読み込む（本番の既存env変数は上書きしない）。
+python-dotenv
