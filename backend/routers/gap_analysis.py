@@ -2,7 +2,6 @@ from datetime import date, timedelta
 from typing import Literal, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from database import get_db
 from models import RppWeekly, Target
@@ -100,11 +99,13 @@ def gap_shop(
     else:
         ym = date_str[:7] if date_str else today.strftime("%Y-%m")
         prev_ym = _prev_month(ym)
+        cur_start, cur_end = _month_bounds(ym)
+        prev_start, prev_end = _month_bounds(prev_ym)
         current_rows = db.query(RppWeekly).filter(
-            func.strftime("%Y-%m", RppWeekly.week_start) == ym
+            RppWeekly.week_start >= cur_start, RppWeekly.week_start < cur_end
         ).all()
         prev_rows = db.query(RppWeekly).filter(
-            func.strftime("%Y-%m", RppWeekly.week_start) == prev_ym
+            RppWeekly.week_start >= prev_start, RppWeekly.week_start < prev_end
         ).all()
 
     current = agg_rows(current_rows)
@@ -158,11 +159,13 @@ def gap_genre(
     else:
         ym = date_str[:7] if date_str else today.strftime("%Y-%m")
         prev_ym = _prev_month(ym)
+        cur_start, cur_end = _month_bounds(ym)
+        prev_start, prev_end = _month_bounds(prev_ym)
         current_rows = db.query(RppWeekly).filter(
-            func.strftime("%Y-%m", RppWeekly.week_start) == ym
+            RppWeekly.week_start >= cur_start, RppWeekly.week_start < cur_end
         ).all()
         prev_rows = db.query(RppWeekly).filter(
-            func.strftime("%Y-%m", RppWeekly.week_start) == prev_ym
+            RppWeekly.week_start >= prev_start, RppWeekly.week_start < prev_end
         ).all()
 
     def _matches_parent(genre_key: str) -> bool:
@@ -241,8 +244,10 @@ def gap_product(
     else:
         ym = date_str[:7] if date_str else today.strftime("%Y-%m")
         prev_ym = _prev_month(ym)
-        q_curr = db.query(RppWeekly).filter(func.strftime("%Y-%m", RppWeekly.week_start) == ym)
-        q_prev = db.query(RppWeekly).filter(func.strftime("%Y-%m", RppWeekly.week_start) == prev_ym)
+        cur_start, cur_end = _month_bounds(ym)
+        prev_start, prev_end = _month_bounds(prev_ym)
+        q_curr = db.query(RppWeekly).filter(RppWeekly.week_start >= cur_start, RppWeekly.week_start < cur_end)
+        q_prev = db.query(RppWeekly).filter(RppWeekly.week_start >= prev_start, RppWeekly.week_start < prev_end)
 
     if genre:
         # ジャンルは階層キー（大分類 "スポーツ" / 大中 "スポーツ/シューズ"）で渡される。
@@ -320,6 +325,20 @@ def _prev_month(ym: str) -> str:
     return f"{year}-{month - 1:02d}"
 
 
+def _month_bounds(ym: str) -> tuple[date, date]:
+    """'YYYY-MM' から [月初, 翌月初) の半開区間を返す。
+
+    月次フィルタは元々 func.strftime("%Y-%m", week_start) を使っていたが、strftime は
+    SQLite 専用のSQL関数で PostgreSQL(本番=Supabase)には存在せず実行時エラーになる。
+    week_start は Date 型なので、この半開区間で範囲フィルタすれば SQLite / Postgres
+    双方で同一に動く（月跨ぎ週は week_start の月に丸める従来仕様も維持される）。
+    """
+    year, month = int(ym[:4]), int(ym[5:7])
+    start = date(year, month, 1)
+    end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    return start, end
+
+
 @router.get("/kpi-tree")
 def get_kpi_tree(
     period: Literal["weekly", "monthly"] = Query("weekly"),
@@ -334,8 +353,9 @@ def get_kpi_tree(
         year_month = current_week.strftime("%Y-%m")
     else:
         year_month = date_str[:7] if date_str else today.strftime("%Y-%m")
+        m_start, m_end = _month_bounds(year_month)
         rows = db.query(RppWeekly).filter(
-            func.strftime("%Y-%m", RppWeekly.week_start) == year_month
+            RppWeekly.week_start >= m_start, RppWeekly.week_start < m_end
         ).all()
 
     target = db.query(Target).filter(Target.year_month == year_month).first()
