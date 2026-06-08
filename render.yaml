@@ -1,0 +1,37 @@
+# Render Blueprint。GitHubリポジトリを Render に接続し、この設定で1サービスを作る。
+# Docker ビルド（リポジトリ直下の Dockerfile）でフロント+バックを1コンテナにまとめ、
+# DB と認証は Supabase（Postgres + Auth）を使う。
+#
+# 必要な環境変数（Renderダッシュボード or 下の envVars で設定。値はSupabaseから取得）:
+#   DATABASE_URL          … Supabase の接続文字列を psycopg 形式に直したもの:
+#                           postgresql+psycopg://postgres.<ref>:<pass>@<host>:5432/postgres?sslmode=require
+#                           （Supabase: Project Settings → Database → Connection string → URI）
+#   SUPABASE_JWT_SECRET   … Supabase: Project Settings → API → JWT Secret（HS256検証用）
+#   VITE_SUPABASE_URL     … Supabase: Project Settings → API → Project URL（フロントのビルド時に埋め込む）
+#   VITE_SUPABASE_ANON_KEY… Supabase: Project Settings → API → anon public キー
+#   ALLOW_ORIGINS         … 同一サービス配信なら不要（任意）
+#
+# ※ VITE_* はビルド時に必要なので、Render の env として設定すれば Dockerfile の ARG が拾う。
+# ※ JWT secret / DB パスワードは sync:false（ダッシュボードで手入力）にして履歴に残さない。
+
+services:
+  - type: web
+    name: rakuten-kpi-app
+    runtime: docker
+    plan: starter            # 無料にするなら free（無アクセス時スリープあり）
+    region: singapore        # 日本に近いリージョン
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        sync: false          # Supabase接続文字列（postgresql+psycopg://...）をダッシュボードで設定
+      - key: SUPABASE_JWT_SECRET
+        sync: false          # Supabase JWT Secret をダッシュボードで設定
+      - key: VITE_SUPABASE_URL
+        sync: false
+      - key: VITE_SUPABASE_ANON_KEY
+        sync: false
+
+# メモ:
+# - SUPABASE_JWT_SECRET を設定すると全API がログイン必須になる（未設定だと認証無効＝誰でもアクセス可）。
+# - SQLite で永続ディスク運用したい場合は DATABASE_URL を sqlite:////data/rakuten_kpi.db にし、
+#   下に disk(mountPath:/data) を足す（その場合 Supabase Postgres は不要だが、認証は引き続き Supabase Auth を使う）。

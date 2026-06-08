@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+pandas
+python-multipart
+pydantic
+# 外部Postgres(Supabase/Neon等)を使う構成で必要。SQLiteのみなら未使用でも害なし。
+# DATABASE_URL は postgresql+psycopg://... の形式で指定する。
+psycopg[binary]
+# Supabase JWT(HS256) 検証用。SUPABASE_JWT_SECRET 設定時に認証を有効化する。
+PyJWT
