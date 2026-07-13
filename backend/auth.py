@@ -12,14 +12,23 @@
 ローカル開発では SUPABASE_JWT_SECRET / SUPABASE_URL いずれも未設定にすることで
 認証を無効化し、従来どおり（ログイン無し）で動かせる。
 
-将来のマルチテナント化に向けて、各リクエストのユーザーは get_current_user で一元的に
-取得できるようにしてある（現状はデータをユーザーで絞らない＝共有）。
+各リクエストのユーザーは get_current_user で一元的に取得できる。
+さらに UserContextMiddleware が検証済みユーザーIDを tenancy.current_user_id
+（ContextVar）へセットし、全DBクエリがユーザー単位に自動で絞り込まれる
+（マルチテナント。詳細は tenancy.py を参照）。
+
+※ ミドルウェアを使う理由: FastAPI の同期依存関係はスレッドプールの
+  コンテキストコピー内で実行されるため、依存関係内で ContextVar をセットしても
+  エンドポイント本体へ伝播しない。ASGI ミドルウェアなら確実に伝播する。
 """
 import logging
 import os
 from typing import Optional
 
 from fastapi import HTTPException, Request
+from starlette.concurrency import run_in_threadpool
+
+from tenancy import current_user_id
 
 logger = logging.getLogger("auth")
 
@@ -97,11 +106,8 @@ class AuthUser:
         self.email = email
 
 
-def get_current_user(request: Request) -> AuthUser:
-    # 認証無効（ローカル開発: シークレット/URL いずれも未設定）はゲストとして通す
-    if not AUTH_ENABLED:
-        return AuthUser(user_id=None, email=None)
-
+def _authenticate_from_header(request: Request) -> AuthUser:
+    """Authorization ヘッダのJWTを検証して AuthUser を返す（失敗時は401）。"""
     header = request.headers.get("Authorization", "")
     if not header.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="認証が必要です。ログインしてください。")
@@ -117,3 +123,68 @@ def get_current_user(request: Request) -> AuthUser:
         raise HTTPException(status_code=401, detail="認証トークンが無効です。再ログインしてください。")
 
     return AuthUser(user_id=payload.get("sub"), email=payload.get("email"))
+
+
+def get_current_user(request: Request) -> AuthUser:
+    # 認証無効（ローカル開発: シークレット/URL いずれも未設定）はゲストとして通す
+    if not AUTH_ENABLED:
+        return AuthUser(user_id=None, email=None)
+
+    # 通常は UserContextMiddleware が検証済みの結果を request.state に入れている
+    try:
+        user = request.state.auth_user
+    except AttributeError:
+        # ミドルウェア未導入の構成でも動くようフォールバック
+        return _authenticate_from_header(request)
+
+    if user is None:
+        detail = getattr(request.state, "auth_error", None) or "認証が必要です。ログインしてください。"
+        raise HTTPException(status_code=401, detail=detail)
+    return user
+
+
+class UserContextMiddleware:
+    """JWTを検証し、ユーザーIDを tenancy.current_user_id（ContextVar）へセットする。
+
+    - 検証結果は scope["state"]（request.state）にも格納し、get_current_user が再検証
+      せずに使えるようにする。
+    - トークンが無い/無効でもここでは 401 にしない（公開エンドポイントを壊さないため）。
+      認可の強制は従来どおり get_current_user（各 /api ルーターの依存関係）が行う。
+    """
+
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope["type"] != "http" or not AUTH_ENABLED:
+            await self.app(scope, receive, send)
+            return
+
+        user: Optional[AuthUser] = None
+        error = "認証が必要です。ログインしてください。"
+
+        raw = b""
+        for key, value in scope.get("headers") or []:
+            if key == b"authorization":
+                raw = value
+                break
+        header = raw.decode("latin-1")
+        if header.startswith("Bearer "):
+            token = header[7:].strip()
+            try:
+                # JWKS取得（初回のみHTTP）を含む同期処理なのでスレッドプールで実行
+                payload = await run_in_threadpool(_decode_token, token)
+                user = AuthUser(user_id=payload.get("sub"), email=payload.get("email"))
+            except Exception as exc:
+                logger.warning("JWT検証に失敗: %s: %s", type(exc).__name__, exc)
+                error = "認証トークンが無効です。再ログインしてください。"
+
+        state = scope.setdefault("state", {})
+        state["auth_user"] = user
+        state["auth_error"] = None if user else error
+
+        ctx_token = current_user_id.set(user.id if user else None)
+        try:
+            await self.app(scope, receive, send)
+        finally:
+            current_user_id.reset(ctx_token)

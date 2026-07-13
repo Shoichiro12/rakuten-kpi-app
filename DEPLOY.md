@@ -58,6 +58,11 @@ git push -u origin main
    - `SUPABASE_JWT_SECRET`    = ステップ1-2 の JWT Secret
    - `VITE_SUPABASE_URL`      = ステップ1-2 の Project URL
    - `VITE_SUPABASE_ANON_KEY` = ステップ1-2 の anon public キー
+   - `SUPABASE_SERVICE_ROLE_KEY` = Supabase: Settings → API → `service_role` キー
+     （**アカウント削除（退会）機能に必要**。全権限キーなのでサーバー環境変数にのみ設定し、絶対にフロントへ渡さない）
+   - `LEGACY_DATA_USER_ID`（任意・一度だけ）= マルチテナント化以前に登録した既存データを
+     引き継ぐユーザーのUUID（Supabase: Authentication → Users で確認）。
+     起動時に user_id が未設定の行をこのユーザーに割り当てる。移行が済んだら消してよい。
 4. デプロイ完了後の `https://rakuten-kpi-app-xxxx.onrender.com` をレビュアーに渡す。
 
 > `SUPABASE_JWT_SECRET` を設定すると全APIがログイン必須になります（未設定だと認証無効なので、本番では必ず設定）。
@@ -66,7 +71,8 @@ git push -u origin main
 ## ステップ4: レビュアーに共有
 
 - URL とログイン情報（メール＋パスワード）を伝える。
-- データは全員共有なので、レビュー用の初期データを入れておくか、相手に取込んでもらう。
+- **データはユーザーごとに分離**されている（マルチテナント）。レビュアーは自分のアカウントで
+  サインアップし、自分でデータを取込む（他ユーザーのデータは見えない）。
 
 ---
 

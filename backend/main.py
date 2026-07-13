@@ -21,10 +21,13 @@ from database import engine, get_db
 import models
 from models import RppWeekly, MonthlyItemSales, MonthlyAnalysis, Target, RppSales, InventoryStatus
 from sample_data import generate_sample_data
-from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export
-from auth import get_current_user, AuthUser
+from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account
+from auth import get_current_user, AuthUser, UserContextMiddleware
+from migrations import run_migrations
 
 models.Base.metadata.create_all(bind=engine)
+# 既存DBへの user_id 列追加・ユニーク制約の張り替え等（冪等）
+run_migrations(engine)
 
 app = FastAPI(title="楽天KPI管理API", version="1.0.0")
 
@@ -41,6 +44,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# JWT検証結果を request.state と tenancy.current_user_id（ContextVar）へ伝える。
+# これにより全DBクエリがログインユーザーのデータに自動で絞り込まれる（tenancy.py）。
+app.add_middleware(UserContextMiddleware)
+
 # 全 /api ルーターをログイン必須にする（SUPABASE_JWT_SECRET 未設定時は素通り＝ローカル開発）
 _auth = [Depends(get_current_user)]
 app.include_router(dashboard.router, dependencies=_auth)
@@ -51,6 +58,7 @@ app.include_router(products.router, dependencies=_auth)
 app.include_router(actions.router, dependencies=_auth)
 app.include_router(evaluation.router, dependencies=_auth)
 app.include_router(export.router, dependencies=_auth)
+app.include_router(account.router, dependencies=_auth)
 
 
 @app.exception_handler(Exception)

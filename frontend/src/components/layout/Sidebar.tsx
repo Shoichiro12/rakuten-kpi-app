@@ -10,6 +10,7 @@ import {
   Megaphone,
   FileDown,
   LogOut,
+  UserCircle,
 } from 'lucide-react'
 
 const nav = [
@@ -55,6 +56,19 @@ export default function Sidebar({ onOpenHelp, userEmail, onSignOut }: SidebarPro
         ))}
       </nav>
       <div className="px-3 pb-4 space-y-1 border-t border-gray-700 pt-3">
+        {userEmail && (
+          <NavLink
+            to="/account"
+            className={({ isActive }) =>
+              `flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg transition-colors ${
+                isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+              }`
+            }
+          >
+            <UserCircle size={16} />
+            アカウント設定
+          </NavLink>
+        )}
         <button
           onClick={onOpenHelp}
           className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"

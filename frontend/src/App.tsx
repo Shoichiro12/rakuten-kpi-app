@@ -11,6 +11,8 @@ import DataImport from './pages/DataImport'
 import TargetSetting from './pages/TargetSetting'
 import RppAnalysis from './pages/RppAnalysis'
 import Reports from './pages/Reports'
+import AccountSettings from './pages/AccountSettings'
+import ResetPassword from './pages/ResetPassword'
 import { supabase, authEnabled } from './lib/supabase'
 
 const ONBOARDING_KEY = 'rakuten-kpi-onboarding-v1'
@@ -20,6 +22,8 @@ export default function App() {
   // 認証: 無効(ローカル)なら常に通す。有効なら Supabase セッションの有無でゲート。
   const [session, setSession] = useState<Session | null>(null)
   const [authReady, setAuthReady] = useState(!authEnabled)
+  // パスワード再設定メールのリンクから戻ってきた状態（PASSWORD_RECOVERY）
+  const [recovering, setRecovering] = useState(false)
 
   useEffect(() => {
     if (!supabase) return
@@ -27,7 +31,10 @@ export default function App() {
       setSession(data.session)
       setAuthReady(true)
     })
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, s) => setSession(s))
+    const { data: sub } = supabase.auth.onAuthStateChange((event, s) => {
+      if (event === 'PASSWORD_RECOVERY') setRecovering(true)
+      setSession(s)
+    })
     return () => sub.subscription.unsubscribe()
   }, [])
 
@@ -51,6 +58,10 @@ export default function App() {
   if (!authReady) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-sm text-gray-400">読み込み中...</div>
   }
+  // パスワード再設定メールのリンク経由なら再設定画面を最優先で表示
+  if (recovering) {
+    return <ResetPassword onDone={() => setRecovering(false)} />
+  }
   // 認証有効かつ未ログインならログイン画面
   if (authEnabled && !session) {
     return <Login />
@@ -69,6 +80,7 @@ export default function App() {
             <Route path="/targets" element={<TargetSetting />} />
             <Route path="/rpp" element={<RppAnalysis />} />
             <Route path="/reports" element={<Reports />} />
+            <Route path="/account" element={<AccountSettings userEmail={session?.user?.email ?? null} />} />
           </Routes>
         </main>
       </div>

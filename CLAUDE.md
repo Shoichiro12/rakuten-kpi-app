@@ -35,8 +35,21 @@ npm run build    # tsc 型チェック + vite build（CIの代わり。型エラ
 ### バックエンド（`backend/`）
 
 - `main.py` がエントリ。起動時に `models.Base.metadata.create_all()` でSQLite（`rakuten_kpi.db`）にテーブルを自動生成する（マイグレーションツールなし＝モデル変更は手動でDB削除 or ALTER）。全例外は `global_exception_handler` が `{"detail": str(exc)}` のJSON 500に変換。CORSは `localhost:5173`/`3000` のみ許可。
-- ルーターは `backend/routers/` 配下（dashboard / import_csv / targets / gap_analysis / products / actions）。**規約: 全エンドポイントは常にJSONを返す（データ無しでも `{}`/`[]`）。** フロントはこれに依存している。
+- ルーターは `backend/routers/` 配下（dashboard / import_csv / targets / gap_analysis / products / actions / evaluation / export / account）。**規約: 全エンドポイントは常にJSONを返す（データ無しでも `{}`/`[]`）。** フロントはこれに依存している。
 - **クエリパラメータの列挙値は `typing.Literal[...]` で型注釈する。** `Query(..., enum=[...])` はPydantic v2環境ではバリデーションされず不正値が素通りする既知の落とし穴があり、`period`/`level`/`period_type` 等はすべて `Literal` に統一済み。
+
+### マルチテナント（ユーザー別データ分離）— `backend/tenancy.py`
+
+- 全データテーブルは `UserScopedMixin` を継承し `user_id` 列（SupabaseユーザーUUID）を持つ。**新しいモデルを追加するときは必ず `UserScopedMixin` を継承すること**（継承しないと全ユーザー共有になる）。
+- 絞り込みはSQLAlchemyイベントで自動適用: `do_orm_execute` が全 SELECT/UPDATE/DELETE に `user_id = 現在ユーザー` を付与（`with_loader_criteria`。集計クエリや `Query.delete()` にも効く）、`before_flush` がINSERT行に user_id をスタンプ。**ルーター側で user_id を意識する必要はない**が、生SQL（`text()`）には自動適用されないので手動で絞ること。
+- 現在ユーザーは `auth.UserContextMiddleware`（ASGI）がContextVar `tenancy.current_user_id` にセットする。FastAPIの同期依存関係内でContextVarをセットしても伝播しない（スレッドプールのコンテキストコピー）ため、ミドルウェア方式。
+- 認証無効（ローカル開発）時は `user_id IS NULL` の行のみ対象＝従来どおり単一ユーザーで動く。
+- ユニーク制約は user_id 込み。既存DBは起動時の `migrations.run_migrations()` が user_id 列追加・Postgresの制約張り替えを冪等に実行。マルチテナント化以前のデータ（user_id NULL）は env `LEGACY_DATA_USER_ID` で特定ユーザーに割り当て可能。
+
+### アカウント管理
+
+- フロント: `/account`（`AccountSettings.tsx`）＝メール変更・パスワード変更（Supabase `updateUser`）・退会。`Login.tsx` にパスワードリセットメール送信、`ResetPassword.tsx` は `PASSWORD_RECOVERY` イベント時にApp.tsxが表示。
+- バックエンド: `routers/account.py`。退会（`DELETE /api/account`）＝本人の全データ削除 + Supabase Admin APIでユーザー削除。**env `SUPABASE_SERVICE_ROLE_KEY` 必須**（未設定は501）。service_roleキーは絶対にフロントへ渡さない。
 
 ### KPI計算は `backend/calculations.py` が単一の真実
 

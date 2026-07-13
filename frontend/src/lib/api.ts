@@ -339,6 +339,13 @@ export const api = {
         'products_kpi.csv',
       ),
   },
+  /* ─── アカウント管理 ─────────────────────────────── */
+  account: {
+    /** アカウント情報（メール・登録データ件数・退会APIの利用可否） */
+    get: () => request('/account'),
+    /** 退会: 本人の全データと Supabase ユーザーを削除 */
+    delete: () => request('/account', { method: 'DELETE' }),
+  },
   sampleData: () =>
     request('/sample-data', { method: 'POST' }),
   dataStatus: () => request('/data-status'),

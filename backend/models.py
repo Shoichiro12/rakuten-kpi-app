@@ -1,8 +1,13 @@
 from sqlalchemy import Column, Integer, Float, String, Date, DateTime, Boolean, UniqueConstraint, func
 from database import Base
+from tenancy import UserScopedMixin
+
+# 全モデル UserScopedMixin を継承し user_id 列を持つ（マルチテナント対応）。
+# クエリへの絞り込み・INSERT時のスタンプは tenancy.py のイベントが自動で行う。
+# ユニーク制約は「ユーザーごとに一意」にするため user_id を含める。
 
 
-class RppWeekly(Base):
+class RppWeekly(Base, UserScopedMixin):
     __tablename__ = "rpp_weekly"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -21,7 +26,7 @@ class RppWeekly(Base):
     created_at = Column(DateTime, default=func.now())
 
 
-class MonthlyAnalysis(Base):
+class MonthlyAnalysis(Base, UserScopedMixin):
     __tablename__ = "monthly_analysis"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -36,11 +41,11 @@ class MonthlyAnalysis(Base):
     created_at = Column(DateTime, default=func.now())
 
 
-class Target(Base):
+class Target(Base, UserScopedMixin):
     __tablename__ = "targets"
 
     id = Column(Integer, primary_key=True, index=True)
-    year_month = Column(String, unique=True, nullable=False)  # YYYY-MM
+    year_month = Column(String, nullable=False)  # YYYY-MM
     target_sales = Column(Float, default=0)    # KGI売上目標
     target_access = Column(Integer, default=0) # アクセス目標
     target_cvr = Column(Float, default=0)      # CVR目標(%)
@@ -48,8 +53,12 @@ class Target(Base):
     expense_rate = Column(Float, default=0.15) # 経費率
     created_at = Column(DateTime, default=func.now())
 
+    __table_args__ = (
+        UniqueConstraint("user_id", "year_month", name="uq_target_user_month"),
+    )
 
-class ActionCheck(Base):
+
+class ActionCheck(Base, UserScopedMixin):
     __tablename__ = "action_checks"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -60,20 +69,24 @@ class ActionCheck(Base):
     created_at = Column(DateTime, default=func.now())
 
     __table_args__ = (
-        UniqueConstraint("product_url", "week_key", "action_key", name="uq_action_check"),
+        UniqueConstraint("user_id", "product_url", "week_key", "action_key", name="uq_action_check"),
     )
 
 
-class InventoryStatus(Base):
+class InventoryStatus(Base, UserScopedMixin):
     __tablename__ = "inventory_status"
 
     id = Column(Integer, primary_key=True, index=True)
-    product_url = Column(String, unique=True, nullable=False)
+    product_url = Column(String, nullable=False)
     has_inventory = Column(Boolean, default=True)
     updated_at = Column(DateTime, default=func.now())
 
+    __table_args__ = (
+        UniqueConstraint("user_id", "product_url", name="uq_inventory_user_product"),
+    )
 
-class MonthlyItemSales(Base):
+
+class MonthlyItemSales(Base, UserScopedMixin):
     __tablename__ = "monthly_item_sales"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -108,11 +121,11 @@ class MonthlyItemSales(Base):
     created_at = Column(DateTime, default=func.now())
 
     __table_args__ = (
-        UniqueConstraint("management_no", "year_month", name="uq_monthly_item"),
+        UniqueConstraint("user_id", "management_no", "year_month", name="uq_monthly_item"),
     )
 
 
-class RppSales(Base):
+class RppSales(Base, UserScopedMixin):
     __tablename__ = "rpp_sales"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -141,5 +154,5 @@ class RppSales(Base):
     created_at = Column(DateTime, default=func.now())
 
     __table_args__ = (
-        UniqueConstraint("period_type", "date_from", "date_to", "item_code", name="uq_rpp_sales"),
+        UniqueConstraint("user_id", "period_type", "date_from", "date_to", "item_code", name="uq_rpp_sales"),
     )
