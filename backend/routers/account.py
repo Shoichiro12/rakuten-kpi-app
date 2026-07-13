@@ -43,15 +43,23 @@ _ALL_MODELS = (RppWeekly, RppSales, MonthlyItemSales, MonthlyAnalysis,
 
 
 def _delete_supabase_user(user_id: str):
-    """Supabase Admin API でユーザーを削除する。"""
+    """Supabase Admin API でユーザーを削除する。
+
+    キー形式で送り方を変える:
+    - 旧形式（service_role JWT, eyJ... で始まる）… apikey + Authorization: Bearer の両方
+    - 新形式（sb_secret_... で始まる）… apikey のみ。Authorization: Bearer に入れると
+      JWTとして解釈され「Invalid JWT / Invalid API key」で拒否される（Supabase仕様）。
+    """
+    headers = {
+        "apikey": _SERVICE_ROLE_KEY,
+        "Content-Type": "application/json",
+    }
+    if not _SERVICE_ROLE_KEY.startswith("sb_secret_"):
+        headers["Authorization"] = f"Bearer {_SERVICE_ROLE_KEY}"
     req = urllib.request.Request(
         f"{_SUPABASE_URL}/auth/v1/admin/users/{user_id}",
         method="DELETE",
-        headers={
-            "apikey": _SERVICE_ROLE_KEY,
-            "Authorization": f"Bearer {_SERVICE_ROLE_KEY}",
-            "Content-Type": "application/json",
-        },
+        headers=headers,
     )
     with urllib.request.urlopen(req, timeout=15) as res:
         return res.status
