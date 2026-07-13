@@ -18,11 +18,20 @@ export interface KPIs {
   roi: number
 }
 
+export interface ShopMetrics {
+  sales: number
+  access: number
+  cv: number
+  cvr: number
+  av: number
+}
+
 export interface DashboardData {
   period: 'weekly' | 'monthly'
   period_label: string
   prev_label: string
   kpis: KPIs | null
+  shop?: ShopMetrics | null
   target_sales: number
   achievement_rate: number | null
   changes: Record<string, number | null>
@@ -47,6 +56,7 @@ export interface TrendPoint {
   cpc: number
   ctr: number
   cv: number
+  ct: number
 }
 
 export interface Target {
@@ -91,6 +101,89 @@ export interface KPITree {
   access: KPITreeNode
   cvr: KPITreeNode
   av: KPITreeNode
+}
+
+/* ─── 評価マトリクス（17パターン・目標×YoY統一判定） ─────────── */
+
+export interface EvaluationJudge {
+  key: string
+  label: string
+  actual: number
+  target: number | null
+  achieve_rate: number | null
+  prev_year: number | null
+  yoy_rate: number | null
+  target_ok: boolean | null
+  yoy_ok: boolean | null
+  achieved: boolean | null
+  basis: 'target' | 'yoy' | null
+  /** 100UUルールにより評価対象外（母数不足） */
+  excluded?: boolean
+}
+
+export interface EvaluationResult {
+  pattern_no: number
+  rank: '◎' | '○' | '△' | '×' | '−'
+  priority: '維持' | '中' | '高' | '−'
+  focus: Array<'access' | 'cvr' | 'av'>
+  comment: string
+  metrics: {
+    sales: EvaluationJudge
+    access: EvaluationJudge
+    cvr: EvaluationJudge
+    av: EvaluationJudge
+  }
+  undetermined: string[]
+  /** アクセス母数不足（100UUルール適用中） */
+  low_sample?: boolean
+  /** 母数不足の閾値（デフォルト100） */
+  min_access?: number
+}
+
+export interface EvaluationMatrixResponse {
+  period: 'weekly' | 'monthly'
+  period_label: string
+  has_data: boolean
+  has_target?: boolean
+  /** アクセスのデータ軸: shop=店舗全体UU（商品分析） / rpp=RPP広告クリック数 */
+  axis?: 'shop' | 'rpp'
+  evaluation: EvaluationResult | null
+}
+
+/* ─── アクセス逆算プラン ──────────────────────────────────────── */
+
+export interface AccessPlan {
+  target_sales: number
+  actual_gross: number
+  actual_ct: number
+  cvr: number
+  av: number
+  cpc: number
+  ad_cost: number
+  required_access: number
+  shortfall_ct: number
+  est_additional_ad_cost: number | null
+  fill_rate: number | null
+  achieved: boolean
+}
+
+export interface AccessPlanResponse {
+  period: 'weekly' | 'monthly'
+  period_label: string
+  has_data: boolean
+  has_target: boolean
+  plan: AccessPlan | null
+}
+
+/* ─── 在庫ステータス（自動連携対応） ──────────────────────────── */
+
+export interface InventoryInfo {
+  product_url: string
+  has_inventory: boolean
+  source: 'auto' | 'manual'
+  stock_count: number | null
+  zero_stock_days: number | null
+  year_month: string | null
 }
 
 export interface DataStatus {
@@ -168,6 +261,43 @@ export interface RppSummaryResponse {
   summary: RppSummaryData
 }
 
+export interface MonthlyItemsPeriod {
+  year_month: string
+  rows: number
+}
+
+export interface MonthlyItemsPeriodsResponse {
+  months: MonthlyItemsPeriod[]
+}
+
+export interface DeleteResult {
+  message: string
+  deleted?: number
+  deleted_sales?: number
+  deleted_weekly?: number
+}
+
+/* ─── データ整合性チェック（二重計上の常時監視） ─────────────── */
+
+export interface IntegrityIssue {
+  type: string
+  year_month: string | null
+  rows: number
+  fixable: boolean
+  detail: string
+}
+
+export interface IntegrityResponse {
+  ok: boolean
+  issues: IntegrityIssue[]
+}
+
+export interface IntegrityFixResult {
+  message: string
+  deleted: number
+  fixed_months: string[]
+}
+
 export interface RppImportResult {
   message?: string
   inserted?: number
@@ -175,4 +305,35 @@ export interface RppImportResult {
   period_types?: string[]
   year_months?: string[]
   format?: string
+}
+
+/* ─── かんたん取込み（zip・複数ファイル・自動判別） ───────────── */
+
+export interface AutoImportItemResult {
+  source: string
+  kind: 'rpp' | 'monthly' | 'unknown'
+  ok: boolean
+  message: string
+  count?: number
+  inserted?: number
+  updated?: number
+  year_month?: string
+}
+
+export interface AutoImportResponse {
+  results: AutoImportItemResult[]
+  ok_count: number
+  ng_count: number
+}
+
+export interface InboxFile {
+  name: string
+  size: number
+  modified: string
+  kind_guess: 'rpp' | 'monthly'
+}
+
+export interface InboxListResponse {
+  dir: string
+  files: InboxFile[]
 }

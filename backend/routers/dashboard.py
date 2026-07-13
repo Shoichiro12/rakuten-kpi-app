@@ -7,6 +7,8 @@ from sqlalchemy import func
 from database import get_db
 from models import RppWeekly, Target
 from calculations import calc_kpis, calc_change_rate
+from evaluation import MIN_ACCESS_SAMPLE
+from shop_metrics import get_shop_monthly
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -108,36 +110,53 @@ def get_dashboard(
     expense_rate = target.expense_rate if target else 0.15
     target_sales = target.target_sales if target else 0
 
+    # KGI売上は商品分析レポート（店舗全体売上）を正とする（月次のみ）。
+    # RPP経由売上はRPP広告実績として別掲。データが無い月はRPP売上へフォールバック。
+    shop = get_shop_monthly(db, year_month) if period == "monthly" else None
+
     if not current_raw:
+        achievement_rate = (
+            round(shop["sales"] / target_sales * 100, 1)
+            if shop and target_sales > 0 else None
+        )
         return {
             "period": period,
             "period_label": period_label,
             "kpis": None,
+            "shop": shop,
             "target_sales": target_sales,
-            "achievement_rate": None,
+            "achievement_rate": achievement_rate,
             "changes": {},
         }
 
     kpis = calc_kpis(**current_raw, expense_rate=expense_rate)
 
+    # 前期比・YoYとも評価に使う全KPIへ算出する（要件No.7: YoY対象KPIの拡大）
+    COMPARE_KEYS = [
+        "gross", "gp", "ad_cost", "rev", "roi", "roas",
+        "cpo", "cvr", "ctr", "cpc", "cv", "ct", "av",
+    ]
+
     changes = {}
     if prev_raw:
         prev_kpis = calc_kpis(**prev_raw, expense_rate=expense_rate)
-        for key in ["gross", "gp", "ad_cost", "rev", "roi", "roas", "cpo", "cvr", "ctr", "cpc", "cv"]:
+        for key in COMPARE_KEYS:
             changes[f"{key}_wow"] = calc_change_rate(kpis[key], prev_kpis[key])
 
     if prev_year_raw:
         prev_year_kpis = calc_kpis(**prev_year_raw, expense_rate=expense_rate)
-        for key in ["gross", "gp", "ad_cost", "rev"]:
+        for key in COMPARE_KEYS:
             changes[f"{key}_yoy"] = calc_change_rate(kpis[key], prev_year_kpis[key])
 
-    achievement_rate = round(kpis["gross"] / target_sales * 100, 1) if target_sales > 0 else None
+    kgi_sales = shop["sales"] if shop else kpis["gross"]
+    achievement_rate = round(kgi_sales / target_sales * 100, 1) if target_sales > 0 else None
 
     return {
         "period": period,
         "period_label": period_label,
         "prev_label": prev_label,
         "kpis": kpis,
+        "shop": shop,
         "target_sales": target_sales,
         "achievement_rate": achievement_rate,
         "changes": changes,
@@ -157,16 +176,20 @@ def get_alerts(
         target_date = date.fromisoformat(date_str) if date_str else today
         current_week = get_week_start(target_date)
         prev_week = current_week - timedelta(weeks=1)
+        prev_year_week = current_week - timedelta(weeks=52)
 
         current_raw = aggregate_rpp(db, current_week)
         prev_raw = aggregate_rpp(db, prev_week)
+        prev_year_raw = aggregate_rpp(db, prev_year_week)
         target_ym = current_week.strftime("%Y-%m")
     else:
         year_month = date_str[:7] if date_str else today.strftime("%Y-%m")
         # 前月は year_month から導出する（today 依存を排除）
         prev_ym = _prev_month(year_month)
+        prev_year_ym = f"{int(year_month[:4]) - 1}-{year_month[5:]}"
         current_raw = aggregate_rpp_monthly(db, year_month)
         prev_raw = aggregate_rpp_monthly(db, prev_ym)
+        prev_year_raw = aggregate_rpp_monthly(db, prev_year_ym)
         target_ym = year_month
 
     if not current_raw:
@@ -179,6 +202,59 @@ def get_alerts(
 
     kpis = calc_kpis(**current_raw, expense_rate=expense_rate)
     prev_kpis = calc_kpis(**prev_raw, expense_rate=expense_rate) if prev_raw else None
+    prev_year_kpis = calc_kpis(**prev_year_raw, expense_rate=expense_rate) if prev_year_raw else None
+
+    # --- データ整合性チェック（二重計上の常時監視） ---
+    # 週次×月次RPPレポート混在による二重計上を検出したら最優先で警告する。
+    # 数値がすべて信用できなくなるため、他のどのアラートよりも重要。
+    from routers.import_csv import detect_rpp_double_count
+    integrity_issues = detect_rpp_double_count(db, year_month=target_ym)
+    for issue in integrity_issues:
+        alerts.append({
+            "type": "danger",
+            "metric": "データ二重計上",
+            "message": f"⚠️ {issue['detail']} データ取込み画面から修復できます。",
+        })
+
+    # --- 統一判定ロジック（目標比×YoY）に基づくアラート（要件No.2） ---
+    # 従来の前期比・固定しきい値アラートに加え、目標とYoYの両軸で評価する。
+    target_sales = target.target_sales if target and target.target_sales > 0 else None
+    if target_sales:
+        achieve = kpis["gross"] / target_sales * 100
+        # 週次は月次目標に対する進捗のため、ここでは月次のみ判定する
+        if period == "monthly" and achieve < 100:
+            alerts.append({
+                "type": "danger" if achieve < 70 else "warning",
+                "metric": "売上目標",
+                "message": f"売上目標が未達です（達成率: {achieve:.1f}% / 目標: ¥{target_sales:,.0f}）",
+            })
+
+    # 100UUルール（要件No.6）: アクセス母数が閾値未満の期間は、CVR・客単価の
+    # 評価・アラートを保留する（母数不足で統計的に信用できないため）。
+    low_sample = kpis["ct"] < MIN_ACCESS_SAMPLE
+    if low_sample:
+        alerts.append({
+            "type": "warning",
+            "metric": "アクセス母数不足",
+            "message": (
+                f"アクセス（クリック数）が{MIN_ACCESS_SAMPLE}未満です"
+                f"（現在: {kpis['ct']:,}）。母数不足のためCVR・客単価の評価を保留しています。"
+                "まずアクセス対策で母数を確保しましょう。"
+            ),
+        })
+
+    if prev_year_kpis:
+        yoy_keys = [("gross", "売上")] if low_sample else [
+            ("gross", "売上"), ("cvr", "CVR"), ("av", "客単価"),
+        ]
+        for key, label in yoy_keys:
+            if prev_year_kpis[key] > 0 and kpis[key] < prev_year_kpis[key]:
+                yoy = kpis[key] / prev_year_kpis[key] * 100
+                alerts.append({
+                    "type": "warning",
+                    "metric": f"{label}（YoY）",
+                    "message": f"{label}が前年同期を下回っています（YoY: {yoy:.1f}%）",
+                })
 
     if kpis["ctr"] < 1.0:
         alerts.append({
@@ -202,7 +278,8 @@ def get_alerts(
                 "message": f"CPCが上昇トレンドです（前期: ¥{prev_kpis['cpc']:,.0f} → 現在: ¥{kpis['cpc']:,.0f}）",
             })
 
-        if kpis["cvr"] < prev_kpis["cvr"] * 0.95:
+        # CVR低下アラートも母数不足時は保留（100UUルール）
+        if not low_sample and kpis["cvr"] < prev_kpis["cvr"] * 0.95:
             alerts.append({
                 "type": "warning",
                 "metric": "CVR",
@@ -210,6 +287,7 @@ def get_alerts(
             })
 
     return {"alerts": alerts}
+
 
 
 @router.get("/trend")
@@ -229,14 +307,14 @@ def get_trend(
             result.append({
                 "week": week_start.isoformat(),
                 "label": f"{week_start.month}/{week_start.day}",
-                **{k: kpis[k] for k in ["gross", "gp", "ad_cost", "rev", "roi", "roas", "cvr", "cpc", "ctr", "cv"]},
+                **{k: kpis[k] for k in ["gross", "gp", "ad_cost", "rev", "roi", "roas", "cvr", "cpc", "ctr", "cv", "ct"]},
             })
         else:
             result.append({
                 "week": week_start.isoformat(),
                 "label": f"{week_start.month}/{week_start.day}",
                 "gross": 0, "gp": 0, "ad_cost": 0, "rev": 0,
-                "roi": 0, "roas": 0, "cvr": 0, "cpc": 0, "ctr": 0, "cv": 0,
+                "roi": 0, "roas": 0, "cvr": 0, "cpc": 0, "ctr": 0, "cv": 0, "ct": 0,
             })
 
     return {"trend": result}

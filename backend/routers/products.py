@@ -2,7 +2,6 @@ from datetime import date, timedelta
 from typing import Literal, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from database import get_db
 from models import RppWeekly
@@ -14,6 +13,18 @@ router = APIRouter(prefix="/api/products", tags=["products"])
 def get_week_start(d: date) -> date:
     weekday = d.isoweekday() % 7
     return d - timedelta(days=weekday)
+
+
+def _month_bounds(ym: str) -> tuple[date, date]:
+    """'YYYY-MM' から [月初, 翌月初) の半開区間を返す。
+
+    strftime は SQLite 専用SQL関数で PostgreSQL(本番=Supabase)では動かないため、
+    Date型の範囲フィルタに統一する（gap_analysis.py と同方針）。
+    """
+    year, month = int(ym[:4]), int(ym[5:7])
+    start = date(year, month, 1)
+    end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    return start, end
 
 
 @router.get("")
@@ -31,26 +42,63 @@ def list_products(
         q = db.query(RppWeekly).filter(RppWeekly.week_start == week_start)
     else:
         ym = date_str[:7] if date_str else today.strftime("%Y-%m")
-        q = db.query(RppWeekly).filter(func.strftime("%Y-%m", RppWeekly.week_start) == ym)
+        m_start, m_end = _month_bounds(ym)
+        q = db.query(RppWeekly).filter(
+            RppWeekly.week_start >= m_start, RppWeekly.week_start < m_end
+        )
 
     if genre:
         q = q.filter(RppWeekly.genre == genre)
 
-    rows = q.order_by(RppWeekly.gross.desc()).all()
+    rows = q.all()
+
+    # 月次では同一商品が週ごとに複数レコード存在するため、商品管理番号
+    # （無ければ商品URL）をキーに合算して1商品=1行に統一する。
+    # 商品名・ジャンル・URLは最新週（week_start 最大）のレコードの値を採用する。
+    # 週次でも同一キーは1件のみなので、同じ集約処理で安全に動作する。
+    agg: dict = {}
+    for r in rows:
+        key = r.management_no or r.product_url
+        if key not in agg:
+            agg[key] = {
+                "product_url": r.product_url,
+                "management_no": r.management_no,
+                "product_name": r.product_name,
+                "genre": r.genre,
+                "week_start": r.week_start,
+                "gross": 0.0, "cost_of_sales": 0.0, "ad_cost": 0.0,
+                "cv": 0, "ct": 0, "_ctr_sum": 0.0,
+            }
+        a = agg[key]
+        a["gross"] += r.gross
+        a["cost_of_sales"] += r.cost_of_sales
+        a["ad_cost"] += r.ad_cost
+        a["cv"] += r.cv
+        a["ct"] += r.ct
+        a["_ctr_sum"] += r.ctr * r.ct  # ct加重平均用
+        # 最新週の属性（商品名・ジャンル・URL）で上書き
+        if r.week_start >= a["week_start"]:
+            a["week_start"] = r.week_start
+            a["product_url"] = r.product_url
+            a["management_no"] = r.management_no
+            a["product_name"] = r.product_name
+            a["genre"] = r.genre
 
     result = []
-    for r in rows:
-        kpis = calc_kpis(r.gross, r.cost_of_sales, r.ad_cost, r.cv, r.ct, ctr=r.ctr)
+    for a in agg.values():
+        ctr = a["_ctr_sum"] / a["ct"] if a["ct"] > 0 else 0.0
+        kpis = calc_kpis(a["gross"], a["cost_of_sales"], a["ad_cost"], a["cv"], a["ct"], ctr=ctr)
         result.append({
-            "product_url": r.product_url,
-            "management_no": r.management_no,
-            "product_name": r.product_name,
-            "genre": r.genre,
-            "week_start": r.week_start.isoformat() if period == "weekly" else None,
+            "product_url": a["product_url"],
+            "management_no": a["management_no"],
+            "product_name": a["product_name"],
+            "genre": a["genre"],
+            "week_start": a["week_start"].isoformat() if period == "weekly" else None,
             **kpis,
             "limit_cpo_exceeded": kpis["cpo"] > kpis["limit_cpo"] if kpis["limit_cpo"] > 0 else False,
         })
 
+    result.sort(key=lambda x: x["gross"], reverse=True)
     return {"products": result, "count": len(result)}
 
 

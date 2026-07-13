@@ -6,36 +6,46 @@ import AlertPanel from '../components/dashboard/AlertPanel'
 import KPIChart, { MultiLineChart } from '../components/dashboard/KPIChart'
 import PeriodSelector from '../components/PeriodSelector'
 import EmptyState from '../components/EmptyState'
+import EvaluationMatrix from '../components/EvaluationMatrix'
+import AccessPlanner from '../components/dashboard/AccessPlanner'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
 import { usePeriodState } from '../lib/usePeriodState'
-import type { DashboardData, Alert, TrendPoint } from '../types'
+import type { DashboardData, Alert, TrendPoint, EvaluationResult, AccessPlan } from '../types'
 
 export default function Dashboard() {
   const { period, dateValue, setPeriod, setDateValue } = usePeriodState()
   const [data, setData] = useState<DashboardData | null>(null)
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [trend, setTrend] = useState<TrendPoint[]>([])
+  const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null)
+  const [accessPlan, setAccessPlan] = useState<AccessPlan | null>(null)
   const [loading, setLoading] = useState(false)
-  const [activeChart, setActiveChart] = useState<'gross' | 'gp' | 'roi' | 'cvr' | 'roas'>('gross')
+  const [activeChart, setActiveChart] = useState<'gross' | 'gp' | 'roi' | 'cvr' | 'roas' | 'ct' | 'cpc'>('gross')
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const dateParam = period === 'monthly' ? dateValue.slice(0, 7) : dateValue
-      const [dash, als, tr] = await Promise.all([
+      const [dash, als, tr, evalRes, planRes] = await Promise.all([
         api.dashboard.get(period, dateParam) as Promise<DashboardData | null>,
         api.dashboard.alerts(period, dateParam) as Promise<{ alerts?: Alert[] } | null>,
         api.dashboard.trend(8) as Promise<{ trend?: TrendPoint[] } | null>,
+        api.evaluation.matrix(period, dateParam).catch(() => null),
+        api.evaluation.accessPlan(period, dateParam).catch(() => null),
       ])
       setData(dash ?? null)
       setAlerts(als?.alerts ?? [])
       setTrend(tr?.trend ?? [])
+      setEvaluation(evalRes?.evaluation ?? null)
+      setAccessPlan(planRes?.plan ?? null)
     } catch (e) {
       console.error('[Dashboard] データ取得エラー:', e)
       setData(null)
       setAlerts([])
       setTrend([])
+      setEvaluation(null)
+      setAccessPlan(null)
     } finally {
       setLoading(false)
     }
@@ -54,6 +64,8 @@ export default function Dashboard() {
     roi: { metric: 'roi' as const, label: 'ROI(%)', color: '#9333ea', formatter: (v: number) => `${v.toFixed(1)}%` },
     cvr: { metric: 'cvr' as const, label: 'CVR(%)', color: '#ea580c', formatter: (v: number) => `${v.toFixed(2)}%` },
     roas: { metric: 'roas' as const, label: 'ROAS(%)', color: '#0891b2', formatter: (v: number) => `${v.toFixed(1)}%` },
+    ct: { metric: 'ct' as const, label: 'アクセス(CT)', color: '#0d9488', formatter: (v: number) => v.toLocaleString() },
+    cpc: { metric: 'cpc' as const, label: 'CPC(円)', color: '#dc2626', formatter: (v: number) => `¥${v.toLocaleString()}` },
   }
 
   return (
@@ -87,11 +99,18 @@ export default function Dashboard() {
         )}
 
         {kpis && <div className="p-6 space-y-6">
-        {/* KGI達成率 */}
+        {/* KGI達成率（月次は商品分析レポート＝店舗全体売上を正とする） */}
         {kpis && data?.target_sales && data.target_sales > 0 && (
           <div className="bg-white rounded-xl border p-4 shadow-sm">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm font-medium text-gray-600">KGI 売上目標達成率</p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-gray-600">KGI 売上目標達成率</p>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                  data.shop ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
+                }`}>
+                  {data.shop ? '商品分析ベース（店舗全体）' : 'RPP経由売上ベース'}
+                </span>
+              </div>
               <span className="text-lg font-bold text-gray-900">
                 {data.achievement_rate?.toFixed(1)}%
               </span>
@@ -109,10 +128,23 @@ export default function Dashboard() {
               />
             </div>
             <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>実績: {formatCurrency(kpis.gross)}</span>
+              <span>
+                実績: {formatCurrency(data.shop ? data.shop.sales : kpis.gross)}
+                {data.shop && <span className="text-gray-400">（RPP経由: {formatCurrency(kpis.gross)}）</span>}
+              </span>
               <span>目標: {formatCurrency(data.target_sales)}</span>
             </div>
           </div>
+        )}
+
+        {/* 評価マトリクス（17パターン・目標×YoY統一判定） */}
+        {evaluation && (
+          <EvaluationMatrix evaluation={evaluation} />
+        )}
+
+        {/* アクセス逆算パネル（売上の最速レバー＝アクセスの現在地） */}
+        {accessPlan && (
+          <AccessPlanner plan={accessPlan} />
         )}
 
         {/* アラート */}
@@ -123,32 +155,81 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* メインKPIカード */}
+        {/* ===== 主要KPI（ヒーローカード：利益・売上の最重要4指標） ===== */}
         <div>
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">サマリKPI</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <h3 className="text-base font-bold text-gray-900 mb-3">主要KPI</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
             <KPICard
+              size="hero"
               label="Rev（営業利益）"
               value={formatCurrency(kpis?.rev)}
               change={changes.rev_wow}
+              yoy={changes.rev_yoy}
               changeLabel="前期比"
-              variant={kpis && kpis.rev < 0 ? 'danger' : 'default'}
+              variant={kpis && kpis.rev < 0 ? 'danger' : 'success'}
               helpMetric="Rev"
             />
             <KPICard
+              size="hero"
               label="ROI（投資利益率）"
               value={formatPercent(kpis?.roi)}
               change={changes.roi_wow}
+              yoy={changes.roi_yoy}
               changeLabel="前期比"
               alert={kpis != null && kpis.roi < 100}
               variant={kpis && kpis.roi < 100 ? 'danger' : 'default'}
               helpMetric="ROI"
             />
             <KPICard
+              size="hero"
+              label="RPP売上（Gross）"
+              value={formatCurrency(kpis?.gross)}
+              change={changes.gross_wow}
+              yoy={changes.gross_yoy}
+              changeLabel="前期比"
+              variant="primary"
+              helpMetric="Gross"
+            />
+            <KPICard
+              size="hero"
+              label="売上総利益（GP）"
+              value={formatCurrency(kpis?.gp)}
+              change={changes.gp_wow}
+              yoy={changes.gp_yoy}
+              changeLabel="前期比"
+              helpMetric="GP"
+            />
+          </div>
+        </div>
+
+        {/* ===== 効率指標（標準カード：広告効率・転換系） ===== */}
+        <div>
+          <h3 className="text-sm font-semibold text-gray-600 mb-3">効率指標</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <KPICard
+              label="ROAS（売上回収率）"
+              value={formatPercent(kpis?.roas)}
+              change={changes.roas_wow}
+              yoy={changes.roas_yoy}
+              changeLabel="前期比"
+              helpMetric="ROAS"
+            />
+            <KPICard
+              label="CVR（注文率）"
+              value={formatPercent(kpis?.cvr, 2)}
+              change={changes.cvr_wow}
+              yoy={changes.cvr_yoy}
+              changeLabel="前期比"
+              alert={kpis != null && changes.cvr_wow != null && changes.cvr_wow < -5}
+              helpMetric="CVR"
+            />
+            <KPICard
               label="CPO（注文獲得単価）"
               value={formatCurrency(kpis?.cpo)}
               change={changes.cpo_wow ? -changes.cpo_wow : null}
+              yoy={changes.cpo_yoy ? -changes.cpo_yoy : null}
               changeLabel="前期比"
+              alert={kpis != null && kpis.limit_cpo != null && kpis.cpo > kpis.limit_cpo}
               helpMetric="CPO"
             />
             <KPICard
@@ -156,79 +237,48 @@ export default function Dashboard() {
               value={formatCurrency(kpis?.limit_cpo)}
               helpMetric="Limit CPO"
             />
+            <KPICard
+              label="CTR（クリック率）"
+              value={formatPercent(kpis?.ctr, 2)}
+              alert={kpis != null && kpis.ctr < 1}
+              helpMetric="CTR"
+            />
+            <KPICard
+              label="CPC（クリック単価）"
+              value={formatCurrency(kpis?.cpc)}
+              change={changes.cpc_wow ? -changes.cpc_wow : null}
+              yoy={changes.cpc_yoy ? -changes.cpc_yoy : null}
+              changeLabel="前期比"
+              alert={kpis != null && changes.cpc_wow != null && changes.cpc_wow > 5}
+              helpMetric="CPC"
+            />
+            <KPICard
+              label="客単価（Av）"
+              value={formatCurrency(kpis?.av)}
+              helpMetric="Av"
+            />
+            <KPICard
+              label="GP率（GPR）"
+              value={formatPercent(kpis?.gpr)}
+              helpMetric="GPR"
+            />
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <KPICard
-            label="RPP売上（Gross）"
-            value={formatCurrency(kpis?.gross)}
-            change={changes.gross_wow}
-            changeLabel="前期比"
-            variant="primary"
-            helpMetric="Gross"
-          />
-          <KPICard
-            label="売上総利益（GP）"
-            value={formatCurrency(kpis?.gp)}
-            change={changes.gp_wow}
-            changeLabel="前期比"
-            helpMetric="GP"
-          />
-          <KPICard
-            label="GP率（GPR）"
-            value={formatPercent(kpis?.gpr)}
-            helpMetric="GPR"
-          />
-          <KPICard
-            label="客単価（Av）"
-            value={formatCurrency(kpis?.av)}
-            helpMetric="Av"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <KPICard
-            label="ROAS（売上回収率）"
-            value={formatPercent(kpis?.roas)}
-            change={changes.roas_wow}
-            changeLabel="前期比"
-            helpMetric="ROAS"
-          />
-          <KPICard
-            label="CVR（注文率）"
-            value={formatPercent(kpis?.cvr, 2)}
-            change={changes.cvr_wow}
-            changeLabel="前期比"
-            alert={kpis != null && changes.cvr_wow != null && changes.cvr_wow < -5}
-            helpMetric="CVR"
-          />
-          <KPICard
-            label="CTR（クリック率）"
-            value={formatPercent(kpis?.ctr, 2)}
-            alert={kpis != null && kpis.ctr < 1}
-            helpMetric="CTR"
-          />
-          <KPICard
-            label="CPC（クリック単価）"
-            value={formatCurrency(kpis?.cpc)}
-            change={changes.cpc_wow ? -changes.cpc_wow : null}
-            changeLabel="前期比"
-            alert={kpis != null && changes.cpc_wow != null && changes.cpc_wow > 5}
-            helpMetric="CPC"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          <KPICard
-            label="広告費（AdCost）"
-            value={formatCurrency(kpis?.ad_cost)}
-            change={changes.ad_cost_wow}
-            changeLabel="前期比"
-          />
-          <KPICard label="注文件数（CV）" value={formatNumber(kpis?.cv)} change={changes.cv_wow} changeLabel="前期比" />
-          <KPICard label="クリック数（CT）" value={formatNumber(kpis?.ct)} />
-          <KPICard label="店舗運営経費" value={formatCurrency(kpis?.steady_cost)} />
+        {/* ===== 参考指標（コンパクトカード：ボリューム・コスト系） ===== */}
+        <div>
+          <h3 className="text-xs font-semibold text-gray-400 mb-2">参考指標</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+            <KPICard
+              size="compact"
+              label="広告費（AdCost）"
+              value={formatCurrency(kpis?.ad_cost)}
+              change={changes.ad_cost_wow}
+            />
+            <KPICard size="compact" label="注文件数（CV）" value={formatNumber(kpis?.cv)} change={changes.cv_wow} />
+            <KPICard size="compact" label="クリック数（CT）" value={formatNumber(kpis?.ct)} />
+            <KPICard size="compact" label="店舗運営経費" value={formatCurrency(kpis?.steady_cost)} />
+          </div>
         </div>
 
         {/* トレンドチャート */}

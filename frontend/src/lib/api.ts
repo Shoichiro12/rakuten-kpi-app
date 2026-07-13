@@ -100,6 +100,52 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return data as T
 }
 
+/**
+ * CSV等のファイルをダウンロードする。
+ * - JSONではなくblobで受け取り、Content-Disposition のファイル名でダウンロードを発火する。
+ * - サーバーが filename*（RFC5987, UTF-8）を返す場合は日本語ファイル名を優先採用する。
+ */
+async function downloadCsv(path: string, fallbackName = 'export.csv'): Promise<void> {
+  const auth = await authHeaders()
+  let res: Response
+  try {
+    res = await fetch(`${BASE}${path}`, { headers: auth })
+  } catch (e) {
+    console.error(`[API] ネットワークエラー (${path}):`, e)
+    throw new Error('サーバーに接続できませんでした。バックエンドが起動しているか確認してください。')
+  }
+  if (!res.ok) {
+    // エラー時はJSONボディの detail を拾って日本語メッセージ化する
+    let msg = `HTTPエラー ${res.status}`
+    try {
+      const d = JSON.parse(await res.text()) as { detail?: string }
+      if (d?.detail) msg = d.detail
+    } catch {
+      /* ボディがJSONでない場合はステータスのみ */
+    }
+    console.error(`[API] ダウンロード失敗 ${res.status} ${path}:`, msg)
+    throw new Error(msg)
+  }
+
+  // ファイル名を Content-Disposition から取得（filename* を優先）
+  const disp = res.headers.get('content-disposition') || ''
+  let filename = fallbackName
+  const star = disp.match(/filename\*=UTF-8''([^;]+)/i)
+  const plain = disp.match(/filename="?([^";]+)"?/i)
+  if (star) filename = decodeURIComponent(star[1])
+  else if (plain) filename = plain[1]
+
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = filename
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
+
 export const api = {
   dashboard: {
     get: (period: string, date?: string) =>
@@ -108,6 +154,18 @@ export const api = {
       request(`/dashboard/alerts?period=${period}${date ? `&date=${date}` : ''}`),
     trend: (weeks = 8) =>
       request(`/dashboard/trend?weeks=${weeks}`),
+  },
+  evaluation: {
+    /** 17パターン評価マトリクス（目標×YoY統一判定） */
+    matrix: (period: string, date?: string) =>
+      request<import('../types').EvaluationMatrixResponse>(
+        `/evaluation/matrix?period=${period}${date ? `&date=${date}` : ''}`,
+      ),
+    /** アクセス逆算プラン（目標売上→必要アクセス→不足分→想定追加広告費） */
+    accessPlan: (period: string, date?: string) =>
+      request<import('../types').AccessPlanResponse>(
+        `/evaluation/access-plan?period=${period}${date ? `&date=${date}` : ''}`,
+      ),
   },
   gap: {
     shop: (period: string, date?: string) =>
@@ -132,6 +190,30 @@ export const api = {
       request('/targets', { method: 'POST', body: JSON.stringify(data) }),
   },
   import: {
+    /** まとめて取込み: CSV/zip 複数ファイルを種別自動判別で一括インポート */
+    auto: async (files: File[]) => {
+      const form = new FormData()
+      files.forEach((f) => form.append('files', f))
+      let r: Response
+      try {
+        r = await fetch(`${BASE}/import/auto`, { method: 'POST', body: form, headers: await authHeaders() })
+      } catch (e) {
+        console.error('[API] ネットワークエラー (importAuto):', e)
+        throw new Error('サーバーに接続できませんでした。バックエンドが起動しているか確認してください。')
+      }
+      return await parseJson(r) as import('../types').AutoImportResponse | undefined
+    },
+    /** ダウンロードフォルダ内のRMSレポート候補一覧 */
+    inboxList: () =>
+      request<import('../types').InboxListResponse>('/import/inbox').then(
+        (d) => d ?? { dir: '', files: [] },
+      ),
+    /** ダウンロードフォルダ内の指定ファイルを取込み */
+    inboxImport: (names: string[]) =>
+      request<import('../types').AutoImportResponse>('/import/inbox', {
+        method: 'POST',
+        body: JSON.stringify({ files: names }),
+      }),
     rpp: (csvText: string, overwrite = false) =>
       request('/import/rpp', {
         method: 'POST',
@@ -169,6 +251,24 @@ export const api = {
       }
       return await parseJson(r) as Record<string, unknown> | undefined
     },
+    /** データ整合性チェック（二重計上等の検出） */
+    integrity: () =>
+      request<import('../types').IntegrityResponse>('/import/integrity').then(
+        (d) => d ?? { ok: true, issues: [] },
+      ),
+    /** 自動修復可能な整合性問題を修復 */
+    integrityFix: () =>
+      request<import('../types').IntegrityFixResult>('/import/integrity/fix', { method: 'POST' }),
+    /** インポート済み月次商品分析データの年月一覧 */
+    monthlyItemsPeriods: () =>
+      request<import('../types').MonthlyItemsPeriodsResponse>('/import/monthly-items/periods').then(
+        (d) => d ?? { months: [] },
+      ),
+    /** 指定年月の月次商品分析データを削除 */
+    monthlyItemsDelete: (yearMonth: string) =>
+      request<import('../types').DeleteResult>(`/import/monthly-items/${encodeURIComponent(yearMonth)}`, {
+        method: 'DELETE',
+      }),
     monthlyItemsUpload: async (file: File, overwrite = false) => {
       const form = new FormData()
       form.append('file', file)
@@ -203,6 +303,16 @@ export const api = {
         `/import/rpp/sales${qs ? `?${qs}` : ''}`,
       ).then((d) => d ?? { total: 0, count: 0, offset: 0, limit: 50, items: [] })
     },
+    /** 期間指定でRPPデータを個別削除（weekly: date_from/date_to, monthly: year_month） */
+    deletePeriod: (params: { period_type: 'weekly' | 'monthly'; date_from?: string; date_to?: string; year_month?: string }) => {
+      const q = new URLSearchParams({ period_type: params.period_type })
+      if (params.date_from) q.set('date_from', params.date_from)
+      if (params.date_to) q.set('date_to', params.date_to)
+      if (params.year_month) q.set('year_month', params.year_month)
+      return request<import('../types').DeleteResult>(`/import/rpp/period?${q.toString()}`, {
+        method: 'DELETE',
+      })
+    },
     /** 期間サマリー */
     summary: (params: RppSummaryParams = {}) => {
       const q = new URLSearchParams()
@@ -216,6 +326,19 @@ export const api = {
       ).then((d) => d ?? null)
     },
   },
+  /* ─── レポート・CSVエクスポート（要件No.9） ───────────────────
+   * CSVはJSONではなくblobで受け取り、ブラウザのダウンロードを発火する。 */
+  export: {
+    /** KPIサマリCSVをダウンロード */
+    summary: (period: string, date?: string) =>
+      downloadCsv(`/export/summary?period=${period}${date ? `&date=${date}` : ''}`, 'kpi_summary.csv'),
+    /** 商品別KPI CSVをダウンロード */
+    products: (period: string, date?: string, genre?: string) =>
+      downloadCsv(
+        `/export/products?period=${period}${date ? `&date=${date}` : ''}${genre ? `&genre=${encodeURIComponent(genre)}` : ''}`,
+        'products_kpi.csv',
+      ),
+  },
   sampleData: () =>
     request('/sample-data', { method: 'POST' }),
   dataStatus: () => request('/data-status'),
@@ -228,8 +351,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ product_url: productUrl, week_key: weekKey, action_key: actionKey }),
       }),
-    getInventory: (productUrl: string) =>
-      request(`/actions/inventory?product_url=${encodeURIComponent(productUrl)}`),
+    getInventory: (productUrl: string, managementNo?: string) =>
+      request(`/actions/inventory?product_url=${encodeURIComponent(productUrl)}${managementNo ? `&management_no=${encodeURIComponent(managementNo)}` : ''}`),
     toggleInventory: (productUrl: string) =>
       request('/actions/inventory/toggle', {
         method: 'POST',

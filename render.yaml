@@ -18,7 +18,7 @@ services:
   - type: web
     name: rakuten-kpi-app
     runtime: docker
-    plan: starter            # 無料にするなら free（無アクセス時スリープあり）
+    plan: free               # 無料プラン（無アクセス時スリープあり）。常時起動にするなら starter
     region: singapore        # 日本に近いリージョン
     healthCheckPath: /api/health
     envVars:

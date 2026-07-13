@@ -8,6 +8,7 @@ import {
   Target,
   HelpCircle,
   Megaphone,
+  FileDown,
   LogOut,
 } from 'lucide-react'
 
@@ -18,6 +19,7 @@ const nav = [
   { to: '/rpp', icon: Megaphone, label: 'RPP広告実績' },
   { to: '/import', icon: Upload, label: 'データ取込み' },
   { to: '/targets', icon: Target, label: '目標設定' },
+  { to: '/reports', icon: FileDown, label: 'レポート出力' },
 ]
 
 interface SidebarProps {

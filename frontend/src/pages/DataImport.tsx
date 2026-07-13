@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import {
   Upload, ClipboardPaste, CheckCircle, Sparkles, Eye,
   Package, ChevronDown, ChevronRight, HelpCircle, Megaphone, BarChart3,
-  Trash2, ArrowRight, ExternalLink,
+  Trash2, ArrowRight, ExternalLink, XCircle, FolderDown,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
@@ -11,7 +11,7 @@ import ErrorBanner from '../components/ErrorBanner'
 import { supabase, authEnabled } from '../lib/supabase'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent } from '../lib/utils'
-import type { DataStatus, RppPeriods, RppImportResult } from '../types'
+import type { DataStatus, RppPeriods, RppImportResult, AutoImportResponse, InboxListResponse, MonthlyItemsPeriod, IntegrityResponse } from '../types'
 
 const RPP_TEMPLATE = `計測期間,商品URL,管理番号,商品名,ジャンル,RPP売上,売上原価,広告費,注文件数,クリック数,CTR(%),CPC(円)
 2024-01-07,https://item.rakuten.co.jp/shop/item001/,ITEM-001,サンプル商品A,スポーツ/シューズ,150000,90000,18000,30,1200,1.5,150
@@ -86,6 +86,48 @@ function DropZone({
         ref={inputRef}
         type="file"
         accept=".csv"
+        onChange={(e) => { pick(e.target.files); e.target.value = '' }}
+        className="hidden"
+      />
+    </div>
+  )
+}
+
+/* ─── まとめて取込みドロップゾーン（複数ファイル・zip対応） ──────── */
+function MultiDropZone({ onFiles, loading }: { onFiles: (files: File[]) => void; loading: boolean }) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [dragging, setDragging] = useState(false)
+
+  const pick = (files: FileList | null) => {
+    if (!files || files.length === 0) return
+    onFiles(Array.from(files))
+  }
+
+  return (
+    <div
+      onClick={() => inputRef.current?.click()}
+      onDragOver={(e) => { e.preventDefault(); setDragging(true) }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={(e) => { e.preventDefault(); setDragging(false); pick(e.dataTransfer.files) }}
+      className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition-colors ${
+        loading
+          ? 'opacity-50 pointer-events-none'
+          : dragging
+            ? 'border-emerald-500 bg-emerald-50'
+            : 'border-emerald-300 bg-emerald-50/40 hover:border-emerald-400 hover:bg-emerald-50'
+      }`}
+    >
+      <Upload size={34} className={`mx-auto mb-3 ${dragging ? 'text-emerald-500' : 'text-emerald-400'}`} />
+      <p className="text-sm font-bold text-gray-800">RMSからダウンロードしたファイルをここに放り込むだけ</p>
+      <p className="text-xs text-gray-500 mt-1.5">
+        zipのままでOK・複数ファイル同時OK・種別は自動判別（RPP広告 / 商品分析）
+      </p>
+      {loading && <p className="text-xs text-emerald-600 mt-2">取込み中...</p>}
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".csv,.zip"
+        multiple
         onChange={(e) => { pick(e.target.files); e.target.value = '' }}
         className="hidden"
       />
@@ -267,6 +309,13 @@ export default function DataImport() {
   const [loading, setLoading] = useState(false)
   const [dataStatus, setDataStatus] = useState<DataStatus | null>(null)
   const [rppPeriods, setRppPeriods] = useState<RppPeriods | null>(null)
+  const [monthlyPeriods, setMonthlyPeriods] = useState<MonthlyItemsPeriod[]>([])
+  const [integrity, setIntegrity] = useState<IntegrityResponse | null>(null)
+
+  // まとめて取込みの結果・ダウンロードフォルダ候補
+  const [autoResults, setAutoResults] = useState<AutoImportResponse | null>(null)
+  const [inbox, setInbox] = useState<InboxListResponse | null>(null)
+  const [inboxSel, setInboxSel] = useState<Set<string>>(new Set())
 
   // 月次プレビュー state
   const [monthlyPreview, setMonthlyPreview] = useState<MonthlyItemsPreview | null>(null)
@@ -291,16 +340,134 @@ export default function DataImport() {
     } catch { /* 取得失敗は無視 */ }
   }, [])
 
+  const loadInbox = useCallback(async () => {
+    try {
+      const r = await api.import.inboxList()
+      setInbox(r)
+      setInboxSel(new Set(r.files.map((f) => f.name)))
+    } catch { /* 取得失敗は無視（候補カードを出さないだけ） */ }
+  }, [])
+
+  const loadMonthlyPeriods = useCallback(async () => {
+    try {
+      const r = await api.import.monthlyItemsPeriods()
+      setMonthlyPeriods(r.months)
+    } catch { /* 取得失敗は無視 */ }
+  }, [])
+
+  const loadIntegrity = useCallback(async () => {
+    try {
+      const r = await api.import.integrity()
+      setIntegrity(r)
+    } catch { /* 取得失敗は無視 */ }
+  }, [])
+
   useEffect(() => {
     loadStatus()
     loadRppPeriods()
-  }, [loadStatus, loadRppPeriods])
+    loadInbox()
+    loadMonthlyPeriods()
+    loadIntegrity()
+  }, [loadStatus, loadRppPeriods, loadInbox, loadMonthlyPeriods, loadIntegrity])
 
   const flash = (s: StatusType) => {
     setStatus(s)
     if (s?.type === 'success') {
       loadStatus()
       loadRppPeriods()
+      loadMonthlyPeriods()
+      loadIntegrity()
+    }
+  }
+
+  const handleIntegrityFix = async () => {
+    if (!window.confirm('重複データ（月次由来の集計行）を自動修復します。よろしいですか？\n※週次データとRPP生データはそのまま残ります')) return
+    setLoading(true); setStatus(null)
+    try {
+      const r = await api.import.integrityFix()
+      flash({ type: 'success', message: r.message })
+    } catch (e: unknown) {
+      flash({ type: 'error', message: e instanceof Error ? e.message : '修復に失敗しました' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /* ─── インポート済みデータの個別削除 ───────────────────────── */
+
+  const handleDeleteRppWeek = async (dateFrom: string, dateTo: string) => {
+    if (!window.confirm(`${dateFrom} 〜 ${dateTo} のRPPデータを削除します。よろしいですか？`)) return
+    setLoading(true); setStatus(null)
+    try {
+      const r = await api.rpp.deletePeriod({ period_type: 'weekly', date_from: dateFrom, date_to: dateTo })
+      flash({ type: 'success', message: r.message })
+    } catch (e: unknown) {
+      flash({ type: 'error', message: e instanceof Error ? e.message : '削除に失敗しました' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteRppMonth = async (ym: string) => {
+    if (!window.confirm(`${ym} の月次RPPデータを削除します。よろしいですか？`)) return
+    setLoading(true); setStatus(null)
+    try {
+      const r = await api.rpp.deletePeriod({ period_type: 'monthly', year_month: ym })
+      flash({ type: 'success', message: r.message })
+    } catch (e: unknown) {
+      flash({ type: 'error', message: e instanceof Error ? e.message : '削除に失敗しました' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteMonthlyItems = async (ym: string) => {
+    if (!window.confirm(`${ym} の商品分析データを削除します。よろしいですか？`)) return
+    setLoading(true); setStatus(null)
+    try {
+      const r = await api.import.monthlyItemsDelete(ym)
+      flash({ type: 'success', message: r.message })
+    } catch (e: unknown) {
+      flash({ type: 'error', message: e instanceof Error ? e.message : '削除に失敗しました' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  /* まとめて取込み（複数ファイル・zip・種別自動判別） */
+  const applyAutoResult = (r: AutoImportResponse | undefined) => {
+    if (!r) return
+    setAutoResults(r)
+    if (r.ok_count > 0) {
+      flash({
+        type: 'success',
+        message: `${r.ok_count}件のファイルを取り込みました${r.ng_count > 0 ? `（${r.ng_count}件は取り込めませんでした。下の結果をご確認ください）` : ''}`,
+      })
+    } else {
+      flash({ type: 'error', message: '取り込めるファイルがありませんでした。下の結果をご確認ください。' })
+    }
+  }
+
+  const handleAutoFiles = async (files: File[]) => {
+    setLoading(true); setStatus(null); setAutoResults(null)
+    try {
+      applyAutoResult(await api.import.auto(files))
+    } catch (e: unknown) {
+      flash({ type: 'error', message: e instanceof Error ? e.message : '取込みに失敗しました' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleInboxImport = async () => {
+    if (inboxSel.size === 0) return
+    setLoading(true); setStatus(null); setAutoResults(null)
+    try {
+      applyAutoResult(await api.import.inboxImport(Array.from(inboxSel)))
+    } catch (e: unknown) {
+      flash({ type: 'error', message: e instanceof Error ? e.message : '取込みに失敗しました' })
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -468,6 +635,34 @@ export default function DataImport() {
           </div>
         )}
 
+        {/* データ整合性の警告（二重計上の常時チェック） */}
+        {integrity && !integrity.ok && (
+          <div className="bg-red-50 border-2 border-red-300 rounded-xl p-4 space-y-2.5">
+            <div className="flex items-center gap-2">
+              <XCircle size={17} className="text-red-500 shrink-0" />
+              <p className="text-sm font-bold text-red-800">データの重複を検出しました — KPIが正しく集計されていない可能性があります</p>
+            </div>
+            <ul className="space-y-1 ml-6">
+              {integrity.issues.map((issue, i) => (
+                <li key={i} className="text-xs text-red-700 leading-relaxed">
+                  ・{issue.detail}
+                </li>
+              ))}
+            </ul>
+            {integrity.issues.some((i) => i.fixable) && (
+              <div className="flex justify-end">
+                <button
+                  onClick={handleIntegrityFix}
+                  disabled={loading}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-xs font-medium rounded-lg transition-colors"
+                >
+                  {loading ? '修復中...' : '重複を自動修復する'}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* セットアップ進捗 */}
         <SetupProgress status={dataStatus} />
 
@@ -480,7 +675,7 @@ export default function DataImport() {
           <div className="grid sm:grid-cols-3 gap-3">
             {[
               { n: '1', t: '楽天RMSでCSVを書き出す', d: '広告レポート（RPP）と商品分析の2種類' },
-              { n: '2', t: '下の枠にドラッグ&ドロップ', d: 'ファイルを置くだけ。文字コードは自動判別' },
+              { n: '2', t: '下の枠にドラッグ&ドロップ', d: 'zipのまま置くだけ。種別・文字コードは自動判別' },
               { n: '3', t: 'ダッシュボードで確認', d: 'KPIと改善アラートが自動表示されます' },
             ].map(({ n, t, d }) => (
               <div key={n} className="bg-white/10 rounded-lg p-3">
@@ -494,7 +689,107 @@ export default function DataImport() {
           </div>
         </div>
 
-        {/* メイン：2種類のレポートアップロード */}
+        {/* まとめて取込み（おすすめ） */}
+        <div className="bg-white rounded-xl border-2 border-emerald-200 shadow-sm p-5 space-y-4">
+          <div className="flex items-center gap-2">
+            <div className="w-9 h-9 rounded-lg bg-emerald-100 flex items-center justify-center shrink-0">
+              <Upload size={18} className="text-emerald-600" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-gray-900">まとめて取込み（おすすめ）</h3>
+              <p className="text-xs text-gray-500 mt-0.5">種類を選ぶ必要はありません。全部まとめてどうぞ</p>
+            </div>
+          </div>
+
+          <MultiDropZone onFiles={handleAutoFiles} loading={loading} />
+
+          {/* ダウンロードフォルダの候補ファイル */}
+          {inbox && inbox.files.length > 0 && (
+            <div className="border-t border-gray-100 pt-4">
+              <div className="flex items-center gap-2 mb-2">
+                <FolderDown size={15} className="text-emerald-600" />
+                <p className="text-xs font-semibold text-gray-700">
+                  ダウンロードフォルダに取込み候補が{inbox.files.length}件見つかりました（ドラッグ不要でそのまま取込めます）
+                </p>
+              </div>
+              <div className="bg-gray-50 rounded-lg border border-gray-100 divide-y divide-gray-100 max-h-48 overflow-auto">
+                {inbox.files.map((f) => (
+                  <label key={f.name} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-gray-100">
+                    <input
+                      type="checkbox"
+                      checked={inboxSel.has(f.name)}
+                      onChange={(e) => {
+                        setInboxSel((prev) => {
+                          const next = new Set(prev)
+                          if (e.target.checked) next.add(f.name)
+                          else next.delete(f.name)
+                          return next
+                        })
+                      }}
+                      className="rounded shrink-0"
+                    />
+                    <span className={`text-xs rounded px-1.5 py-0.5 shrink-0 ${
+                      f.kind_guess === 'rpp' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'
+                    }`}>
+                      {f.kind_guess === 'rpp' ? 'RPP広告' : '商品分析'}
+                    </span>
+                    <span className="text-xs text-gray-800 truncate flex-1">{f.name}</span>
+                    <span className="text-xs text-gray-400 shrink-0">{f.modified}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex justify-end mt-2">
+                <button
+                  onClick={handleInboxImport}
+                  disabled={loading || inboxSel.size === 0}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors"
+                >
+                  {loading ? '取込み中...' : `選択した${inboxSel.size}件を取り込む`}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* 取込み結果（ファイルごと） */}
+          {autoResults && (
+            <div className="border-t border-gray-100 pt-4">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-gray-700">
+                  取込み結果: 成功 {autoResults.ok_count}件 / 失敗 {autoResults.ng_count}件
+                </p>
+                <button onClick={() => setAutoResults(null)} className="text-xs text-gray-400 hover:text-gray-600">
+                  閉じる
+                </button>
+              </div>
+              <div className="bg-gray-50 rounded-lg border border-gray-100 divide-y divide-gray-100">
+                {autoResults.results.map((r, i) => (
+                  <div key={`${r.source}-${i}`} className="flex items-start gap-2.5 px-3 py-2">
+                    {r.ok
+                      ? <CheckCircle size={14} className="text-green-500 shrink-0 mt-0.5" />
+                      : <XCircle size={14} className="text-red-400 shrink-0 mt-0.5" />}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xs rounded px-1.5 py-0.5 shrink-0 ${
+                          r.kind === 'rpp'
+                            ? 'bg-blue-100 text-blue-700'
+                            : r.kind === 'monthly'
+                              ? 'bg-violet-100 text-violet-700'
+                              : 'bg-gray-200 text-gray-600'
+                        }`}>
+                          {r.kind === 'rpp' ? 'RPP広告' : r.kind === 'monthly' ? '商品分析' : '判別不可'}
+                        </span>
+                        <span className="text-xs font-medium text-gray-800 truncate">{r.source}</span>
+                      </div>
+                      <p className={`text-xs mt-0.5 ${r.ok ? 'text-gray-500' : 'text-red-500'}`}>{r.message}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 個別に取り込む（種類ごと） */}
         <div className="grid lg:grid-cols-2 gap-5">
           {/* RPP広告レポート */}
           <div className="bg-white rounded-xl border shadow-sm p-5 space-y-3">
@@ -628,19 +923,25 @@ export default function DataImport() {
                 実績を閲覧 <ExternalLink size={12} />
               </button>
             </div>
+            <p className="text-xs text-gray-400">× を押すとその期間のデータだけを削除できます</p>
             <div className="grid sm:grid-cols-2 gap-3">
               {rppPeriods.weekly.length > 0 && (
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">週次</p>
                   <div className="flex flex-wrap gap-1.5">
-                    {rppPeriods.weekly.slice(0, 8).map((p) => (
-                      <span key={`${p.year_month}-${p.date_from}`} className="text-xs bg-blue-50 text-blue-700 border border-blue-100 rounded px-2 py-0.5">
+                    {rppPeriods.weekly.map((p) => (
+                      <span key={`${p.year_month}-${p.date_from}`} className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-100 rounded px-2 py-0.5">
                         {p.date_from} 〜 {p.date_to}
+                        <button
+                          onClick={() => handleDeleteRppWeek(p.date_from, p.date_to)}
+                          disabled={loading}
+                          title="この週のデータを削除"
+                          className="text-blue-300 hover:text-red-500 font-bold leading-none disabled:opacity-40"
+                        >
+                          ×
+                        </button>
                       </span>
                     ))}
-                    {rppPeriods.weekly.length > 8 && (
-                      <span className="text-xs text-gray-400">他 {rppPeriods.weekly.length - 8}件</span>
-                    )}
                   </div>
                 </div>
               )}
@@ -649,13 +950,47 @@ export default function DataImport() {
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">月次</p>
                   <div className="flex flex-wrap gap-1.5">
                     {rppPeriods.monthly.map((p) => (
-                      <span key={p.year_month} className="text-xs bg-violet-50 text-violet-700 border border-violet-100 rounded px-2 py-0.5">
+                      <span key={p.year_month} className="inline-flex items-center gap-1 text-xs bg-violet-50 text-violet-700 border border-violet-100 rounded px-2 py-0.5">
                         {p.year_month}
+                        <button
+                          onClick={() => handleDeleteRppMonth(p.year_month)}
+                          disabled={loading}
+                          title="この月のデータを削除"
+                          className="text-violet-300 hover:text-red-500 font-bold leading-none disabled:opacity-40"
+                        >
+                          ×
+                        </button>
                       </span>
                     ))}
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* インポート済み商品分析データ一覧（個別削除対応） */}
+        {monthlyPeriods.length > 0 && (
+          <div className="bg-white rounded-xl border shadow-sm p-5 space-y-3">
+            <div className="flex items-center gap-2">
+              <BarChart3 size={15} className="text-violet-600" />
+              <h3 className="text-sm font-bold text-gray-900">インポート済み商品分析データ（月次）</h3>
+            </div>
+            <p className="text-xs text-gray-400">× を押すとその月のデータだけを削除できます</p>
+            <div className="flex flex-wrap gap-1.5">
+              {monthlyPeriods.map((m) => (
+                <span key={m.year_month} className="inline-flex items-center gap-1 text-xs bg-violet-50 text-violet-700 border border-violet-100 rounded px-2 py-0.5">
+                  {m.year_month}（{m.rows.toLocaleString()}件）
+                  <button
+                    onClick={() => handleDeleteMonthlyItems(m.year_month)}
+                    disabled={loading}
+                    title="この月のデータを削除"
+                    className="text-violet-300 hover:text-red-500 font-bold leading-none disabled:opacity-40"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
             </div>
           </div>
         )}

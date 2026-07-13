@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import RppWeekly, Target
 from calculations import calc_kpis, calc_change_rate
+from shop_metrics import get_shop_monthly
 
 router = APIRouter(prefix="/api/gap", tags=["gap"])
 
@@ -262,38 +263,57 @@ def gap_product(
     prev_rows = q_prev.all()
 
     # 月次モードでは同一商品が複数週レコードとして存在するため、
-    # 辞書への単純代入（上書き）ではなく商品URLごとに合算する。
-    # 週次モードでも安全に動作する（同一週に同一URLは1件のみのため合算しても同値）。
-    def _build_prev_agg(rows) -> dict:
-        """product_url をキーに gross/cost_of_sales/ad_cost/cv/ct を合算した辞書を返す。
-        ctr は ct 加重平均で算出する。"""
+    # 商品管理番号（無ければ商品URL）をキーに1商品=1行へ合算する。
+    # 商品名・ジャンル・URLは最新週（week_start が最大）のレコードの値を採用する
+    # （週によって商品名が変更されるため、常に最新の名称で表示する）。
+    # 週次モードでも安全に動作する（同一週に同一商品は1件のみのため合算しても同値）。
+    def _agg_key(r) -> str:
+        return r.management_no or r.product_url
+
+    def _build_agg(rows) -> dict:
+        """商品キーごとに gross/cost_of_sales/ad_cost/cv/ct を合算した辞書を返す。
+        ctr は ct 加重平均。商品名等の属性は最新週のレコードから採用する。"""
         agg: dict = {}
         for r in rows:
-            url = r.product_url
-            if url not in agg:
-                agg[url] = {
+            key = _agg_key(r)
+            if key not in agg:
+                agg[key] = {
                     "gross": 0.0, "cost_of_sales": 0.0,
                     "ad_cost": 0.0, "cv": 0, "ct": 0,
                     "_ctr_sum": 0.0,  # ctr × ct の累計（加重平均用）
+                    "_latest_week": r.week_start,
+                    "product_url": r.product_url,
+                    "management_no": r.management_no,
+                    "product_name": r.product_name,
+                    "genre": r.genre,
                 }
-            agg[url]["gross"] += r.gross
-            agg[url]["cost_of_sales"] += r.cost_of_sales
-            agg[url]["ad_cost"] += r.ad_cost
-            agg[url]["cv"] += r.cv
-            agg[url]["ct"] += r.ct
-            agg[url]["_ctr_sum"] += r.ctr * r.ct
-        # 加重平均 ctr を確定し、内部フィールドを除去
-        for url, v in agg.items():
+            a = agg[key]
+            a["gross"] += r.gross
+            a["cost_of_sales"] += r.cost_of_sales
+            a["ad_cost"] += r.ad_cost
+            a["cv"] += r.cv
+            a["ct"] += r.ct
+            a["_ctr_sum"] += r.ctr * r.ct
+            # 最新週の属性（商品名・ジャンル・URL）で上書き
+            if r.week_start >= a["_latest_week"]:
+                a["_latest_week"] = r.week_start
+                a["product_url"] = r.product_url
+                a["management_no"] = r.management_no
+                a["product_name"] = r.product_name
+                a["genre"] = r.genre
+        for key, v in agg.items():
             v["ctr"] = v["_ctr_sum"] / v["ct"] if v["ct"] > 0 else 0.0
             del v["_ctr_sum"]
+            del v["_latest_week"]
         return agg
 
-    prev_map = _build_prev_agg(prev_rows)
+    current_map = _build_agg(current_rows)
+    prev_map = _build_agg(prev_rows)
 
     result = []
-    for r in current_rows:
-        kpis = calc_kpis(r.gross, r.cost_of_sales, r.ad_cost, r.cv, r.ct, ctr=r.ctr)
-        prev_agg = prev_map.get(r.product_url)
+    for key, a in current_map.items():
+        kpis = calc_kpis(a["gross"], a["cost_of_sales"], a["ad_cost"], a["cv"], a["ct"], ctr=a["ctr"])
+        prev_agg = prev_map.get(key)
         prev_kpis = calc_kpis(
             prev_agg["gross"], prev_agg["cost_of_sales"], prev_agg["ad_cost"],
             prev_agg["cv"], prev_agg["ct"], ctr=prev_agg["ctr"]
@@ -304,10 +324,10 @@ def gap_product(
                 changes[k] = calc_change_rate(kpis[k], prev_kpis[k])
 
         result.append({
-            "product_url": r.product_url,
-            "management_no": r.management_no,
-            "product_name": r.product_name,
-            "genre": r.genre,
+            "product_url": a["product_url"],
+            "management_no": a["management_no"],
+            "product_name": a["product_name"],
+            "genre": a["genre"],
             "current": kpis,
             "prev": prev_kpis,
             "changes": changes,
@@ -366,13 +386,26 @@ def get_kpi_tree(
     # actual_av    = gross / cv      （RPP経由客単価）
     # → actual_access × (actual_cvr/100) × actual_av ≈ actual_gross が成立する。
     # ※ MonthlyAnalysis.access_count（店舗全体UU）は母数が異なるため使用しない。
-    actual_gross = sum(r.gross for r in rows)
-    actual_cv = sum(r.cv for r in rows)
-    actual_ct = sum(r.ct for r in rows)   # RPPクリック数（アクセス代替）
-    actual_access = actual_ct             # RPP軸ではクリック数をアクセス指標とする
-    actual_cvr = round((actual_cv / actual_ct * 100) if actual_ct > 0 else 0, 2)
-    actual_av = round((actual_gross / actual_cv) if actual_cv > 0 else 0, 0)
+    # 月次は商品分析レポート（店舗全体売上・UU）を正とする。
+    # KGI = アクセスUU × 転換率 × 客単価 が同一データ軸で成立する。
+    # データが無い月・週次はRPP軸（クリック数ベース）へフォールバック。
+    shop = get_shop_monthly(db, year_month) if period == "monthly" else None
+    if shop:
+        actual_gross = shop["sales"]
+        actual_access = shop["access"]
+        actual_cvr = shop["cvr"]
+        actual_av = shop["av"]
+        access_label = "アクセス人数（UU）"
+    else:
+        actual_gross = sum(r.gross for r in rows)
+        actual_cv = sum(r.cv for r in rows)
+        actual_ct = sum(r.ct for r in rows)   # RPPクリック数（アクセス代替）
+        actual_access = actual_ct             # RPP軸ではクリック数をアクセス指標とする
+        actual_cvr = round((actual_cv / actual_ct * 100) if actual_ct > 0 else 0, 2)
+        actual_av = round((actual_gross / actual_cv) if actual_cv > 0 else 0, 0)
+        access_label = "クリック数（RPP）"
 
+    t_sales = target.target_sales if target else 0
     t_sales = target.target_sales if target else 0
     t_access = target.target_access if target else 0
     t_cvr = target.target_cvr if target else 0
@@ -391,8 +424,9 @@ def get_kpi_tree(
 
     return {
         "has_target": target is not None,
+        "axis": "shop" if shop else "rpp",
         "kgi": node("売上目標", "kgi", actual_gross, t_sales, "currency"),
-        "access": node("クリック数（RPP）", "access", actual_access, t_access, "number"),
+        "access": node(access_label, "access", actual_access, t_access, "number"),
         "cvr": node("転換率（CVR）", "cvr", actual_cvr, t_cvr, "percent"),
         "av": node("客単価（Av）", "av", actual_av, t_av, "currency"),
     }

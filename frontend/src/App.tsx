@@ -10,6 +10,7 @@ import ProductKPI from './pages/ProductKPI'
 import DataImport from './pages/DataImport'
 import TargetSetting from './pages/TargetSetting'
 import RppAnalysis from './pages/RppAnalysis'
+import Reports from './pages/Reports'
 import { supabase, authEnabled } from './lib/supabase'
 
 const ONBOARDING_KEY = 'rakuten-kpi-onboarding-v1'
@@ -67,6 +68,7 @@ export default function App() {
             <Route path="/import" element={<DataImport />} />
             <Route path="/targets" element={<TargetSetting />} />
             <Route path="/rpp" element={<RppAnalysis />} />
+            <Route path="/reports" element={<Reports />} />
           </Routes>
         </main>
       </div>

@@ -6,10 +6,11 @@ import LogicTree from '../components/gap/LogicTree'
 import StepIndicator from '../components/gap/StepIndicator'
 import GenreCards from '../components/gap/GenreCards'
 import ActionPanel from '../components/gap/ActionPanel'
+import EvaluationMatrix from '../components/EvaluationMatrix'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
 import { usePeriodState } from '../lib/usePeriodState'
-import type { KPIs, GenreKPI, KPITree } from '../types'
+import type { KPIs, GenreKPI, KPITree, EvaluationResult } from '../types'
 
 interface ShopData { current: KPIs; prev: KPIs | null; changes: Record<string, number | null> }
 interface ProductItem {
@@ -31,6 +32,7 @@ export default function GapAnalysis() {
   const [selectedProduct, setSelectedProduct] = useState<ProductItem | null>(null)
 
   const [treeData, setTreeData] = useState<KPITree | null>(null)
+  const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null)
   const [shopData, setShopData] = useState<ShopData | null>(null)
   const [genreData, setGenreData] = useState<GenreKPI[]>([])
   const [productData, setProductData] = useState<ProductItem[]>([])
@@ -41,20 +43,23 @@ export default function GapAnalysis() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [tree, shop, genre] = await Promise.all([
+      const [tree, shop, genre, evalRes] = await Promise.all([
         api.gap.kpiTree(period, dateParam) as Promise<KPITree | null>,
         api.gap.shop(period, dateParam) as Promise<ShopData | null>,
         api.gap.genre(period, dateParam) as Promise<{ genres?: GenreKPI[] } | null>,
+        api.evaluation.matrix(period, dateParam).catch(() => null),
       ])
       setTreeData(tree ?? null)
       setShopData(shop ?? null)
       setGenreData(genre?.genres ?? [])
+      setEvaluation(evalRes?.evaluation ?? null)
     } catch (e) {
       console.error('[GapAnalysis] データ取得エラー:', e)
       // エラー時は既存の表示を維持しつつ、空状態に戻す
       setTreeData(null)
       setShopData(null)
       setGenreData([])
+      setEvaluation(null)
     } finally {
       setLoading(false)
     }
@@ -118,6 +123,9 @@ export default function GapAnalysis() {
 
           {/* STEP インジケーター */}
           <StepIndicator currentStep={step} onStepClick={handleStepClick} />
+
+          {/* 評価マトリクス（17パターン・目標×YoY統一判定） */}
+          {evaluation && <EvaluationMatrix evaluation={evaluation} />}
 
           {/* ロジックツリー */}
           <div className="bg-white rounded-xl border shadow-sm p-5">
@@ -190,6 +198,7 @@ export default function GapAnalysis() {
                       <th className="px-3 py-2.5 text-right">売上</th>
                       <th className="px-3 py-2.5 text-right">前期比</th>
                       <th className="px-3 py-2.5 text-right">GP</th>
+                      <th className="px-3 py-2.5 text-right">アクセス</th>
                       <th className="px-3 py-2.5 text-right">CV</th>
                       <th className="px-3 py-2.5 text-right">CVR</th>
                       <th className="px-3 py-2.5 text-right">ROAS</th>
@@ -200,8 +209,13 @@ export default function GapAnalysis() {
                   <tbody className="divide-y divide-gray-100">
                     {productData.map((p) => {
                       const isSelected = selectedProduct?.product_url === p.product_url
-                      const cvrWarn = shopData && p.current.cvr < shopData.current.cvr * 0.85
-                      const avWarn = shopData && p.current.av < shopData.current.av * 0.85
+                      // 優先度: 在庫 > アクセス > 客単価 = CVR（講座ロジック準拠）
+                      const accessWarn = p.current.ct < 100 ||
+                        (shopData && shopData.current.ctr > 0 && p.current.ctr < shopData.current.ctr * 0.75)
+                      const lowAccess = p.current.ct < 100
+                      // アクセス母数不足(100未満)の場合、CVR・客単価の警告は表示しない（信用できない数値のため）
+                      const cvrWarn = !lowAccess && shopData && p.current.cvr < shopData.current.cvr * 0.85
+                      const avWarn = !lowAccess && shopData && p.current.av < shopData.current.av * 0.85
                       return (
                         <tr
                           key={p.product_url}
@@ -222,6 +236,10 @@ export default function GapAnalysis() {
                           <td className="px-3 py-2.5 text-right font-medium text-xs">{formatCurrency(p.current.gross)}</td>
                           <td className="px-3 py-2.5 text-right text-xs"><ChangeCell value={p.changes.gross} /></td>
                           <td className="px-3 py-2.5 text-right text-xs">{formatCurrency(p.current.gp)}</td>
+                          <td className={`px-3 py-2.5 text-right text-xs font-medium ${accessWarn ? 'text-red-600' : ''}`}>
+                            {formatNumber(p.current.ct)}
+                            {accessWarn && ' ⚠️'}
+                          </td>
                           <td className="px-3 py-2.5 text-right text-xs">{formatNumber(p.current.cv)}</td>
                           <td className={`px-3 py-2.5 text-right text-xs font-medium ${cvrWarn ? 'text-red-600' : ''}`}>
                             {formatPercent(p.current.cvr, 2)}
@@ -236,12 +254,12 @@ export default function GapAnalysis() {
                               className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
                                 isSelected
                                   ? 'bg-blue-600 text-white'
-                                  : cvrWarn || avWarn || p.limit_cpo_exceeded
+                                  : accessWarn || cvrWarn || avWarn || p.limit_cpo_exceeded
                                   ? 'bg-amber-100 text-amber-700 hover:bg-amber-200'
                                   : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                               }`}
                             >
-                              {isSelected ? '閉じる' : cvrWarn || avWarn || p.limit_cpo_exceeded ? '⚠️ 改善' : '改善策'}
+                              {isSelected ? '閉じる' : accessWarn || cvrWarn || avWarn || p.limit_cpo_exceeded ? '⚠️ 改善' : '改善策'}
                             </button>
                           </td>
                         </tr>
