@@ -337,3 +337,76 @@ export interface InboxListResponse {
   dir: string
   files: InboxFile[]
 }
+
+/* ─── RPP診断（RppAnalysisページ専用） ────────────────────────── */
+
+/** 確信度。needs_check はキーワード別レポート取込後に confirmed へ昇格予定 */
+export type RppConfidence = 'confirmed' | 'needs_check' | 'info'
+export type RppDiagnosisStatus = 'insufficient_data' | 'issues' | 'good'
+
+/** 既存ActionPanelのActionDefと同構造 + confidence（バックエンドRPP_ACTIONSと対応） */
+export interface RppActionDef {
+  key: string
+  category: 'Promotion' | 'Price' | 'Product' | 'Place' | '仕入れ'
+  confidence: RppConfidence
+  text: string
+  detail?: string
+}
+
+export interface RppDiagnosisIssue {
+  issue: string
+  confidence: RppConfidence
+  action_key: string | null
+  label: string
+  action: RppActionDef | null
+}
+
+export interface RppDiagnosisMetrics {
+  ct: number
+  ctr: number
+  cvr_720: number
+  roas_720: number
+  cpo_720: number
+  cpc: number
+  prev_cpc: number | null
+  cpc_change_rate: number | null
+  ad_cost: number
+  gross_720: number
+  cv_720: number
+  bid_price: number
+}
+
+export interface RppDiagnosisItem {
+  management_no: string
+  product_name: string | null
+  item_url: string | null
+  status: RppDiagnosisStatus
+  issues: RppDiagnosisIssue[]
+  metrics: RppDiagnosisMetrics
+}
+
+export interface RppDiagnosisBenchmarks {
+  avg_ctr?: number
+  avg_cvr?: number
+  roas_line?: number
+  ctr_ratio?: number
+  cvr_ratio?: number
+  cpc_spike_rate?: number
+}
+
+export interface RppDiagnosisResponse {
+  period_type: 'weekly' | 'monthly'
+  year_month: string | null
+  date_from: string | null
+  date_to: string | null
+  /** チェック状態保存用キー（weekly=date_from / monthly=year_month） */
+  period_key: string
+  /** 原価データが無いためLimit CPO判定は現状スキップ（false） */
+  cpo_evaluable: boolean
+  cpo_skip_reason: string
+  min_ct: number
+  issue_labels: Record<string, string>
+  actions: RppActionDef[]
+  benchmarks: RppDiagnosisBenchmarks
+  items: RppDiagnosisItem[]
+}

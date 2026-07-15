@@ -21,7 +21,7 @@ from database import engine, get_db
 import models
 from models import RppWeekly, MonthlyItemSales, MonthlyAnalysis, Target, RppSales, InventoryStatus
 from sample_data import generate_sample_data
-from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account
+from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account, rpp_diagnosis
 from auth import get_current_user, AuthUser, UserContextMiddleware
 from migrations import run_migrations
 
@@ -56,6 +56,7 @@ app.include_router(targets.router, dependencies=_auth)
 app.include_router(gap_analysis.router, dependencies=_auth)
 app.include_router(products.router, dependencies=_auth)
 app.include_router(actions.router, dependencies=_auth)
+app.include_router(rpp_diagnosis.router, dependencies=_auth)
 app.include_router(evaluation.router, dependencies=_auth)
 app.include_router(export.router, dependencies=_auth)
 app.include_router(account.router, dependencies=_auth)

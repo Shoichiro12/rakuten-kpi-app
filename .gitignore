@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 *.db
+*.db-journal
 
 # Node / Vite
 node_modules/

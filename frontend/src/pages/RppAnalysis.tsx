@@ -5,11 +5,12 @@ import {
   ResponsiveContainer, Cell,
 } from 'recharts'
 import Header from '../components/layout/Header'
+import RppDiagnosisPanel from '../components/rpp/RppDiagnosisPanel'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent } from '../lib/utils'
 import type {
   RppPeriods, RppWeeklyPeriod, RppMonthlyPeriod,
-  RppSummaryResponse, RppSalesItem,
+  RppSummaryResponse, RppSalesItem, RppDiagnosisResponse, RppDiagnosisItem,
 } from '../types'
 
 type PeriodType = 'weekly' | 'monthly'
@@ -86,6 +87,56 @@ function PeriodSelect<T extends RppWeeklyPeriod | RppMonthlyPeriod>({
   )
 }
 
+/* ─── 診断バッジ（テーブルの診断列） ──────────────────────── */
+// 課題コード → テーブル表示用の短縮ラベル
+const ISSUE_SHORT: Record<string, string> = {
+  cpo_over: 'CPO超過',
+  roas_low: 'ROAS<100%',
+  ctr_low: 'CTR低',
+  cvr_low: 'CVR低',
+  cpc_spike: 'CPC急騰',
+}
+
+function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
+  if (!diag) {
+    return <span className="text-gray-300">—</span>
+  }
+  if (diag.status === 'insufficient_data') {
+    return (
+      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
+        データ不足
+      </span>
+    )
+  }
+  if (diag.status === 'good') {
+    return (
+      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
+        良好
+      </span>
+    )
+  }
+  const shown = diag.issues.slice(0, 2)
+  const rest = diag.issues.length - shown.length
+  return (
+    <span className="inline-flex items-center gap-1 flex-wrap">
+      {shown.map((i) => (
+        <span
+          key={i.issue}
+          className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${
+            i.confidence === 'confirmed'
+              ? 'bg-red-100 text-red-700'
+              : 'bg-amber-100 text-amber-700'
+          }`}
+          title={`${i.label}（${i.confidence === 'confirmed' ? '確定' : '要確認'}）`}
+        >
+          {ISSUE_SHORT[i.issue] ?? i.issue}
+        </span>
+      ))}
+      {rest > 0 && <span className="text-[10px] text-gray-400">+{rest}</span>}
+    </span>
+  )
+}
+
 /* ─── メインページ ────────────────────────────────────────── */
 export default function RppAnalysis() {
   const [periodType, setPeriodType] = useState<PeriodType>('weekly')
@@ -96,6 +147,8 @@ export default function RppAnalysis() {
   const [summary, setSummary] = useState<RppSummaryResponse | null>(null)
   const [salesItems, setSalesItems] = useState<RppSalesItem[]>([])
   const [salesTotal, setSalesTotal] = useState(0)
+  const [diagnosis, setDiagnosis] = useState<RppDiagnosisResponse | null>(null)
+  const [selectedCode, setSelectedCode] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -113,7 +166,7 @@ export default function RppAnalysis() {
 
   useEffect(() => { loadPeriods() }, [loadPeriods])
 
-  /* サマリー＆商品一覧を取得 */
+  /* サマリー＆商品一覧＆診断を取得 */
   const loadData = useCallback(async () => {
     const params =
       periodType === 'weekly' && selectedWeekly
@@ -134,19 +187,23 @@ export default function RppAnalysis() {
 
     setLoading(true)
     setError(null)
+    setSelectedCode(null) // 期間切替時は診断パネルを閉じる
     try {
-      const [sum, sales] = await Promise.all([
+      const [sum, sales, diag] = await Promise.all([
         api.rpp.summary(params),
         api.rpp.sales({ ...params, limit: 100 }),
+        api.rpp.diagnosis(params),
       ])
       setSummary(sum)
       setSalesItems(sales?.items ?? [])
       setSalesTotal(sales?.total ?? 0)
+      setDiagnosis(diag)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'データ取得に失敗しました')
       setSummary(null)
       setSalesItems([])
       setSalesTotal(0)
+      setDiagnosis(null)
     } finally {
       setLoading(false)
     }
@@ -155,6 +212,12 @@ export default function RppAnalysis() {
   useEffect(() => { loadData() }, [loadData])
 
   const s = summary?.summary
+
+  /* 診断結果を management_no で引けるようにする */
+  const diagByCode = new Map<string, RppDiagnosisItem>(
+    (diagnosis?.items ?? []).map((i) => [i.management_no, i]),
+  )
+  const selectedDiag = selectedCode ? diagByCode.get(selectedCode) : undefined
 
   /* Recharts用データ（広告費上位10件） */
   const chartData = salesItems
@@ -190,7 +253,8 @@ export default function RppAnalysis() {
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 bg-gray-50 space-y-5">
+      <div className="flex-1 flex overflow-hidden">
+        <div className="flex-1 overflow-auto p-6 bg-gray-50 space-y-5">
 
         {/* タブ + 期間セレクタ */}
         <div className="flex flex-wrap items-center gap-3">
@@ -353,11 +417,14 @@ export default function RppAnalysis() {
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
               <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
                 <p className="text-sm font-bold text-gray-900">商品別実績</p>
-                {salesTotal > salesItems.length && (
-                  <span className="text-xs text-gray-400">
-                    {salesItems.length}件表示 / 全{salesTotal}件
-                  </span>
-                )}
+                <div className="flex items-center gap-3">
+                  <span className="text-xs text-gray-400">行クリックで診断を表示</span>
+                  {salesTotal > salesItems.length && (
+                    <span className="text-xs text-gray-400">
+                      {salesItems.length}件表示 / 全{salesTotal}件
+                    </span>
+                  )}
+                </div>
               </div>
 
               {salesItems.length === 0 && !loading && (
@@ -371,6 +438,9 @@ export default function RppAnalysis() {
                       <tr className="bg-gray-50 text-left">
                         <th className="px-4 py-2.5 text-gray-500 font-medium whitespace-nowrap">
                           商品名
+                        </th>
+                        <th className="px-4 py-2.5 text-gray-500 font-medium whitespace-nowrap">
+                          診断
                         </th>
                         <th className="px-4 py-2.5 text-gray-500 font-medium text-right whitespace-nowrap">
                           広告費
@@ -399,8 +469,17 @@ export default function RppAnalysis() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {salesItems.map((item) => (
-                        <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                      {salesItems.map((item) => {
+                        const diag = item.item_code ? diagByCode.get(item.item_code) : undefined
+                        const isSelected = item.item_code != null && item.item_code === selectedCode
+                        return (
+                        <tr
+                          key={item.id}
+                          onClick={() => { if (item.item_code && diag) setSelectedCode(item.item_code) }}
+                          className={`transition-colors ${
+                            isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+                          } ${item.item_code && diag ? 'cursor-pointer' : ''}`}
+                        >
                           <td className="px-4 py-2.5 max-w-[180px]">
                             <p className="font-medium text-gray-800 truncate">
                               {item.product_name || item.item_code || '—'}
@@ -408,6 +487,9 @@ export default function RppAnalysis() {
                             {item.item_code && item.product_name && (
                               <p className="text-gray-400 truncate">{item.item_code}</p>
                             )}
+                          </td>
+                          <td className="px-4 py-2.5 whitespace-nowrap">
+                            <DiagnosisBadges diag={diag} />
                           </td>
                           <td className="px-4 py-2.5 text-right font-medium text-gray-900 whitespace-nowrap">
                             {item.ad_cost != null ? formatCurrency(item.ad_cost) : '—'}
@@ -458,7 +540,8 @@ export default function RppAnalysis() {
                             ) : '—'}
                           </td>
                         </tr>
-                      ))}
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
@@ -472,6 +555,16 @@ export default function RppAnalysis() {
               )}
             </div>
           </>
+        )}
+        </div>
+
+        {/* 診断パネル（行クリックで表示。ActionPanelとトンマナを揃える） */}
+        {selectedDiag && diagnosis && (
+          <RppDiagnosisPanel
+            item={selectedDiag}
+            diagnosis={diagnosis}
+            onClose={() => setSelectedCode(null)}
+          />
         )}
       </div>
     </div>

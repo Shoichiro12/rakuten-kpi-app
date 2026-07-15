@@ -325,6 +325,30 @@ export const api = {
         `/import/rpp/summary${qs ? `?${qs}` : ''}`,
       ).then((d) => d ?? null)
     },
+    /** 商品単位のRPP診断（management_no 省略で期間内の全商品を一括診断） */
+    diagnosis: (params: RppSummaryParams & { management_no?: string } = {}) => {
+      const q = new URLSearchParams()
+      if (params.period_type) q.set('period_type', params.period_type)
+      if (params.management_no) q.set('management_no', params.management_no)
+      if (params.year_month) q.set('year_month', params.year_month)
+      if (params.date_from) q.set('date_from', params.date_from)
+      if (params.date_to) q.set('date_to', params.date_to)
+      const qs = q.toString()
+      return request<import('../types').RppDiagnosisResponse>(
+        `/rpp/diagnosis${qs ? `?${qs}` : ''}`,
+      ).then((d) => d ?? null)
+    },
+    /** 診断アクションのチェック状態（既存 actions.get と同パターン） */
+    diagnosisChecks: (managementNo: string, periodKey: string) =>
+      request<Record<string, boolean>>(
+        `/rpp/diagnosis/checks?management_no=${encodeURIComponent(managementNo)}&period_key=${encodeURIComponent(periodKey)}`,
+      ).then((d) => d ?? {}),
+    /** 診断アクションのチェックをトグル（既存 actions.toggle と同パターン） */
+    diagnosisToggle: (managementNo: string, periodKey: string, actionKey: string) =>
+      request<{ action_key: string; checked: boolean }>('/rpp/diagnosis/toggle', {
+        method: 'POST',
+        body: JSON.stringify({ management_no: managementNo, period_key: periodKey, action_key: actionKey }),
+      }),
   },
   /* ─── レポート・CSVエクスポート（要件No.9） ───────────────────
    * CSVはJSONではなくblobで受け取り、ブラウザのダウンロードを発火する。 */

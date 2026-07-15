@@ -73,6 +73,28 @@ class ActionCheck(Base, UserScopedMixin):
     )
 
 
+class RppActionCheck(Base, UserScopedMixin):
+    """RPP診断パネルのアクションチェック状態。
+
+    既存 ActionCheck は product_url ベースだが、RPP（RppSales）には product_url が
+    無いケースがあるため management_no（item_code）ベースの専用テーブルにする。
+    period_key は既存 ActionCheck.week_key と同じ規約
+    （weekly = YYYY-MM-DD（date_from） / monthly = YYYY-MM）。
+    """
+    __tablename__ = "rpp_action_checks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    management_no = Column(String, nullable=False)
+    period_key = Column(String, nullable=False)  # YYYY-MM-DD (weekly) or YYYY-MM (monthly)
+    action_key = Column(String, nullable=False)
+    checked = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "management_no", "period_key", "action_key", name="uq_rpp_action_check"),
+    )
+
+
 class InventoryStatus(Base, UserScopedMixin):
     __tablename__ = "inventory_status"
 
