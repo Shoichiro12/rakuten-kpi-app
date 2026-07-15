@@ -78,7 +78,7 @@ def api_root():
 @app.post("/api/sample-data")
 def create_sample_data(db: Session = Depends(get_db), _user: AuthUser = Depends(get_current_user)):
     generate_sample_data(db)
-    return {"message": "サンプルデータを生成しました（10商品 × 8週間）"}
+    return {"message": "サンプルデータを生成しました（10商品 × 8週間、RPP診断デモ付き）"}
 
 
 @app.get("/api/data-status")

@@ -1,7 +1,7 @@
 import random
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
-from models import RppWeekly, MonthlyAnalysis, Target
+from models import RppWeekly, MonthlyAnalysis, Target, RppSales
 
 
 PRODUCTS = [
@@ -30,13 +30,87 @@ PRICE_RANGES = {
     "ACC-003": (1580, 0.67),
 }
 
+# ─── RPP診断デモ用シナリオ ────────────────────────────────────────────────
+# RPP分析ページの診断機能（calculations.detect_rpp_issues）の全パターンが
+# サンプルデータ上で確認できるよう、商品ごとに「意図した課題」を仕込む。
+#
+#   good         … 良好（課題なし）
+#   ctr_low      … CTRが全商品平均の75%未満 → 確定: クリエイティブ課題
+#   cvr_low      … CVRが全商品平均(加重)の85%未満 → 確定: LP/商品ページ課題
+#   roas_low     … ROAS100%割れ → 要確認: キーワード確認
+#   cpc_spike    … 直近週のCPCが前週比+20%以上 → 要確認: 入札見直し
+#   multi        … roas_low + ctr_low + cvr_low の複数該当
+#   insufficient … クリック数10未満 → データ不足（判定スキップ）
+#
+# 数値レンジは平均値との相対関係が崩れないよう十分に離してある
+# （CTR平均≈1.4% / CVR加重平均≈2.9%を想定した設計）。
+RPP_SCENARIOS = {
+    "RUN-001": {"kind": "good",         "ct": (380, 450), "ctr": (1.9, 2.2), "cvr": (4.2, 4.8), "roas": (280, 340)},
+    "RUN-002": {"kind": "cpc_spike",    "ct": (320, 380), "ctr": (1.7, 1.9), "cvr": (2.9, 3.2), "cpc_base": (20, 22), "cpc_now": (29, 31)},
+    "SPW-001": {"kind": "ctr_low",      "ct": (230, 280), "ctr": (0.45, 0.55), "cvr": (3.8, 4.2), "roas": (190, 230)},
+    "SPW-002": {"kind": "cvr_low",      "ct": (280, 330), "ctr": (1.5, 1.7), "cvr": (1.1, 1.3), "roas": (140, 170)},
+    "SPW-003": {"kind": "roas_low",     "ct": (280, 330), "ctr": (1.4, 1.6), "cvr": (3.3, 3.7), "roas": (70, 90)},
+    "BAG-001": {"kind": "multi",        "ct": (180, 220), "ctr": (0.40, 0.50), "cvr": (0.9, 1.1), "roas": (55, 75)},
+    "BAG-002": {"kind": "good",         "ct": (350, 420), "ctr": (2.0, 2.3), "cvr": (4.0, 4.5), "roas": (260, 320)},
+    "ACC-001": {"kind": "insufficient", "ct": (4, 8),     "ctr": (0.9, 1.1), "cvr": (0, 0),     "roas": (0, 0)},
+    "ACC-002": {"kind": "good",         "ct": (400, 470), "ctr": (1.9, 2.2), "cvr": (4.3, 4.9), "roas": (300, 360)},
+    "ACC-003": {"kind": "cvr_low",      "ct": (250, 300), "ctr": (1.6, 1.8), "cvr": (1.2, 1.4), "roas": (150, 180)},
+}
+
 
 def get_week_start(d: date) -> date:
     return d - timedelta(days=d.weekday() + 1) if d.weekday() != 6 else d
 
 
+def _week_metrics(rng: random.Random, mgmt_no: str, week_offset: int) -> dict:
+    """シナリオに基づき1商品×1週のRPP実績を生成する。
+
+    week_offset=0 が最新週。cpc_spike は最新週だけCPCを跳ね上げ、
+    前週比+20%以上（要確認: 入札見直し）を成立させる。
+    """
+    sc = RPP_SCENARIOS[mgmt_no]
+    unit_price, _ = PRICE_RANGES[mgmt_no]
+
+    ct = rng.randint(*sc["ct"])
+    ctr = round(rng.uniform(*sc["ctr"]), 2)
+
+    if sc["kind"] == "insufficient":
+        # クリック母数不足（判定スキップ対象）。売上ゼロ〜1件の弱小広告
+        cv = rng.randint(0, 1)
+        gross = cv * unit_price
+        ad_cost = ct * rng.uniform(25, 35)
+    elif sc["kind"] == "cpc_spike":
+        # CPCを直接指定し、最新週だけ急騰させる（ROASは100%以上を維持）
+        cvr = rng.uniform(*sc["cvr"])
+        cv = max(1, round(ct * cvr / 100))
+        gross = cv * unit_price * rng.uniform(0.95, 1.05)
+        cpc = rng.uniform(*(sc["cpc_now"] if week_offset == 0 else sc["cpc_base"]))
+        ad_cost = ct * cpc
+    else:
+        # CPCを商品ごとに固定（cvr・roasの中央値から逆算）し、週ごとの揺らぎを
+        # ±数%に抑える。ROAS逆算方式だと乱数の組み合わせでCPCが前週比+20%を
+        # 超えて cpc_spike を誤発火することがあるため、CPC基準で生成する。
+        cvr0 = sum(sc["cvr"]) / 2
+        roas0 = sum(sc["roas"]) / 2
+        cpc0 = unit_price * cvr0 / roas0  # = price*(cvr0/100)/(roas0/100)
+        cvr = rng.uniform(*sc["cvr"])
+        cv = max(1, round(ct * cvr / 100))
+        gross = cv * unit_price * rng.uniform(0.97, 1.03)
+        ad_cost = ct * cpc0 * rng.uniform(0.98, 1.02)
+
+    return {
+        "ct": ct,
+        "ctr": ctr,
+        "cv": cv,
+        "gross": round(gross, 0),
+        "ad_cost": round(ad_cost, 0),
+        "cpc": round(ad_cost / ct, 1) if ct else 0.0,
+    }
+
+
 def generate_sample_data(db: Session):
     db.query(RppWeekly).delete()
+    db.query(RppSales).delete()
     db.query(MonthlyAnalysis).delete()
     db.query(Target).delete()
 
@@ -45,40 +119,104 @@ def generate_sample_data(db: Session):
 
     rng = random.Random(42)
 
+    # ── 週次: RppWeekly（既存集計用）+ RppSales（RPP分析・診断用）を同じ数値で生成 ──
+    weekly_rows: list[dict] = []
     for week_offset in range(8):
         week_start = current_week_start - timedelta(weeks=week_offset)
+        week_end = week_start + timedelta(days=6)
 
         for product in PRODUCTS:
             mgmt_no = product["management_no"]
-            unit_price, cost_rate = PRICE_RANGES[mgmt_no]
+            _, cost_rate = PRICE_RANGES[mgmt_no]
+            m = _week_metrics(rng, mgmt_no, week_offset)
 
-            trend_factor = 1.0 + week_offset * 0.03
-            cv = max(1, int(rng.gauss(30 + (8 - week_offset) * 5, 8) / trend_factor))
-            gross = cv * unit_price * rng.uniform(0.9, 1.1)
-            cost_of_sales = gross * (cost_rate + rng.uniform(-0.02, 0.02))
-            ad_cost = gross * rng.uniform(0.08, 0.15)
-
-            ctr_base = rng.uniform(0.8, 2.5)
-            cvr_pct = rng.uniform(0.5, 2.5)
-            ct = max(1, int(cv / (cvr_pct / 100)))
-            cpc = ad_cost / ct if ct > 0 else 0
-
-            row = RppWeekly(
+            db.add(RppWeekly(
                 week_start=week_start,
                 product_url=product["product_url"],
                 management_no=mgmt_no,
                 product_name=product["product_name"],
                 genre=product["genre"],
-                gross=round(gross, 0),
-                cost_of_sales=round(cost_of_sales, 0),
-                ad_cost=round(ad_cost, 0),
-                cv=cv,
-                ct=ct,
-                ctr=round(ctr_base, 2),
-                cpc=round(cpc, 0),
-            )
-            db.add(row)
+                gross=m["gross"],
+                cost_of_sales=round(m["gross"] * (cost_rate + rng.uniform(-0.02, 0.02)), 0),
+                ad_cost=m["ad_cost"],
+                cv=m["cv"],
+                ct=m["ct"],
+                ctr=m["ctr"],
+                cpc=round(m["cpc"], 0),
+            ))
 
+            # 12h値は720h値の約7割（実レポートの傾向に合わせたサンプル比率）
+            cv_12 = round(m["cv"] * 0.7)
+            gross_12 = round(m["gross"] * 0.7, 0)
+            row = {
+                "period_type": "weekly",
+                "year_month": week_start.strftime("%Y-%m"),
+                "date_from": week_start.isoformat(),
+                "date_to": week_end.isoformat(),
+                "item_code": mgmt_no,
+                "item_url": product["product_url"],
+                "product_name": product["product_name"],
+                "bid_price": int(m["cpc"] * 1.2) or 10,
+                "ct": m["ct"],
+                "ad_cost": int(m["ad_cost"]),
+                "cpc_actual": m["cpc"],
+                "ctr": m["ctr"],
+                "gross_720": m["gross"],
+                "cv_720": m["cv"],
+                "cvr_720": round(m["cv"] / m["ct"] * 100, 2) if m["ct"] else 0.0,
+                "roas_720": round(m["gross"] / m["ad_cost"] * 100, 1) if m["ad_cost"] else 0.0,
+                "cpo_720": round(m["ad_cost"] / m["cv"], 0) if m["cv"] else 0.0,
+                "gross_12": gross_12,
+                "cv_12": cv_12,
+                "cvr_12": round(cv_12 / m["ct"] * 100, 2) if m["ct"] else 0.0,
+                "roas_12": round(gross_12 / m["ad_cost"] * 100, 1) if m["ad_cost"] else 0.0,
+                "cpo_12": round(m["ad_cost"] / cv_12, 0) if cv_12 else 0.0,
+            }
+            weekly_rows.append(row)
+            db.add(RppSales(**row))
+
+    # ── 月次: 週次RppSalesを week_start の月で束ねて月次行を作る ──
+    # （実データ同様、RPP分析ページの月次タブ・月次診断の動作確認用）
+    monthly_agg: dict[tuple[str, str], list[dict]] = {}
+    for r in weekly_rows:
+        monthly_agg.setdefault((r["year_month"], r["item_code"]), []).append(r)
+
+    for (ym, mgmt_no), rows in monthly_agg.items():
+        y, mo = map(int, ym.split("-"))
+        last_day = (date(y + (mo == 12), mo % 12 + 1, 1) - timedelta(days=1)).day
+        ct = sum(r["ct"] for r in rows)
+        ad_cost = sum(r["ad_cost"] for r in rows)
+        gross_720 = sum(r["gross_720"] for r in rows)
+        cv_720 = sum(r["cv_720"] for r in rows)
+        gross_12 = sum(r["gross_12"] for r in rows)
+        cv_12 = sum(r["cv_12"] for r in rows)
+        first = rows[0]
+        db.add(RppSales(
+            period_type="monthly",
+            year_month=ym,
+            date_from=f"{ym}-01",
+            date_to=f"{ym}-{last_day:02d}",
+            item_code=mgmt_no,
+            item_url=first["item_url"],
+            product_name=first["product_name"],
+            bid_price=max(r["bid_price"] for r in rows),
+            ct=ct,
+            ad_cost=ad_cost,
+            cpc_actual=round(ad_cost / ct, 1) if ct else 0.0,
+            ctr=round(sum(r["ctr"] for r in rows) / len(rows), 2),
+            gross_720=gross_720,
+            cv_720=cv_720,
+            cvr_720=round(cv_720 / ct * 100, 2) if ct else 0.0,
+            roas_720=round(gross_720 / ad_cost * 100, 1) if ad_cost else 0.0,
+            cpo_720=round(ad_cost / cv_720, 0) if cv_720 else 0.0,
+            gross_12=gross_12,
+            cv_12=cv_12,
+            cvr_12=round(cv_12 / ct * 100, 2) if ct else 0.0,
+            roas_12=round(gross_12 / ad_cost * 100, 1) if ad_cost else 0.0,
+            cpo_12=round(ad_cost / cv_12, 0) if cv_12 else 0.0,
+        ))
+
+    # ── 月次商品分析（レガシー）と目標は従来どおり ──
     for month_offset in range(2):
         month_date = date(today.year, today.month, 1)
         if month_offset == 1:
@@ -97,7 +235,7 @@ def generate_sample_data(db: Session):
             sales = cv_monthly * unit_price * rng.uniform(0.95, 1.05)
             access = int(cv_monthly / rng.uniform(0.008, 0.02))
 
-            row = MonthlyAnalysis(
+            db.add(MonthlyAnalysis(
                 year_month=year_month,
                 product_url=product["product_url"],
                 management_no=mgmt_no,
@@ -106,8 +244,7 @@ def generate_sample_data(db: Session):
                 sales=round(sales, 0),
                 access_count=access,
                 cv=cv_monthly,
-            )
-            db.add(row)
+            ))
 
     for month_offset in range(2):
         month_date = date(today.year, today.month, 1)
@@ -118,14 +255,13 @@ def generate_sample_data(db: Session):
                 month_date = date(month_date.year, month_date.month - 1, 1)
         year_month = month_date.strftime("%Y-%m")
 
-        target = Target(
+        db.add(Target(
             year_month=year_month,
             target_sales=5_000_000,
             target_access=50000,
             target_cvr=1.5,
             target_av=7000,
             expense_rate=0.15,
-        )
-        db.add(target)
+        ))
 
     db.commit()
