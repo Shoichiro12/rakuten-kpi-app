@@ -390,10 +390,7 @@ export default function RppAnalysis() {
                       tickFormatter={(v: number) => `￥${(v / 1000).toFixed(0)}k`}
                     />
                     <Tooltip
-                      formatter={(value: number, name: string) => {
-                        const label = name === 'adCost' ? '広告費' : '売上(720h)'
-                        return [formatCurrency(value), label]
-                      }}
+                      formatter={(value: number, name: string) => [formatCurrency(value), name]}
                       contentStyle={{ fontSize: 12 }}
                     />
                     <Bar dataKey="adCost" name="広告費" radius={[4, 4, 0, 0]}>
