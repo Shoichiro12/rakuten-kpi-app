@@ -2,7 +2,6 @@ from datetime import date, timedelta
 from typing import Literal, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 
 from database import get_db
 from models import RppWeekly, Target
@@ -19,6 +18,20 @@ def _prev_month(ym: str) -> str:
     if month == 1:
         return f"{year - 1}-12"
     return f"{year}-{month - 1:02d}"
+
+
+def _month_bounds(ym: str) -> tuple[date, date]:
+    """'YYYY-MM' から [月初, 翌月初) の半開区間を返す。
+
+    月次フィルタは元々 func.strftime("%Y-%m", week_start) を使っていたが、strftime は
+    SQLite 専用のSQL関数で PostgreSQL(本番=Supabase)には存在せず実行時エラー→500になる。
+    week_start は Date 型なので、この半開区間で範囲フィルタすれば SQLite / Postgres
+    双方で同一に動く（月跨ぎ週は week_start の月に丸める従来仕様も維持される）。
+    """
+    year, month = int(ym[:4]), int(ym[5:7])
+    start = date(year, month, 1)
+    end = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    return start, end
 
 
 def get_week_start(d: date) -> date:
@@ -49,8 +62,9 @@ def aggregate_rpp(db: Session, week_start: date) -> dict:
 
 
 def aggregate_rpp_monthly(db: Session, year_month: str) -> dict:
+    m_start, m_end = _month_bounds(year_month)
     rows = db.query(RppWeekly).filter(
-        func.strftime("%Y-%m", RppWeekly.week_start) == year_month
+        RppWeekly.week_start >= m_start, RppWeekly.week_start < m_end
     ).all()
     if not rows:
         return None
