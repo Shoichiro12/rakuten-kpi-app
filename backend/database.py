@@ -12,6 +12,11 @@ DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./rakuten_kpi.db")
 engine_kwargs = {}
 if DATABASE_URL.startswith("sqlite"):
     engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    # 本番Postgres(Supabase): アイドルで切れた古い接続を掴んで遅延/エラーになるのを防ぐ。
+    # pool_pre_ping は毎回 SELECT 1 の往復が増えて逆に遅くなるため使わず、一定時間で
+    # 接続を作り直す pool_recycle を使う（往復を増やさずに張り直しを回避）。
+    engine_kwargs["pool_recycle"] = 300
 
 engine = create_engine(DATABASE_URL, **engine_kwargs)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

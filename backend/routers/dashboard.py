@@ -2,6 +2,7 @@ from datetime import date, timedelta
 from typing import Literal, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 
 from database import get_db
 from models import RppWeekly, Target
@@ -40,42 +41,46 @@ def get_week_start(d: date) -> date:
     return d - timedelta(days=weekday)
 
 
-def _weighted_ctr(rows) -> float:
-    total_ct = sum(r.ct for r in rows)
-    if total_ct == 0:
-        return 0.0
-    return sum(r.ctr * r.ct for r in rows) / total_ct
+# 集計はSQL側で完結させる（全行をPythonへ転送して合算するとリモートDBで転送コストが
+# 積み上がるため）。CTRは加重平均: Σ(ctr*ct) / Σ(ct)。データ0件なら None を返す。
+_AGG_COLUMNS = (
+    func.count(RppWeekly.id),
+    func.coalesce(func.sum(RppWeekly.gross), 0.0),
+    func.coalesce(func.sum(RppWeekly.cost_of_sales), 0.0),
+    func.coalesce(func.sum(RppWeekly.ad_cost), 0.0),
+    func.coalesce(func.sum(RppWeekly.cv), 0),
+    func.coalesce(func.sum(RppWeekly.ct), 0),
+    func.coalesce(func.sum(RppWeekly.ctr * RppWeekly.ct), 0.0),
+)
+
+
+def _row_to_agg(row) -> dict:
+    """集計行（count, Σgross, Σcost, Σad, Σcv, Σct, Σ(ctr*ct)）を集計dictに変換。"""
+    total_ct = row[5] or 0
+    return {
+        "gross": row[1],
+        "cost_of_sales": row[2],
+        "ad_cost": row[3],
+        "cv": row[4],
+        "ct": total_ct,
+        "ctr": (row[6] / total_ct) if total_ct else 0.0,
+    }
+
+
+def _aggregate(db: Session, *criteria) -> dict:
+    row = db.query(*_AGG_COLUMNS).filter(*criteria).one()
+    if not row[0]:  # count == 0 → データ無し
+        return None
+    return _row_to_agg(row)
 
 
 def aggregate_rpp(db: Session, week_start: date) -> dict:
-    rows = db.query(RppWeekly).filter(RppWeekly.week_start == week_start).all()
-    if not rows:
-        return None
-    return {
-        "gross": sum(r.gross for r in rows),
-        "cost_of_sales": sum(r.cost_of_sales for r in rows),
-        "ad_cost": sum(r.ad_cost for r in rows),
-        "cv": sum(r.cv for r in rows),
-        "ct": sum(r.ct for r in rows),
-        "ctr": _weighted_ctr(rows),
-    }
+    return _aggregate(db, RppWeekly.week_start == week_start)
 
 
 def aggregate_rpp_monthly(db: Session, year_month: str) -> dict:
     m_start, m_end = _month_bounds(year_month)
-    rows = db.query(RppWeekly).filter(
-        RppWeekly.week_start >= m_start, RppWeekly.week_start < m_end
-    ).all()
-    if not rows:
-        return None
-    return {
-        "gross": sum(r.gross for r in rows),
-        "cost_of_sales": sum(r.cost_of_sales for r in rows),
-        "ad_cost": sum(r.ad_cost for r in rows),
-        "cv": sum(r.cv for r in rows),
-        "ct": sum(r.ct for r in rows),
-        "ctr": _weighted_ctr(rows),
-    }
+    return _aggregate(db, RppWeekly.week_start >= m_start, RppWeekly.week_start < m_end)
 
 
 @router.get("")
@@ -311,11 +316,25 @@ def get_trend(
 ):
     today = date.today()
     current_week = get_week_start(today)
+    oldest_week = current_week - timedelta(weeks=weeks - 1)
+
+    # 8週間分を1週ずつ問い合わせると、リモートDBでは往復が週数ぶん積み上がる。
+    # week_start でGROUP BYした1クエリにまとめ、Python側で週ごとに割り当てる。
+    grouped = (
+        db.query(RppWeekly.week_start, *_AGG_COLUMNS)
+        .filter(
+            RppWeekly.week_start >= oldest_week,
+            RppWeekly.week_start <= current_week,
+        )
+        .group_by(RppWeekly.week_start)
+        .all()
+    )
+    by_week = {r[0]: _row_to_agg(r[1:]) for r in grouped}
 
     result = []
     for i in range(weeks - 1, -1, -1):
         week_start = current_week - timedelta(weeks=i)
-        raw = aggregate_rpp(db, week_start)
+        raw = by_week.get(week_start)
         if raw:
             kpis = calc_kpis(**raw)
             result.append({
