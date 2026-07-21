@@ -56,6 +56,11 @@ export default function Dashboard() {
   }, [load])
 
   const kpis = data?.kpis
+  const shop = data?.shop
+  // RPP広告データが無い月でも、商品分析レポート（店舗全体）の実績があれば表示する。
+  // 以前は kpis（RPP由来）の有無だけで画面全体を出し分けていたため、商品分析だけ
+  // 取り込んである月が「データがありません」になっていた。
+  const hasAnyData = Boolean(kpis || shop)
   const changes = data?.changes ?? {}
 
   const chartConfigs = {
@@ -93,14 +98,14 @@ export default function Dashboard() {
       />
 
       <div className="flex-1 overflow-auto bg-gray-50">
-        {/* データなし */}
-        {!loading && !kpis && (
+        {/* データなし（RPP・商品分析ともに無い期間のみ） */}
+        {!loading && !hasAnyData && (
           <EmptyState onDataGenerated={load} />
         )}
 
-        {kpis && <div className="p-6 space-y-6">
+        {hasAnyData && <div className="p-6 space-y-6">
         {/* KGI達成率（月次は商品分析レポート＝店舗全体売上を正とする） */}
-        {kpis && data?.target_sales && data.target_sales > 0 && (
+        {data?.target_sales != null && data.target_sales > 0 && (
           <div className="bg-white rounded-xl border p-4 shadow-sm">
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2">
@@ -129,8 +134,8 @@ export default function Dashboard() {
             </div>
             <div className="flex justify-between text-xs text-gray-500 mt-1">
               <span>
-                実績: {formatCurrency(data.shop ? data.shop.sales : kpis.gross)}
-                {data.shop && <span className="text-gray-400">（RPP経由: {formatCurrency(kpis.gross)}）</span>}
+                実績: {formatCurrency(data.shop ? data.shop.sales : kpis?.gross)}
+                {data.shop && kpis && <span className="text-gray-400">（RPP経由: {formatCurrency(kpis.gross)}）</span>}
               </span>
               <span>目標: {formatCurrency(data.target_sales)}</span>
             </div>
@@ -155,6 +160,32 @@ export default function Dashboard() {
           </div>
         )}
 
+        {/* RPP広告データが無い期間：商品分析（店舗全体）の実績だけで表示する。
+            以前はここで「データがありません」になり、店舗全体の実績まで隠れていた。 */}
+        {!kpis && shop && (
+          <>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4">
+              <p className="text-sm font-medium text-amber-900">
+                この期間はRPP広告データが未取込のため、広告系KPI（ROI・ROAS・CPC・CTR など）は表示できません。
+              </p>
+              <p className="text-xs text-amber-700 mt-1">
+                下記は商品分析レポート（店舗全体）の実績です。広告KPIも見るには「データ取込み」からRPPデータを取り込んでください。
+              </p>
+            </div>
+
+            <div>
+              <h3 className="text-base font-bold text-gray-900 mb-3">店舗全体の実績（商品分析）</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+                <KPICard size="hero" label="売上" value={formatCurrency(shop.sales)} variant="primary" />
+                <KPICard size="hero" label="アクセス人数（UU）" value={formatNumber(shop.access)} />
+                <KPICard size="hero" label="転換率（CVR）" value={formatPercent(shop.cvr, 2)} />
+                <KPICard size="hero" label="客単価（Av）" value={formatCurrency(shop.av)} />
+              </div>
+            </div>
+          </>
+        )}
+
+        {kpis && (<>
         {/* ===== 主要KPI（ヒーローカード：利益・売上の最重要4指標） ===== */}
         <div>
           <h3 className="text-base font-bold text-gray-900 mb-3">主要KPI</h3>
@@ -280,6 +311,7 @@ export default function Dashboard() {
             <KPICard size="compact" label="店舗運営経費" value={formatCurrency(kpis?.steady_cost)} />
           </div>
         </div>
+        </>)}
 
         {/* トレンドチャート */}
         <div className="bg-white rounded-xl border shadow-sm p-4">
