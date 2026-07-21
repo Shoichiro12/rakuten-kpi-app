@@ -178,3 +178,34 @@ class RppSales(Base, UserScopedMixin):
     __table_args__ = (
         UniqueConstraint("user_id", "period_type", "date_from", "date_to", "item_code", name="uq_rpp_sales"),
     )
+
+
+class ActionLog(Base, UserScopedMixin):
+    """「今日やるべきこと」の実施記録（Phase 1）＋ 学習ループの土台（Phase 2）。
+
+    docs/VISION.md の Phase 2「提案 → 実施結果 → 売上変化 → 学習」を回すには、
+    提案を実施した時点のKPIを保存しておく必要がある。後から遡って復元できないため、
+    実施操作のたびにスナップショットを取る。Phase 2 ではこの行と後続期間の実績を
+    突き合わせて、提案ごとの効果を定量化する。
+    """
+
+    __tablename__ = "action_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    action_key = Column(String, nullable=False)   # recommendations.py のルールキー
+    period_key = Column(String, nullable=False)   # YYYY-MM-DD(週次) / YYYY-MM(月次)
+    period_type = Column(String, nullable=False)  # 'weekly' | 'monthly'
+    status = Column(String, nullable=False, default="done")  # 'done' | 'snoozed'
+    title = Column(String)                        # 提案文のスナップショット（文言変更に耐える）
+
+    # 実施時点のKPIスナップショット（Phase 2 の効果測定用）
+    snapshot_sales = Column(Float)
+    snapshot_access = Column(Integer)
+    snapshot_cvr = Column(Float)
+    snapshot_av = Column(Float)
+
+    created_at = Column(DateTime, default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "action_key", "period_key", name="uq_action_log"),
+    )

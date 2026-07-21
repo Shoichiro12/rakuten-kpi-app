@@ -410,3 +410,27 @@ export interface RppDiagnosisResponse {
   benchmarks: RppDiagnosisBenchmarks
   items: RppDiagnosisItem[]
 }
+
+
+export type RecommendationPriority = 'critical' | 'recommended' | 'check'
+
+export interface Recommendation {
+  key: string
+  priority: RecommendationPriority
+  metric: string
+  title: string
+  reason: string
+  impact: string | null
+  effort: string
+  badges: string[]
+  link: string | null
+}
+
+export interface RecommendationsResponse {
+  period: 'weekly' | 'monthly'
+  period_label: string
+  period_key: string
+  target_gap: number | null
+  recommendations: Recommendation[]
+  done_count: number
+}

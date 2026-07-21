@@ -370,6 +370,36 @@ export const api = {
     /** 退会: 本人の全データと Supabase ユーザーを削除 */
     delete: () => request('/account', { method: 'DELETE' }),
   },
+  /* ─── 今日やるべきこと（Phase 1） ─────────────────── */
+  recommendations: {
+    /** 優先度順の推奨アクション（既定3件） */
+    get: (period: string, date?: string) =>
+      request(`/recommendations?period=${period}${date ? `&date=${date}` : ''}`),
+    /** 実施 / 後で（スヌーズ）を記録。実施時点のKPIも保存される */
+    complete: (
+      actionKey: string,
+      periodKey: string,
+      periodType: string,
+      status: 'done' | 'snoozed',
+      title?: string,
+    ) =>
+      request('/recommendations/complete', {
+        method: 'POST',
+        body: JSON.stringify({
+          action_key: actionKey,
+          period_key: periodKey,
+          period_type: periodType,
+          status,
+          title,
+        }),
+      }),
+    /** 実施記録を取り消して再表示する */
+    undo: (actionKey: string, periodKey: string) =>
+      request(
+        `/recommendations/complete?action_key=${encodeURIComponent(actionKey)}&period_key=${encodeURIComponent(periodKey)}`,
+        { method: 'DELETE' },
+      ),
+  },
   sampleData: () =>
     request('/sample-data', { method: 'POST' }),
   dataStatus: () => request('/data-status'),

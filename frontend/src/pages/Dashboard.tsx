@@ -8,10 +8,13 @@ import PeriodSelector from '../components/PeriodSelector'
 import EmptyState from '../components/EmptyState'
 import EvaluationMatrix from '../components/EvaluationMatrix'
 import AccessPlanner from '../components/dashboard/AccessPlanner'
+import TodayActions from '../components/dashboard/TodayActions'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
 import { usePeriodState } from '../lib/usePeriodState'
-import type { DashboardData, Alert, TrendPoint, EvaluationResult, AccessPlan } from '../types'
+import type {
+  DashboardData, Alert, TrendPoint, EvaluationResult, AccessPlan, RecommendationsResponse,
+} from '../types'
 
 export default function Dashboard() {
   const { period, dateValue, setPeriod, setDateValue } = usePeriodState()
@@ -20,6 +23,7 @@ export default function Dashboard() {
   const [trend, setTrend] = useState<TrendPoint[]>([])
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null)
   const [accessPlan, setAccessPlan] = useState<AccessPlan | null>(null)
+  const [recos, setRecos] = useState<RecommendationsResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [activeChart, setActiveChart] = useState<'gross' | 'gp' | 'roi' | 'cvr' | 'roas' | 'ct' | 'cpc'>('gross')
 
@@ -27,18 +31,20 @@ export default function Dashboard() {
     setLoading(true)
     try {
       const dateParam = period === 'monthly' ? dateValue.slice(0, 7) : dateValue
-      const [dash, als, tr, evalRes, planRes] = await Promise.all([
+      const [dash, als, tr, evalRes, planRes, recoRes] = await Promise.all([
         api.dashboard.get(period, dateParam) as Promise<DashboardData | null>,
         api.dashboard.alerts(period, dateParam) as Promise<{ alerts?: Alert[] } | null>,
         api.dashboard.trend(8) as Promise<{ trend?: TrendPoint[] } | null>,
         api.evaluation.matrix(period, dateParam).catch(() => null),
         api.evaluation.accessPlan(period, dateParam).catch(() => null),
+        api.recommendations.get(period, dateParam).catch(() => null) as Promise<RecommendationsResponse | null>,
       ])
       setData(dash ?? null)
       setAlerts(als?.alerts ?? [])
       setTrend(tr?.trend ?? [])
       setEvaluation(evalRes?.evaluation ?? null)
       setAccessPlan(planRes?.plan ?? null)
+      setRecos(recoRes ?? null)
     } catch (e) {
       console.error('[Dashboard] データ取得エラー:', e)
       setData(null)
@@ -46,6 +52,7 @@ export default function Dashboard() {
       setTrend([])
       setEvaluation(null)
       setAccessPlan(null)
+      setRecos(null)
     } finally {
       setLoading(false)
     }
@@ -104,6 +111,9 @@ export default function Dashboard() {
         )}
 
         {hasAnyData && <div className="p-6 space-y-6">
+        {/* 今日やるべきこと（Phase 1）。数値より先に「次の行動」を見せるため最上部に置く。 */}
+        <TodayActions data={recos} onChanged={load} />
+
         {/* KGI達成率（月次は商品分析レポート＝店舗全体売上を正とする） */}
         {data?.target_sales != null && data.target_sales > 0 && (
           <div className="bg-white rounded-xl border p-4 shadow-sm">
