@@ -7,6 +7,9 @@ interface GenreCardsProps {
   selectedGenre: string | null
   selectedKPI: string | null
   onSelect: (genre: string) => void
+  /** 集計軸。'shop'=商品分析（店舗全体・CVRはUU基準）/ それ以外=RPP（CVRはクリック基準）。
+   *  月次と週次で母数が変わるため、どちらで見ているかを明示する。 */
+  axis?: string | null
 }
 
 function ChangeChip({ value }: { value: number | null | undefined }) {
@@ -24,7 +27,7 @@ function isWarning(change: number | null | undefined): boolean {
   return change != null && change < -5
 }
 
-export default function GenreCards({ genres, selectedGenre, selectedKPI, onSelect }: GenreCardsProps) {
+export default function GenreCards({ genres, selectedGenre, selectedKPI, onSelect, axis }: GenreCardsProps) {
   if (genres.length === 0) return null
 
   // 差分最大（最も悪化）のジャンルを特定
@@ -52,6 +55,18 @@ export default function GenreCards({ genres, selectedGenre, selectedKPI, onSelec
           )}
         </p>
         <span className="text-xs text-gray-400 bg-gray-100 rounded px-2 py-0.5">{genres.length}ジャンル</span>
+        <span
+          className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+            axis === 'shop' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
+          }`}
+          title={
+            axis === 'shop'
+              ? 'CVRはアクセス人数(UU)を母数にした転換率です'
+              : 'CVRはRPPのクリック数を母数にした転換率です'
+          }
+        >
+          {axis === 'shop' ? '商品分析ベース（店舗全体）' : 'RPP経由ベース'}
+        </span>
       </div>
 
       <div className="flex gap-3 overflow-x-auto pb-2">

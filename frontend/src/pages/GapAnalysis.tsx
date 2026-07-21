@@ -35,6 +35,8 @@ export default function GapAnalysis() {
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null)
   const [shopData, setShopData] = useState<ShopData | null>(null)
   const [genreData, setGenreData] = useState<GenreKPI[]>([])
+  // 集計軸（'shop'=商品分析／null=RPP）。月次と週次でCVRの母数が変わるため保持する。
+  const [genreAxis, setGenreAxis] = useState<string | null>(null)
   const [productData, setProductData] = useState<ProductItem[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -46,12 +48,13 @@ export default function GapAnalysis() {
       const [tree, shop, genre, evalRes] = await Promise.all([
         api.gap.kpiTree(period, dateParam) as Promise<KPITree | null>,
         api.gap.shop(period, dateParam) as Promise<ShopData | null>,
-        api.gap.genre(period, dateParam) as Promise<{ genres?: GenreKPI[] } | null>,
+        api.gap.genre(period, dateParam) as Promise<{ genres?: GenreKPI[]; axis?: string | null } | null>,
         api.evaluation.matrix(period, dateParam).catch(() => null),
       ])
       setTreeData(tree ?? null)
       setShopData(shop ?? null)
       setGenreData(genre?.genres ?? [])
+      setGenreAxis(genre?.axis ?? null)
       setEvaluation(evalRes?.evaluation ?? null)
     } catch (e) {
       console.error('[GapAnalysis] データ取得エラー:', e)
@@ -167,6 +170,7 @@ export default function GapAnalysis() {
           {(step >= 2 || selectedKPI) && genreData.length > 0 && (
             <div className="bg-white rounded-xl border shadow-sm p-5">
               <GenreCards
+                axis={genreAxis}
                 genres={genreData}
                 selectedGenre={selectedGenre}
                 selectedKPI={selectedKPI}

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import RppWeekly, Target
+from models import RppWeekly, Target, MonthlyItemSales
 from calculations import calc_kpis, calc_change_rate
 from shop_metrics import get_shop_monthly
 
@@ -58,6 +58,127 @@ def _genre_path_parts(genre_key: str, level: str) -> dict:
         "genre_path": genre_key,
     }
     return result
+
+
+def _shop_genre_key(row, level: str) -> str:
+    """MonthlyItemSales の genre_u1/u2/u3 から指定レベルの集計キーを作る。
+
+    RppWeekly.genre はスラッシュ区切りの1カラムだが、商品分析レポートは大中小が
+    別カラムなので専用に組み立てる。欠損は "未分類" で補完し、RPP軸のキー形式
+    （_extract_genre_key）と揃えることで、フロントの階層ドリルダウンをそのまま使う。
+    """
+    u1 = (row.genre_u1 or "").strip() or "未分類"
+    u2 = (row.genre_u2 or "").strip() or "未分類"
+    u3 = (row.genre_u3 or "").strip() or "未分類"
+    if level == "u1":
+        return u1
+    if level == "u2":
+        return f"{u1}/{u2}"
+    return f"{u1}/{u2}/{u3}"
+
+
+def _aggregate_shop_genre(rows, level: str, matches_parent) -> dict:
+    """商品分析レポート（店舗全体）をジャンル単位に合算する。"""
+    genres: dict = {}
+    for r in rows:
+        key = _shop_genre_key(r, level)
+        if not matches_parent(key):
+            continue
+        g = genres.setdefault(
+            key, {"gross": 0.0, "access": 0, "cv": 0, "ad_cost": 0.0, "ad_sales": 0.0}
+        )
+        g["gross"] += r.sales or 0
+        g["access"] += r.access_uu or 0
+        g["cv"] += r.cv or 0
+        g["ad_cost"] += r.ad_cost or 0
+        g["ad_sales"] += r.ad_sales or 0
+    return genres
+
+
+def _shop_genre_kpis(raw: dict) -> dict:
+    """商品分析軸のジャンルKPI。
+
+    注意: ここでの cvr は「アクセス人数(UU) → 注文」であり、RPP軸の
+    「クリック → 注文」とは母数が違う。同一画面で混ぜないため、月次は
+    STEP1〜STEP3すべてを商品分析軸で統一する（CLAUDE.md の注意点に対応）。
+    """
+    access = raw["access"]
+    cv = raw["cv"]
+    gross = raw["gross"]
+    ad_cost = raw["ad_cost"]
+    return {
+        "gross": round(gross, 0),
+        "access": access,
+        "ct": access,  # フロント互換（アクセス母数を指す既存キー）
+        "cv": cv,
+        "cvr": round(cv / access * 100, 2) if access > 0 else 0,
+        "av": round(gross / cv, 0) if cv > 0 else 0,
+        "ad_cost": round(ad_cost, 0),
+        "roas": round(raw["ad_sales"] / ad_cost * 100, 1) if ad_cost > 0 else 0,
+    }
+
+
+def _build_shop_products(items, prev_items, genre: Optional[str]) -> dict:
+    """商品分析レポート（店舗全体）から商品別KPIを組み立てる（月次のSTEP3用）。
+
+    RPP軸の calc_kpis は広告費・原価が前提だが、商品分析には原価が無いため
+    そのままでは Rev/ROI/Limit CPO が算出できない。ここでは店舗全体軸で意味のある
+    指標（売上・アクセスUU・CVR・客単価・広告費・ROAS）だけを返し、
+    広告効率の判定は limit_cpo_exceeded=False として出さない（誤判定を避ける）。
+    """
+    def _match(row) -> bool:
+        if not genre:
+            return True
+        key3 = _shop_genre_key(row, "u3")
+        return key3 == genre or key3.startswith(genre + "/")
+
+    def _kpis(row) -> dict:
+        access = row.access_uu or 0
+        cv = row.cv or 0
+        sales = row.sales or 0
+        ad_cost = row.ad_cost or 0
+        return {
+            "gross": round(sales, 0),
+            "access": access,
+            "ct": access,
+            "cv": cv,
+            "cvr": round(cv / access * 100, 2) if access > 0 else 0,
+            "av": round(sales / cv, 0) if cv > 0 else 0,
+            "ad_cost": round(ad_cost, 0),
+            "roas": round((row.ad_sales or 0) / ad_cost * 100, 1) if ad_cost > 0 else 0,
+            "limit_cpo": 0,
+            "cpo": round(ad_cost / cv, 0) if cv > 0 else 0,
+        }
+
+    prev_by_key = {
+        (r.management_no or r.product_url): r for r in prev_items
+    }
+
+    result = []
+    for r in items:
+        if not _match(r):
+            continue
+        key = r.management_no or r.product_url
+        kpis = _kpis(r)
+        prev_row = prev_by_key.get(key)
+        prev_kpis = _kpis(prev_row) if prev_row else None
+        changes = {}
+        if prev_kpis:
+            for k in ["gross", "cv", "cvr", "av", "roas", "access"]:
+                changes[k] = calc_change_rate(kpis[k], prev_kpis[k])
+        result.append({
+            "product_url": r.product_url,
+            "management_no": r.management_no,
+            "product_name": r.product_name,
+            "genre": _shop_genre_key(r, "u3"),
+            "current": kpis,
+            "prev": prev_kpis,
+            "changes": changes,
+            "limit_cpo_exceeded": False,
+        })
+
+    result.sort(key=lambda x: x["current"]["gross"], reverse=True)
+    return {"products": result, "axis": "shop"}
 
 
 def get_week_start(d: date) -> date:
@@ -152,6 +273,8 @@ def gap_genre(
       各要素に genre_path / genre_level / genre_u1 / genre_u2 / genre_u3 を追加。
     """
     today = date.today()
+    shop_cur_items: list = []
+    shop_prev_items: list = []
     if period == "weekly":
         current_week = get_week_start(date.fromisoformat(date_str) if date_str else today)
         prev_week = current_week - timedelta(weeks=1)
@@ -162,6 +285,16 @@ def gap_genre(
         prev_ym = _prev_month(ym)
         cur_start, cur_end = _month_bounds(ym)
         prev_start, prev_end = _month_bounds(prev_ym)
+        # 月次は STEP1（KGIツリー・評価マトリクス）が商品分析＝店舗全体を正としている。
+        # ジャンル内訳も同じ軸で出さないと、UUから絞り込んだ先がRPPクリック数になり
+        # ドリルダウンの数字が繋がらない。商品分析があればそちらを優先する。
+        shop_cur_items = db.query(MonthlyItemSales).filter(
+            MonthlyItemSales.year_month == ym
+        ).all()
+        if shop_cur_items:
+            shop_prev_items = db.query(MonthlyItemSales).filter(
+                MonthlyItemSales.year_month == prev_ym
+            ).all()
         current_rows = db.query(RppWeekly).filter(
             RppWeekly.week_start >= cur_start, RppWeekly.week_start < cur_end
         ).all()
@@ -176,6 +309,28 @@ def gap_genre(
         # genre_key は level に応じた集計キー（例: "スポーツ" or "スポーツ/シューズ"）
         # parent は 1 段上のキーなので前方一致で判定する
         return genre_key == parent or genre_key.startswith(parent + "/")
+
+    # --- 月次かつ商品分析データあり: 店舗全体軸でジャンル内訳を返す ---
+    if shop_cur_items:
+        cur_g = _aggregate_shop_genre(shop_cur_items, level, _matches_parent)
+        prev_g = _aggregate_shop_genre(shop_prev_items, level, _matches_parent)
+        shop_result = []
+        for genre_key, raw in cur_g.items():
+            kpis = _shop_genre_kpis(raw)
+            prev_kpis = _shop_genre_kpis(prev_g[genre_key]) if genre_key in prev_g else None
+            changes = {}
+            if prev_kpis:
+                for k in ["gross", "cv", "cvr", "av", "roas", "access"]:
+                    changes[k] = calc_change_rate(kpis[k], prev_kpis[k])
+            shop_result.append({
+                "genre": genre_key,
+                "current": kpis,
+                "prev": prev_kpis,
+                "changes": changes,
+                **_genre_path_parts(genre_key, level),
+            })
+        shop_result.sort(key=lambda x: x["current"]["gross"], reverse=True)
+        return {"genres": shop_result, "level": level, "parent": parent, "axis": "shop"}
 
     def group_by_genre(rows):
         """level・parent に基づいてジャンルキーを解決し集計する。"""
@@ -249,6 +404,15 @@ def gap_product(
         prev_start, prev_end = _month_bounds(prev_ym)
         q_curr = db.query(RppWeekly).filter(RppWeekly.week_start >= cur_start, RppWeekly.week_start < cur_end)
         q_prev = db.query(RppWeekly).filter(RppWeekly.week_start >= prev_start, RppWeekly.week_start < prev_end)
+
+        # STEP2（ジャンル別）と同じく、月次は商品分析＝店舗全体を正とする。
+        # RPPしか見ないと、RPP未取込の月にドリルダウンした先が空になる。
+        shop_items = db.query(MonthlyItemSales).filter(MonthlyItemSales.year_month == ym).all()
+        if shop_items:
+            shop_prev = db.query(MonthlyItemSales).filter(
+                MonthlyItemSales.year_month == prev_ym
+            ).all()
+            return _build_shop_products(shop_items, shop_prev, genre)
 
     if genre:
         # ジャンルは階層キー（大分類 "スポーツ" / 大中 "スポーツ/シューズ"）で渡される。
