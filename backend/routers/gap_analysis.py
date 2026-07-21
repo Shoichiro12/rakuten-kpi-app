@@ -114,7 +114,10 @@ def _shop_genre_kpis(raw: dict) -> dict:
         "cvr": round(cv / access * 100, 2) if access > 0 else 0,
         "av": round(gross / cv, 0) if cv > 0 else 0,
         "ad_cost": round(ad_cost, 0),
-        "roas": round(raw["ad_sales"] / ad_cost * 100, 1) if ad_cost > 0 else 0,
+        # 広告費が未取込の場合は 0% ではなく None を返す。0%と表示すると
+        # 「広告効率が最悪」と誤解されるが、実際は「データが無い」だけのため。
+        # フロントの formatPercent は null を「—」として描画する。
+        "roas": round(raw["ad_sales"] / ad_cost * 100, 1) if ad_cost > 0 else None,
     }
 
 
@@ -145,7 +148,8 @@ def _build_shop_products(items, prev_items, genre: Optional[str]) -> dict:
             "cvr": round(cv / access * 100, 2) if access > 0 else 0,
             "av": round(sales / cv, 0) if cv > 0 else 0,
             "ad_cost": round(ad_cost, 0),
-            "roas": round((row.ad_sales or 0) / ad_cost * 100, 1) if ad_cost > 0 else 0,
+            # 広告費未取込は 0% ではなく None（「—」表示）。上の _shop_genre_kpis と同方針。
+            "roas": round((row.ad_sales or 0) / ad_cost * 100, 1) if ad_cost > 0 else None,
             "limit_cpo": 0,
             "cpo": round(ad_cost / cv, 0) if cv > 0 else 0,
         }
@@ -165,6 +169,10 @@ def _build_shop_products(items, prev_items, genre: Optional[str]) -> dict:
         changes = {}
         if prev_kpis:
             for k in ["gross", "cv", "cvr", "av", "roas", "access"]:
+                # roas は広告費未取込だと None。None 同士の減算で落ちるため除外する。
+                if kpis.get(k) is None or prev_kpis.get(k) is None:
+                    changes[k] = None
+                    continue
                 changes[k] = calc_change_rate(kpis[k], prev_kpis[k])
         result.append({
             "product_url": r.product_url,
@@ -353,6 +361,10 @@ def gap_genre(
             changes = {}
             if prev_kpis:
                 for k in ["gross", "cv", "cvr", "av", "roas", "access"]:
+                    # roas は広告費未取込だと None。None 同士の減算で落ちるため除外する。
+                    if kpis.get(k) is None or prev_kpis.get(k) is None:
+                        changes[k] = None
+                        continue
                     changes[k] = calc_change_rate(kpis[k], prev_kpis[k])
             shop_result.append({
                 "genre": genre_key,

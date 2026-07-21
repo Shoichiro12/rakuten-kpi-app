@@ -393,6 +393,8 @@ export const api = {
           title,
         }),
       }),
+    /** 実施した施策のその後（Phase 2 の効果測定） */
+    outcomes: () => request('/recommendations/outcomes'),
     /** 実施記録を取り消して再表示する */
     undo: (actionKey: string, periodKey: string) =>
       request(

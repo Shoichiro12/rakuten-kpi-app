@@ -61,6 +61,11 @@ def get_recommendations(
         for r in db.query(ActionLog).filter(ActionLog.period_key == pkey).all()
     }
 
+    # Phase 2: 過去の実施結果から順位の微調整値を得る（サンプル不足なら空dict）
+    from learning import outcome_weights
+
+    weights = outcome_weights(db)
+
     items = build_recommendations(
         evaluation=(ev or {}).get("evaluation"),
         plan=(ap or {}).get("plan"),
@@ -69,6 +74,7 @@ def get_recommendations(
         changes=dash.get("changes"),
         done_keys=done_keys,
         limit=limit,
+        weights=weights,
     )
 
     # 商品単位の提案（「どの商品の何を直すか」）。
@@ -109,6 +115,25 @@ def get_recommendations(
         "recommendations": items,
         "product_recommendations": product_items,
         "done_count": len(done_keys),
+    }
+
+
+@router.get("/outcomes")
+def get_outcomes(db: Session = Depends(get_db)):
+    """実施した施策の「その後」を返す（Phase 2 の振り返り）。
+
+    測定できたものだけでなく、翌月データ待ち（pending）も正直に返す。
+    効果は相関であって因果ではないため、UI側でも断定的な表現はしない。
+    """
+    from learning import MIN_SAMPLE_FOR_WEIGHT, measure_all, summarize_outcomes
+
+    results = measure_all(db, limit=20)
+    return {
+        "results": results,
+        "summary": summarize_outcomes(db),
+        "measured_count": sum(1 for r in results if r["status"] == "measured"),
+        "pending_count": sum(1 for r in results if r["status"] == "pending"),
+        "min_sample_for_weight": MIN_SAMPLE_FOR_WEIGHT,
     }
 
 

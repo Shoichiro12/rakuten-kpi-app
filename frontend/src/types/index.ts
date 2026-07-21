@@ -440,3 +440,34 @@ export interface RecommendationsResponse {
   product_recommendations?: Recommendation[]
   done_count: number
 }
+
+/** 実施した施策の「その後」（Phase 2 の効果測定） */
+export interface ActionOutcome {
+  action_key: string
+  title: string | null
+  period_key: string
+  status: 'measured' | 'pending' | 'not_applicable'
+  metric: string | null
+  metric_label: string | null
+  before: number | null
+  after: number | null
+  delta_pct: number | null
+  next_period: string | null
+}
+
+export interface OutcomeSummary {
+  count: number
+  positive: number
+  metric: string | null
+  metric_label: string | null
+  avg_delta_pct: number | null
+}
+
+export interface OutcomesResponse {
+  results: ActionOutcome[]
+  summary: Record<string, OutcomeSummary>
+  measured_count: number
+  pending_count: number
+  /** この件数未満は提案順位に反映しない（偶然を学習しないため） */
+  min_sample_for_weight: number
+}

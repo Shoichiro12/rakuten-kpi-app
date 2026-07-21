@@ -315,6 +315,7 @@ def build_recommendations(
     changes: Optional[dict] = None,
     done_keys: Optional[set] = None,
     limit: int = DEFAULT_LIMIT,
+    weights: Optional[dict] = None,
 ) -> list:
     """各シグナルから提案を生成し、優先度順に上位 limit 件を返す。
 
@@ -352,7 +353,17 @@ def build_recommendations(
             item["_order"] = order
             items.append(item)
 
-    items.sort(key=lambda x: (_PRIORITY_ORDER.get(x["priority"], 9), x["_order"]))
+    # 過去の実施結果を順位へ控えめに反映する（Phase 2 の学習ループ）。
+    # 優先度の枠は跨がせない。「赤字の止血」より「過去に効いた施策」を
+    # 上に出すようなことは起こらないようにする。枠内での微調整に留める。
+    w = weights or {}
+    items.sort(
+        key=lambda x: (
+            _PRIORITY_ORDER.get(x["priority"], 9),
+            -w.get(x["key"].split(":")[0], 0),
+            x["_order"],
+        )
+    )
     for it in items:
         it.pop("_order", None)
     return items[:limit] if limit and limit > 0 else items
