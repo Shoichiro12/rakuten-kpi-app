@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
 import Sidebar from './components/layout/Sidebar'
+import ErrorBoundary from './components/ErrorBoundary'
 import OnboardingModal from './components/OnboardingModal'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
@@ -14,6 +15,30 @@ import Reports from './pages/Reports'
 import AccountSettings from './pages/AccountSettings'
 import ResetPassword from './pages/ResetPassword'
 import { supabase, authEnabled } from './lib/supabase'
+
+/**
+ * 画面ルーティング。ErrorBoundary で囲み、1画面の描画エラーでアプリ全体が
+ * 白くなるのを防ぐ。key に経路を渡すことで、ページを移動するとエラー状態が
+ * 自動的にリセットされる（useLocation は BrowserRouter の内側でのみ使えるため
+ * App 本体ではなくこの子コンポーネントに置いている）。
+ */
+function AppRoutes({ userEmail }: { userEmail: string | null }) {
+  const location = useLocation()
+  return (
+    <ErrorBoundary key={location.pathname} label="この画面">
+      <Routes>
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/gap" element={<GapAnalysis />} />
+        <Route path="/products" element={<ProductKPI />} />
+        <Route path="/import" element={<DataImport />} />
+        <Route path="/targets" element={<TargetSetting />} />
+        <Route path="/rpp" element={<RppAnalysis />} />
+        <Route path="/reports" element={<Reports />} />
+        <Route path="/account" element={<AccountSettings userEmail={userEmail} />} />
+      </Routes>
+    </ErrorBoundary>
+  )
+}
 
 const ONBOARDING_KEY = 'rakuten-kpi-onboarding-v1'
 
@@ -72,16 +97,7 @@ export default function App() {
       <div className="flex h-screen overflow-hidden bg-gray-50">
         <Sidebar onOpenHelp={reopenOnboarding} userEmail={session?.user?.email ?? null} onSignOut={signOut} />
         <main className="flex-1 overflow-auto flex flex-col">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/gap" element={<GapAnalysis />} />
-            <Route path="/products" element={<ProductKPI />} />
-            <Route path="/import" element={<DataImport />} />
-            <Route path="/targets" element={<TargetSetting />} />
-            <Route path="/rpp" element={<RppAnalysis />} />
-            <Route path="/reports" element={<Reports />} />
-            <Route path="/account" element={<AccountSettings userEmail={session?.user?.email ?? null} />} />
-          </Routes>
+          <AppRoutes userEmail={session?.user?.email ?? null} />
         </main>
       </div>
 

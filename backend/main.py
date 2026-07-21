@@ -159,9 +159,25 @@ if os.path.isdir(_FRONTEND_DIST):
     if os.path.isdir(_ASSETS_DIR):
         app.mount("/assets", StaticFiles(directory=_ASSETS_DIR), name="assets")
 
+    # index.html は絶対にキャッシュさせない。
+    # ビルドのたびに /assets/index-<hash>.js のファイル名が変わり、古いハッシュの
+    # ファイルはデプロイで消える。index.html がブラウザにキャッシュされていると、
+    # 「古いindex.html → 存在しないJSを参照 → 404 → 画面が真っ白」になる。
+    # assets 側はファイル名にハッシュが入っているので長期キャッシュで問題ない。
+    _NO_STORE = {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        "Pragma": "no-cache",
+        "Expires": "0",
+    }
+
+    def _index_response() -> FileResponse:
+        return FileResponse(
+            os.path.join(_FRONTEND_DIST, "index.html"), headers=_NO_STORE
+        )
+
     @app.get("/")
     def _serve_index():
-        return FileResponse(os.path.join(_FRONTEND_DIST, "index.html"))
+        return _index_response()
 
     @app.get("/{full_path:path}")
     def _serve_spa(full_path: str):
@@ -170,4 +186,4 @@ if os.path.isdir(_FRONTEND_DIST):
         candidate = os.path.join(_FRONTEND_DIST, full_path)
         if full_path and os.path.isfile(candidate):
             return FileResponse(candidate)
-        return FileResponse(os.path.join(_FRONTEND_DIST, "index.html"))
+        return _index_response()

@@ -230,6 +230,38 @@ def gap_shop(
             RppWeekly.week_start >= prev_start, RppWeekly.week_start < prev_end
         ).all()
 
+    # 月次はSTEP2・STEP3と同じく商品分析＝店舗全体を正とする。
+    # ここだけRPP専用のままだと、RPP未取込の月に current が null になり、
+    # STEP3が shopData.current.ctr を参照して画面全体がクラッシュする。
+    if period != "weekly":
+        shop_cur = get_shop_monthly(db, ym)
+        if shop_cur:
+            shop_prev = get_shop_monthly(db, prev_ym)
+
+            def _to_kpis(s: dict) -> dict:
+                return {
+                    "gross": s["sales"],
+                    "access": s["access"],
+                    "ct": s["access"],
+                    "cv": s["cv"],
+                    "cvr": s["cvr"],
+                    "av": s["av"],
+                    # 商品分析にはRPPのCTR概念が無い。0にすると「CTRが低い」判定が
+                    # 誤発火するため、比較の起点にならない値として明示的に0を返し、
+                    # 参照側は ctr > 0 のときだけ判定する（既存の実装と整合）。
+                    "ctr": 0,
+                    "ad_cost": 0,
+                    "roas": 0,
+                }
+
+            cur_k = _to_kpis(shop_cur)
+            prev_k = _to_kpis(shop_prev) if shop_prev else None
+            ch = {}
+            if prev_k:
+                for k in ["gross", "cv", "cvr", "av", "access"]:
+                    ch[k] = calc_change_rate(cur_k[k], prev_k[k])
+            return {"current": cur_k, "prev": prev_k, "changes": ch, "axis": "shop"}
+
     current = agg_rows(current_rows)
     prev = agg_rows(prev_rows)
     if not current:

@@ -214,12 +214,16 @@ export default function GapAnalysis() {
                     {productData.map((p) => {
                       const isSelected = selectedProduct?.product_url === p.product_url
                       // 優先度: 在庫 > アクセス > 客単価 = CVR（講座ロジック準拠）
+                      // shopData.current は「対象期間にショップ全体の実績が無い」場合 null になる。
+                      // ガードせずに参照すると描画中に例外が出て画面全体が白くなるため、
+                      // 必ずオプショナルチェーンで参照する（比較対象が無いときは警告を出さない）。
+                      const shopCur = shopData?.current ?? null
                       const accessWarn = p.current.ct < 100 ||
-                        (shopData && shopData.current.ctr > 0 && p.current.ctr < shopData.current.ctr * 0.75)
+                        (!!shopCur && shopCur.ctr > 0 && p.current.ctr < shopCur.ctr * 0.75)
                       const lowAccess = p.current.ct < 100
                       // アクセス母数不足(100未満)の場合、CVR・客単価の警告は表示しない（信用できない数値のため）
-                      const cvrWarn = !lowAccess && shopData && p.current.cvr < shopData.current.cvr * 0.85
-                      const avWarn = !lowAccess && shopData && p.current.av < shopData.current.av * 0.85
+                      const cvrWarn = !lowAccess && !!shopCur && shopCur.cvr > 0 && p.current.cvr < shopCur.cvr * 0.85
+                      const avWarn = !lowAccess && !!shopCur && shopCur.av > 0 && p.current.av < shopCur.av * 0.85
                       return (
                         <tr
                           key={p.product_url}
@@ -319,7 +323,7 @@ export default function GapAnalysis() {
         </div>
 
         {/* アクションパネル（右サイド） */}
-        {selectedProduct && shopData && (
+        {selectedProduct && shopData?.current && (
           <ActionPanel
             product={selectedProduct}
             shopKpis={shopData.current}
