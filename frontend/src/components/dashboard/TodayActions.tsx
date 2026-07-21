@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { CheckCircle2, ChevronRight, ListChecks, Undo2 } from 'lucide-react'
+import { CheckCircle2, ChevronRight, ListChecks, Package, Undo2 } from 'lucide-react'
 import { api } from '../../lib/api'
 import { formatCurrency } from '../../lib/utils'
 import type { Recommendation, RecommendationsResponse } from '../../types'
@@ -32,6 +32,8 @@ export default function TodayActions({ data, onChanged }: Props) {
   if (!data) return null
 
   const items = data.recommendations ?? []
+  const productItems = data.product_recommendations ?? []
+  const totalCount = items.length + productItems.length
 
   const act = async (item: Recommendation, status: 'done' | 'snoozed') => {
     setBusy(item.key)
@@ -58,8 +60,66 @@ export default function TodayActions({ data, onChanged }: Props) {
     }
   }
 
+  // 提案カード1件分。店舗全体・商品単位の両方で同じ見た目を使う。
+  const renderCard = (item: Recommendation) => {
+    const style = PRIORITY_STYLE[item.priority] ?? PRIORITY_STYLE.check
+    const disabled = busy === item.key
+    return (
+      <div key={item.key} className="bg-gray-50 rounded-lg p-3">
+        <div className="flex items-start gap-2.5">
+          <span className={`text-[11px] px-2 py-0.5 rounded font-medium whitespace-nowrap ${style.cls}`}>
+            {style.label}
+          </span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-gray-900">{item.title}</p>
+            <p className="text-xs text-gray-600 mt-1 leading-relaxed">{item.reason}</p>
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              {item.impact && (
+                <span className="text-[11px] px-2 py-0.5 rounded bg-green-100 text-green-700">
+                  {item.impact}
+                </span>
+              )}
+              <span className="text-[11px] px-2 py-0.5 rounded bg-white text-gray-500 border">
+                所要 {item.effort}
+              </span>
+              {item.badges?.map((b) => (
+                <span key={b} className="text-[11px] px-2 py-0.5 rounded bg-white text-gray-500 border">
+                  {b}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="flex gap-2 mt-2.5">
+          <button
+            onClick={() => act(item, 'done')}
+            disabled={disabled}
+            className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-white text-gray-700 disabled:opacity-40"
+          >
+            実施した
+          </button>
+          {item.link && (
+            <button
+              onClick={() => navigate(item.link!)}
+              className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-white text-gray-700 flex items-center gap-1"
+            >
+              対応する<ChevronRight size={12} />
+            </button>
+          )}
+          <button
+            onClick={() => act(item, 'snoozed')}
+            disabled={disabled}
+            className="text-xs px-3 py-1.5 rounded text-gray-400 hover:text-gray-600 disabled:opacity-40"
+          >
+            後で
+          </button>
+        </div>
+      </div>
+    )
+  }
+
   // 提案0件＝いま緊急に対処すべき課題が無い健全な状態。無言で消さず明示する。
-  if (items.length === 0) {
+  if (totalCount === 0) {
     return (
       <div className="bg-white rounded-xl border shadow-sm p-4">
         <div className="flex items-center gap-2">
@@ -85,7 +145,7 @@ export default function TodayActions({ data, onChanged }: Props) {
         <ListChecks size={18} className="text-blue-600" />
         <span className="text-base font-bold text-gray-900">今日やるべきこと</span>
         <span className="text-[11px] px-2 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
-          {items.length}件
+          {totalCount}件
         </span>
         {data.done_count > 0 && (
           <span className="text-[11px] text-gray-400">実施済み {data.done_count}件</span>
@@ -110,63 +170,22 @@ export default function TodayActions({ data, onChanged }: Props) {
       )}
 
       <div className="space-y-2.5">
-        {items.map((item) => {
-          const style = PRIORITY_STYLE[item.priority] ?? PRIORITY_STYLE.check
-          const disabled = busy === item.key
-          return (
-            <div key={item.key} className="bg-gray-50 rounded-lg p-3">
-              <div className="flex items-start gap-2.5">
-                <span className={`text-[11px] px-2 py-0.5 rounded font-medium whitespace-nowrap ${style.cls}`}>
-                  {style.label}
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-gray-900">{item.title}</p>
-                  <p className="text-xs text-gray-600 mt-1 leading-relaxed">{item.reason}</p>
-                  <div className="flex flex-wrap gap-1.5 mt-2">
-                    {item.impact && (
-                      <span className="text-[11px] px-2 py-0.5 rounded bg-green-100 text-green-700">
-                        {item.impact}
-                      </span>
-                    )}
-                    <span className="text-[11px] px-2 py-0.5 rounded bg-white text-gray-500 border">
-                      所要 {item.effort}
-                    </span>
-                    {item.badges?.map((b) => (
-                      <span key={b} className="text-[11px] px-2 py-0.5 rounded bg-white text-gray-500 border">
-                        {b}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2 mt-2.5">
-                <button
-                  onClick={() => act(item, 'done')}
-                  disabled={disabled}
-                  className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-white text-gray-700 disabled:opacity-40"
-                >
-                  実施した
-                </button>
-                {item.link && (
-                  <button
-                    onClick={() => navigate(item.link!)}
-                    className="text-xs px-3 py-1.5 rounded border border-gray-300 hover:bg-white text-gray-700 flex items-center gap-1"
-                  >
-                    対応する<ChevronRight size={12} />
-                  </button>
-                )}
-                <button
-                  onClick={() => act(item, 'snoozed')}
-                  disabled={disabled}
-                  className="text-xs px-3 py-1.5 rounded text-gray-400 hover:text-gray-600 disabled:opacity-40"
-                >
-                  後で
-                </button>
-              </div>
-            </div>
-          )
-        })}
+        {items.map(renderCard)}
       </div>
+
+      {productItems.length > 0 && (
+        <div className="mt-4 pt-3 border-t border-gray-100">
+          <div className="flex items-center gap-2 mb-2">
+            <Package size={14} className="text-gray-500" />
+            <span className="text-xs font-semibold text-gray-700">商品別のアクション</span>
+            <span className="text-[10px] text-gray-400">機会損失の大きい順</span>
+          </div>
+          <div className="space-y-2.5">
+            {productItems.map(renderCard)}
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

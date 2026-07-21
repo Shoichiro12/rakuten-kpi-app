@@ -424,6 +424,10 @@ export interface Recommendation {
   effort: string
   badges: string[]
   link: string | null
+  /** 商品単位の提案のみ設定される（店舗全体の提案では undefined） */
+  product_name?: string
+  management_no?: string
+  impact_value?: number
 }
 
 export interface RecommendationsResponse {
@@ -432,5 +436,7 @@ export interface RecommendationsResponse {
   period_key: string
   target_gap: number | null
   recommendations: Recommendation[]
+  /** 商品単位の提案（どの商品の何を直すか）。機会損失の大きい順。 */
+  product_recommendations?: Recommendation[]
   done_count: number
 }

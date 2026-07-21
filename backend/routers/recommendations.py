@@ -14,8 +14,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import ActionLog
+from models import ActionLog, MonthlyItemSales
 from recommendations import build_recommendations
+from product_recommendations import build_product_recommendations
 
 router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
 
@@ -70,6 +71,27 @@ def get_recommendations(
         limit=limit,
     )
 
+    # 商品単位の提案（「どの商品の何を直すか」）。
+    # 店舗全体の提案が「CVRを上げる」で止まるのに対し、こちらは商品名まで特定する。
+    # 商品分析レポートがある期間のみ（RPP未取込でも動く）。
+    import calendar as _cal
+
+    ym = _period_key("monthly", date_str) if period == "monthly" else None
+    if ym is None:
+        # 週次でも、その週が属する月の商品分析データを参照する
+        ym = pkey[:7]
+    product_rows = db.query(MonthlyItemSales).filter(
+        MonthlyItemSales.year_month == ym
+    ).all()
+    days_in_month = _cal.monthrange(int(ym[:4]), int(ym[5:7]))[1]
+    product_items = build_product_recommendations(
+        items=product_rows,
+        shop=dash.get("shop"),
+        days_in_month=days_in_month,
+        done_keys=done_keys,
+        limit=limit,
+    )
+
     gap = None
     target_sales = dash.get("target_sales") or 0
     if target_sales > 0:
@@ -85,6 +107,7 @@ def get_recommendations(
         "period_key": pkey,
         "target_gap": gap,
         "recommendations": items,
+        "product_recommendations": product_items,
         "done_count": len(done_keys),
     }
 
