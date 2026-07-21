@@ -138,16 +138,24 @@ def measure_action(db, log) -> dict:
         after = _shop_metrics(db, nxt)
 
     # 実施時点のスナップショットを優先する（実施後に当月データが更新されても、
-    # 「実施したときに見えていた数字」を起点にするのが正しい比較になる）
-    snap = {
-        "sales": log.snapshot_sales,
-        "access": log.snapshot_access,
-        "cvr": log.snapshot_cvr,
-        "av": log.snapshot_av,
-    }
-    before_val = snap.get(metric)
-    if before_val is None and before:
+    # 「実施したときに見えていた数字」を起点にするのが正しい比較になる）。
+    #
+    # ただし商品単位の施策では、その商品の実績を必ず起点にする。
+    # 旧バージョンは商品施策でも店舗全体の値をスナップショットしていたため、
+    # そのまま使うと「店舗売上 → 商品売上」の比較になってしまう。
+    # 商品の実績が取れる場合はそちらを優先し、過去データも正しく測れるようにする。
+    if mgmt and before:
         before_val = before.get(metric)
+    else:
+        snap = {
+            "sales": log.snapshot_sales,
+            "access": log.snapshot_access,
+            "cvr": log.snapshot_cvr,
+            "av": log.snapshot_av,
+        }
+        before_val = snap.get(metric)
+        if before_val is None and before:
+            before_val = before.get(metric)
 
     after_val = after.get(metric) if after else None
 

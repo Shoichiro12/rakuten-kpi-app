@@ -170,10 +170,44 @@ def complete_recommendation(payload: CompletePayload, db: Session = Depends(get_
 
     row.status = payload.status
     row.title = payload.title
-    row.snapshot_sales = shop.get("sales") if shop else kpis.get("gross")
-    row.snapshot_access = shop.get("access") if shop else kpis.get("ct")
-    row.snapshot_cvr = shop.get("cvr") if shop else kpis.get("cvr")
-    row.snapshot_av = shop.get("av") if shop else kpis.get("av")
+
+    # 商品単位の施策（key が "rule:management_no" 形式）は、その商品の実績を
+    # スナップショットする。店舗全体の値を入れてしまうと、効果測定のときに
+    # 「店舗売上 → 商品売上」を比較することになり数字が意味を成さない。
+    mgmt = payload.action_key.split(":", 1)[1] if ":" in payload.action_key else None
+    snap = None
+    if mgmt:
+        item = (
+            db.query(MonthlyItemSales)
+            .filter(
+                MonthlyItemSales.year_month == payload.period_key[:7],
+                MonthlyItemSales.management_no == mgmt,
+            )
+            .first()
+        )
+        if item is not None:
+            access = item.access_uu or 0
+            cv = item.cv or 0
+            sales = item.sales or 0
+            snap = {
+                "sales": sales,
+                "access": access,
+                "cvr": round(cv / access * 100, 2) if access > 0 else 0,
+                "av": round(sales / cv, 0) if cv > 0 else 0,
+            }
+
+    if snap is None:
+        snap = {
+            "sales": shop.get("sales") if shop else kpis.get("gross"),
+            "access": shop.get("access") if shop else kpis.get("ct"),
+            "cvr": shop.get("cvr") if shop else kpis.get("cvr"),
+            "av": shop.get("av") if shop else kpis.get("av"),
+        }
+
+    row.snapshot_sales = snap["sales"]
+    row.snapshot_access = snap["access"]
+    row.snapshot_cvr = snap["cvr"]
+    row.snapshot_av = snap["av"]
 
     db.commit()
     return {"action_key": row.action_key, "period_key": row.period_key, "status": row.status}
