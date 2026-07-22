@@ -82,6 +82,35 @@ def create_sample_data(db: Session = Depends(get_db), _user: AuthUser = Depends(
     return {"message": "サンプルデータを生成しました（10商品 × 8週間、RPP診断デモ付き）"}
 
 
+@app.get("/api/security-status")
+def security_status(db: Session = Depends(get_db), _user: AuthUser = Depends(get_current_user)):
+    """RLS（行レベルセキュリティ）の適用状況を返す。
+
+    起動時の migrations._enforce_rls_pg で自動適用しているが、万一失敗しても
+    気付けるように可視化する。unprotected が空でなければ、Data API経由で
+    そのテーブルのデータが外部から読み書きできる状態＝要即対応。
+    """
+    from sqlalchemy import text as _text
+
+    if engine.dialect.name != "postgresql":
+        return {"dialect": engine.dialect.name, "applicable": False,
+                "protected": [], "unprotected": [], "ok": True}
+
+    rows = db.execute(_text(
+        "SELECT tablename, rowsecurity FROM pg_tables "
+        "WHERE schemaname = 'public' ORDER BY tablename"
+    )).fetchall()
+    protected = [r[0] for r in rows if r[1]]
+    unprotected = [r[0] for r in rows if not r[1]]
+    return {
+        "dialect": "postgresql",
+        "applicable": True,
+        "protected": protected,
+        "unprotected": unprotected,
+        "ok": len(unprotected) == 0,
+    }
+
+
 @app.get("/api/data-status")
 def data_status(db: Session = Depends(get_db), _user: AuthUser = Depends(get_current_user)):
     """セットアップ進捗の判定に使うデータ登録状況。フロントのガイド表示に利用。"""

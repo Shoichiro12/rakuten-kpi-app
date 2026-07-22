@@ -2,6 +2,44 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## ⚠️ セキュリティ最優先事項: 新しいテーブルには必ずRLSを（顧客データ漏洩の防止）
+
+**このプロダクトは他社（EC事業者）の売上データを預かる。データ漏洩は一度でも起こしてはならない。**
+
+### 実際に起きたこと（2026-07）
+
+`models.Base.metadata.create_all()` で作成したテーブルは **RLSが無効のまま** `public` スキーマに置かれる。
+Supabase は `public` スキーマを Data API (PostgREST) 経由で公開するため、
+**フロントのJSに埋め込まれた anon キーだけで、誰でも全データを読み書きできる状態だった。**
+
+実際に未ログイン・anonキーのみで商品名・売上・目標値の実データが取得できることを確認済み。
+Supabase Security Advisor に `rls_disabled_in_public` の Critical が9テーブル分出ていた。
+
+補足: **anonキーが漏れていたわけではない。** anonキーは公開が前提の値で、
+本来の防御はRLSが担う。そのRLSが無効だったため防御がゼロだった。
+
+### 現在の防御（3重）
+
+1. **起動時に自動強制** … `migrations._enforce_rls_pg()` が `pg_tables` を走査し、
+   RLS未適用のテーブルを自動で `ENABLE ROW LEVEL SECURITY` する。
+   **新しいモデルを追加してもデプロイすれば自動で塞がる。** 冪等。
+2. **可視化** … `GET /api/security-status` が `unprotected` を返す。
+   ここが空でなければ即対応が必要。
+3. **このドキュメント**
+
+### 新しいモデルを追加するときの必須確認
+
+- `UserScopedMixin` を継承する（ユーザー単位のデータ分離。`tenancy.py` 参照）
+- デプロイ後に `GET /api/security-status` で `ok: true` / `unprotected: []` を確認する
+- **RLSを無効化するコードを書かない。** どうしても必要なら理由をここに追記すること
+
+### なぜアプリが壊れないか
+
+バックエンド(FastAPI)は `DATABASE_URL` でテーブル所有者(`postgres`ロール)として直接接続しており、
+**所有者はRLSをバイパスする**。そのためポリシーを1つも作らなくてもアプリの動作は変わらず、
+Data API 経由の anon / authenticated アクセスだけが全拒否される。
+（`FORCE ROW LEVEL SECURITY` は所有者にも適用されてしまうので使わないこと）
+
 楽天（Rakuten）出店者向けのKPI管理アプリ。FastAPIバックエンド + React/Viteフロントエンドの2構成。楽天RMSからエクスポートしたCSVを取り込み、KGI→KPIのロジックツリー分解・GAP分析・RPP広告実績を可視化する。UI・コメント・エラーメッセージはすべて日本語。
 
 ## この製品が目指しているもの（必読）

@@ -96,6 +96,48 @@ def _assign_legacy_data(conn):
         logger.info("migrations: 既存データ %d 行をユーザー %s に割り当て", total, uid)
 
 
+def _enforce_rls_pg(conn):
+    """【重要・セキュリティ】public スキーマの全テーブルに RLS を強制する。
+
+    背景（2026-07 に実際に発生した重大インシデント）:
+      models.Base.metadata.create_all() で作ったテーブルは RLS が無効のまま
+      public スキーマに置かれる。Supabase は public スキーマを Data API
+      (PostgREST) 経由で公開するため、フロントに埋め込まれた anon キー
+      （公開が前提の値）だけで、誰でも全社の売上データを読み書きできる
+      状態になっていた。Supabase の Security Advisor から
+      「rls_disabled_in_public」として9テーブル分の Critical 警告が出ていた。
+
+    なぜコードで自動化するか:
+      手動で ALTER TABLE すると「新しいモデルを追加したときに付け忘れる」。
+      顧客のデータベースが漏れる事故は一度でも起きてはならないので、
+      ドキュメントではなく起動時の強制で担保する。
+
+    安全性:
+      - バックエンドはテーブル所有者(postgres)として接続しており、所有者は
+        RLS をバイパスするため、この設定でアプリの動作は一切変わらない。
+      - ポリシーを作らないので anon / authenticated からは全拒否になる。
+      - 冪等。既に有効なテーブルを再実行しても無害。
+    """
+    rows = conn.execute(text(
+        "SELECT tablename FROM pg_tables "
+        "WHERE schemaname = 'public' AND rowsecurity = false"
+    )).fetchall()
+
+    for (table,) in rows:
+        # テーブル名は pg_tables 由来なので任意入力ではない。念のため引用符で囲む。
+        conn.execute(text(f'ALTER TABLE public."{table}" ENABLE ROW LEVEL SECURITY'))
+        logger.warning(
+            "migrations: RLSが無効だったテーブル %s を保護しました"
+            "（Data API経由の情報漏洩を防止）", table
+        )
+
+    if rows:
+        logger.warning(
+            "migrations: 合計 %d テーブルのRLSを有効化しました。"
+            "新しいモデルを追加した場合はこれが正常な動作です。", len(rows)
+        )
+
+
 def run_migrations(engine):
     dialect = engine.dialect.name  # 'sqlite' / 'postgresql'
     try:
@@ -110,3 +152,15 @@ def run_migrations(engine):
     except Exception:
         # マイグレーション失敗でアプリを止めない（ログに残して継続）
         logger.exception("migrations: 実行中にエラーが発生しました")
+
+    # RLS の強制は上のマイグレーションとは独立したトランザクションで行う。
+    # 上が失敗しても、セキュリティの担保だけは必ず試みる。
+    if dialect == "postgresql":
+        try:
+            with engine.begin() as conn:
+                _enforce_rls_pg(conn)
+        except Exception:
+            logger.exception(
+                "migrations: RLSの有効化に失敗しました。"
+                "Data API経由でデータが露出する可能性があります。至急確認してください。"
+            )
