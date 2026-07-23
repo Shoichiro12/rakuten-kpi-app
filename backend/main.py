@@ -29,7 +29,32 @@ models.Base.metadata.create_all(bind=engine)
 # 既存DBへの user_id 列追加・ユニーク制約の張り替え等（冪等）
 run_migrations(engine)
 
-app = FastAPI(title="楽天KPI管理API", version="1.0.0")
+# 本番では API ドキュメント（/docs, /redoc, /openapi.json）を公開しない。
+# 既定は無効。ローカル等で見たいときだけ ENABLE_DOCS=1 を設定する。
+# 公開されていると全 API パス構造が誰でも閲覧でき、攻撃の起点になるため塞ぐ。
+_ENABLE_DOCS = os.environ.get("ENABLE_DOCS") == "1"
+app = FastAPI(
+    title="楽天KPI管理API",
+    version="1.0.0",
+    docs_url="/docs" if _ENABLE_DOCS else None,
+    redoc_url="/redoc" if _ENABLE_DOCS else None,
+    openapi_url="/openapi.json" if _ENABLE_DOCS else None,
+)
+
+
+# 全レスポンスにセキュリティヘッダーを付与する。
+# クリックジャッキング・MIMEスニッフィング・リファラ漏洩・旧来のXSS等を緩和し、
+# HTTPS を強制する。Stripe 審査の「セキュアコーディング」項目のエビデンスにもなる。
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    return response
 
 # 同一サービスでフロントを配信する構成では本来CORS不要だが、フロントを別ドメインに
 # 置く場合に備え環境変数 ALLOW_ORIGINS（カンマ区切り）で追加できるようにする。
@@ -73,7 +98,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 
 @app.get("/api")
 def api_root():
-    return {"message": "楽天KPI管理API", "docs": "/docs"}
+    body = {"message": "楽天KPI管理API"}
+    if _ENABLE_DOCS:
+        body["docs"] = "/docs"
+    return body
 
 
 @app.post("/api/sample-data")
