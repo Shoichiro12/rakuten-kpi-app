@@ -7,6 +7,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Literal, Optional
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+
+from malware import scan_bytes  # アップロードのマルウェアスキャン
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
@@ -816,6 +818,8 @@ async def import_rpp_file(
     - overwrite=true の場合、同一期間の既存データを削除してから挿入
     """
     content = await file.read()
+
+    scan_bytes(content, getattr(file, 'filename', 'upload') or 'upload')
     if not content:
         raise HTTPException(status_code=400, detail="ファイルが空です")
 
@@ -1085,6 +1089,8 @@ def import_monthly_text(payload: CsvTextPayload, db: Session = Depends(get_db)):
 @router.post("/monthly-items/preview")
 async def preview_monthly_items(file: UploadFile = File(...)):
     content = await file.read()
+
+    scan_bytes(content, getattr(file, 'filename', 'upload') or 'upload')
     try:
         year_month, records = parse_monthly_items_file(content)
     except ValueError as e:
@@ -1173,6 +1179,8 @@ async def import_monthly_items(
     db: Session = Depends(get_db),
 ):
     content = await file.read()
+
+    scan_bytes(content, getattr(file, 'filename', 'upload') or 'upload')
     try:
         return _import_monthly_items_bytes(content, db, overwrite=overwrite)
     except ValueError as e:
@@ -1306,6 +1314,8 @@ async def import_auto(
     items: list[tuple[str, bytes]] = []
     for up in files:
         content = await up.read()
+
+        scan_bytes(content, getattr(up, 'filename', 'upload') or 'upload')
         items.append((up.filename or "アップロードファイル", content))
     return _import_uploads(items, db)
 
