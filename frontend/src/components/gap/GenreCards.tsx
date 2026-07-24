@@ -38,7 +38,7 @@ export default function GenreCards({ genres, selectedGenre, selectedKPI, onSelec
   }, genres[0])
 
   const kpiLabel: Record<string, string> = {
-    access: 'アクセス（UU）',
+    access: axis === 'shop' ? 'アクセス（UU）' : 'アクセス（RPPクリック）',
     cvr: '転換率（CVR）',
     av: '客単価',
   }

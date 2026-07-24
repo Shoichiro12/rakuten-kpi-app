@@ -272,6 +272,39 @@ def _rule_high_potential(row, shop, days_in_month: int) -> Optional[dict]:
     }
 
 
+def _rule_low_sample_hold(row, shop, days_in_month: int) -> Optional[dict]:
+    """低母数（reliable=false）商品の「判定保留・データ蓄積待ち」（要件No.10 / No.6）。
+
+    他ルールは母数不足の商品を is_reliable ゲートで除外する＝何も提案が出ない。
+    それだと「なぜこの商品には何も出ないのか」が分からず、誤って現状のCVR・客単価で
+    判断してしまう。そこで「まだ判断しない・アクセスを積む」ことを明示アクションとして出す。
+    データが全く無い商品（アクセス0）には出さない（多少のアクセスがある低母数のみ）。
+    """
+    access = row.access_uu or 0
+    if access <= 0 or is_reliable(access):
+        return None
+    sales = row.sales or 0
+    return {
+        "key": f"low_sample_hold:{row.management_no}",
+        "priority": "check",
+        "metric": "access",
+        "product_name": _name(row),
+        "management_no": row.management_no,
+        "title": f"「{_name(row)}」は判定保留（データ蓄積待ち）",
+        "reason": (
+            f"アクセス {access:,}人で母数が{MIN_ACCESS_SAMPLE}未満です。この人数ではCVR・客単価が"
+            "統計的に信用できません。今の数値で価格やページを判断せず、まずアクセスを積んで"
+            "母数を確保してから見直してください。"
+        ),
+        "impact": "誤った判断を避けるための保留です",
+        # 並び順のためだけの極小値（保留は最下位に置く）
+        "impact_value": sales * 0.001,
+        "effort": "—",
+        "badges": [f"母数 {access:,}（<{MIN_ACCESS_SAMPLE}）", "参考値"],
+        "link": "/products",
+    }
+
+
 _PRODUCT_RULES = [
     _rule_stock_out,
     _rule_low_stock,
@@ -279,6 +312,7 @@ _PRODUCT_RULES = [
     _rule_no_review,
     _rule_low_review_score,
     _rule_high_potential,
+    _rule_low_sample_hold,
 ]
 
 _PRIORITY_ORDER = {"critical": 0, "recommended": 1, "check": 2}
@@ -334,3 +368,157 @@ def build_product_recommendations(
         )
     )
     return result[:limit] if limit and limit > 0 else result
+
+
+# ── アクション種別のラベル（action_key の接頭辞 → 表示名）─────────────────────
+ACTION_LABELS = {
+    "stock_out": "在庫切れ（欠品）",
+    "low_stock": "在庫僅少（先読み発注）",
+    "cvr_page": "商品ページ改善（CVR低下）",
+    "review_zero": "レビュー獲得（レビュー0件）",
+    "review_low": "低評価レビュー対応",
+    "boost": "広告強化（伸び代あり）",
+    "low_sample_hold": "判定保留（データ蓄積待ち）",
+    "cost_review": "原価・価格見直し",
+}
+
+
+def build_cost_review_actions(
+    rpp_products,
+    individual_cost_mnos,
+    done_keys: Optional[set] = None,
+    limit: int = 0,
+) -> list:
+    """原価見直しアクション（要件No.10 / 4P: Price）。
+
+    「個別原価率が設定されている」かつ「限界CPO超過（cpo > limit_cpo）」の商品に対し、
+    原価・価格・入札のいずれかで採算ラインへ戻すよう促す。データ源は RPP（限界CPOはRPP由来）。
+
+    rpp_products: [{management_no, product_name, cpo, limit_cpo, cv}, ...]（当月のRPP集計）。
+    individual_cost_mnos: 個別原価率(ProductCost)が設定済みの management_no 集合。
+    既存に price_review 系アクションは無いため重複しない。
+    """
+    done = done_keys or set()
+    out: list = []
+    for p in rpp_products or []:
+        mno = p.get("management_no")
+        if not mno or mno not in individual_cost_mnos:
+            continue
+        cpo = p.get("cpo") or 0
+        limit_cpo = p.get("limit_cpo") or 0
+        if limit_cpo <= 0 or cpo <= limit_cpo:
+            continue
+        key = f"cost_review:{mno}"
+        if key in done:
+            continue
+        over = cpo - limit_cpo
+        cv = p.get("cv") or 0
+        name = p.get("product_name") or mno
+        out.append({
+            "key": key,
+            "priority": "recommended",
+            "metric": "price",
+            "product_name": name,
+            "management_no": mno,
+            "title": f"「{name}」の原価・価格を見直す",
+            "reason": (
+                f"個別原価率を設定済みですが、CPO {_yen(cpo)} が限界CPO {_yen(limit_cpo)} を超過しています。"
+                "この広告効率では1件売るごとに粗利が削られます。原価の再交渉・値上げ・"
+                "広告入札の見直しのいずれかで採算ラインへ戻してください。"
+            ),
+            "impact": f"超過分 約{_yen(over)}/件",
+            "impact_value": over * cv,
+            "effort": "30分",
+            "badges": [f"CPO {_yen(cpo)} / 限界 {_yen(limit_cpo)}"],
+            "link": "/products",
+        })
+    out.sort(key=lambda x: -x.get("impact_value", 0))
+    return out[:limit] if limit and limit > 0 else out
+
+
+def merge_and_limit(*action_lists, limit: int = 3) -> list:
+    """複数のアクションリストを商品単位でまとめ、優先度→金額インパクト順で limit 件返す。
+
+    1商品から複数系統（例: 商品ルール由来の cvr_page と RPP由来の cost_review）が
+    出た場合は、最も優先すべき1件に絞る（1商品1指示の原則を保つ）。
+    """
+    by_product: dict = {}
+    for lst in action_lists:
+        for item in lst or []:
+            key = item.get("management_no") or item["key"]
+            cur = by_product.get(key)
+            if cur is None or (
+                _PRIORITY_ORDER.get(item["priority"], 9), -item.get("impact_value", 0),
+            ) < (
+                _PRIORITY_ORDER.get(cur["priority"], 9), -cur.get("impact_value", 0),
+            ):
+                by_product[key] = item
+    result = list(by_product.values())
+    result.sort(key=lambda x: (_PRIORITY_ORDER.get(x["priority"], 9), -x.get("impact_value", 0)))
+    return result[:limit] if limit and limit > 0 else result
+
+
+def summarize_actions(
+    items,
+    shop: Optional[dict] = None,
+    days_in_month: int = 30,
+    restock_days: int = RESTOCK_ALERT_DAYS,
+    extra_actions: Optional[list] = None,
+) -> list:
+    """スコープ（店舗全体 or 特定ジャンル）内の全商品に課題検出ルールを走らせ、
+    action_key（種別）別に該当商品数・影響額を集計してランキングで返す（要件No.3）。
+
+    build_product_recommendations が「1商品1アクション」に絞るのに対し、こちらは
+    「どの課題がどれだけ広がっているか」を見るため、全ルール・全該当を種別で束ねる。
+    extra_actions には RPP由来の cost_review など、商品ルール外のアクションを渡せる。
+    戻り値: [{action_key, label, metric, priority, affected_count, impact_estimate, sample_products}]
+    """
+    shop = dict(shop) if shop else {}
+    shop.setdefault("restock_days", restock_days)
+    agg: dict = {}
+
+    def _add(item: dict):
+        atype = item["key"].split(":")[0]
+        g = agg.setdefault(atype, {
+            "action_key": atype,
+            "label": ACTION_LABELS.get(atype, atype),
+            "metric": item.get("metric"),
+            "priority": item.get("priority", "recommended"),
+            "affected": [],
+            "impact_estimate": 0.0,
+        })
+        g["affected"].append({
+            "management_no": item.get("management_no"),
+            "product_name": item.get("product_name"),
+            "impact_value": item.get("impact_value", 0) or 0,
+        })
+        g["impact_estimate"] += item.get("impact_value", 0) or 0
+
+    for row in items or []:
+        for rule in _PRODUCT_RULES:
+            try:
+                it = rule(row, shop, days_in_month)
+            except Exception:
+                continue
+            if it:
+                _add(it)
+    for it in extra_actions or []:
+        _add(it)
+
+    result = []
+    for atype, g in agg.items():
+        affected = sorted(g["affected"], key=lambda x: -(x["impact_value"] or 0))
+        result.append({
+            "action_key": atype,
+            "label": g["label"],
+            "metric": g["metric"],
+            "priority": g["priority"],
+            "affected_count": len(affected),
+            "impact_estimate": round(g["impact_estimate"], 0),
+            "sample_products": [
+                {"management_no": a["management_no"], "product_name": a["product_name"]}
+                for a in affected[:3]
+            ],
+        })
+    result.sort(key=lambda x: (_PRIORITY_ORDER.get(x["priority"], 9), -x["impact_estimate"]))
+    return result

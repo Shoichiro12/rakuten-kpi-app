@@ -5,6 +5,7 @@ import PeriodSelector from '../components/PeriodSelector'
 import LogicTree from '../components/gap/LogicTree'
 import StepIndicator from '../components/gap/StepIndicator'
 import GenreCards from '../components/gap/GenreCards'
+import ActionSummary from '../components/gap/ActionSummary'
 import ActionPanel from '../components/gap/ActionPanel'
 import EvaluationMatrix from '../components/EvaluationMatrix'
 import ReliabilityNote from '../components/ReliabilityNote'
@@ -152,6 +153,14 @@ export default function GapAnalysis() {
 
           {/* 評価マトリクス（17パターン・目標×YoY統一判定） */}
           {evaluation && <EvaluationMatrix evaluation={evaluation} axis={evalAxis} />}
+
+          {/* アクションサマリ（スコープ内の課題集中度・要件No.3） */}
+          <ActionSummary
+            scope={selectedGenre ? 'genre' : 'shop'}
+            genre={selectedGenre ?? undefined}
+            period={period}
+            date={dateParam}
+          />
 
           {/* ロジックツリー */}
           <div className="bg-white rounded-xl border shadow-sm p-5">

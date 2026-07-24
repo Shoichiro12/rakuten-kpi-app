@@ -509,5 +509,15 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ product_url: productUrl }),
       }),
+    /** 店舗全体 or 特定ジャンル内の課題を種別別に集計（GAP分析 step1/2 用・要件No.3） */
+    summary: (scope: 'shop' | 'genre', opts: { genre?: string; period?: string; date?: string } = {}) => {
+      const q = new URLSearchParams()
+      q.set('scope', scope)
+      if (opts.genre) q.set('genre', opts.genre)
+      if (opts.period) q.set('period', opts.period)
+      if (opts.date) q.set('date', opts.date)
+      return request<import('../types').ActionSummaryResponse>(`/actions/summary?${q.toString()}`)
+        .then((d) => d ?? { scope, genre: null, year_month: null, count: 0, items: [] })
+    },
   },
 }

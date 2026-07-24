@@ -68,7 +68,7 @@ export default function ProductKPIPage() {
     <div className="flex flex-col h-full">
       <Header
         title="商品別KPI"
-        subtitle={`${products.length}件の商品${alertCount > 0 ? ` ⚠️ ${alertCount}件要確認` : ''}`}
+        subtitle={loading && products.length === 0 ? '読み込み中…' : `${products.length}件の商品${alertCount > 0 ? ` ⚠️ ${alertCount}件要確認` : ''}`}
         actions={
           <PeriodSelector
             period={period}

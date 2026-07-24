@@ -1,14 +1,77 @@
-from typing import Optional
+import calendar as _cal
+from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import ActionCheck, InventoryStatus, MonthlyItemSales, Product
+from models import ActionCheck, InventoryStatus, MonthlyItemSales, Product, ProductCost, Shop
+from shop_metrics import get_shop_monthly, get_rpp_month_products
+from masters import inactive_management_nos
+from product_recommendations import summarize_actions, build_cost_review_actions
 
 router = APIRouter(prefix="/api/actions", tags=["actions"])
+
+
+@router.get("/summary")
+def get_action_summary(
+    scope: Literal["shop", "genre"] = Query("shop"),
+    genre: Optional[str] = Query(None),
+    period: Literal["weekly", "monthly"] = Query("monthly"),
+    date_str: Optional[str] = Query(None, alias="date"),
+    db: Session = Depends(get_db),
+):
+    """スコープ（店舗全体 or 特定ジャンル）内の課題を種別別に集計してランキングで返す（要件No.3）。
+
+    GAP分析の STEP1（店舗全体）/ STEP2（ジャンル）で、個別商品を選ぶ前に
+    「今どこに課題が集中しているか」を見せるためのサマリ。
+    ベンチマーク（店舗平均CVR等）は常に店舗全体、集計対象だけをスコープで絞る。
+    """
+    # 対象月（週次でも、その週が属する月の商品分析データを使う）
+    ym = date_str[:7] if date_str else None
+    if not ym:
+        ym = db.query(func.max(MonthlyItemSales.year_month)).scalar()
+    if not ym:
+        return {"scope": scope, "genre": genre, "year_month": None, "count": 0, "items": []}
+
+    inactive = inactive_management_nos(db)
+    all_rows = [
+        r for r in db.query(MonthlyItemSales).filter(MonthlyItemSales.year_month == ym).all()
+        if r.management_no not in inactive
+    ]
+    if not all_rows:
+        return {"scope": scope, "genre": genre, "year_month": ym, "count": 0, "items": []}
+
+    shop = get_shop_monthly(db, ym, exclude_management_nos=inactive) or {}
+
+    def _in_genre(item) -> bool:
+        if scope != "genre" or not genre:
+            return True
+        path = "/".join([g for g in [item.genre_u1, item.genre_u2, item.genre_u3] if g])
+        return path == genre or path.startswith(genre + "/") or (item.genre_u1 or "") == genre
+
+    scope_rows = [r for r in all_rows if _in_genre(r)]
+
+    days_in_month = _cal.monthrange(int(ym[:4]), int(ym[5:7]))[1]
+    shop_row = db.query(Shop).first()
+    restock_days = shop_row.restock_lead_days if shop_row and shop_row.restock_lead_days else 14
+
+    # 原価見直し（RPP由来）を extra_actions として追加（スコープ内商品に限定）
+    scope_mnos = {r.management_no for r in scope_rows}
+    individual_cost = {pc.management_no for pc in db.query(ProductCost).all() if pc.management_no}
+    rpp_products = [
+        p for p in get_rpp_month_products(db, ym, exclude_management_nos=inactive)
+        if p["management_no"] in scope_mnos
+    ]
+    cost_review = build_cost_review_actions(rpp_products, individual_cost)
+
+    items = summarize_actions(
+        scope_rows, shop=shop, days_in_month=days_in_month,
+        restock_days=restock_days, extra_actions=cost_review,
+    )
+    return {"scope": scope, "genre": genre, "year_month": ym, "count": len(items), "items": items}
 
 
 def _resolve_product(db: Session, management_no: Optional[str], product_url: Optional[str]) -> Optional[Product]:

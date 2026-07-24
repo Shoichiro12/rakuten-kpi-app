@@ -104,9 +104,17 @@ def get_recommendations(
         shop=dash.get("shop"),
         days_in_month=days_in_month,
         done_keys=done_keys,
-        limit=limit,
+        limit=0,  # マージ前は全件。cost_review と合流させてから limit を掛ける
         restock_days=restock_days,
     )
+    # 原価見直し（RPP由来）: 個別原価率設定商品で限界CPO超過（要件No.10 / 4P Price）。
+    from models import ProductCost
+    from shop_metrics import get_rpp_month_products
+    from product_recommendations import build_cost_review_actions, merge_and_limit
+    _individual_cost = {pc.management_no for pc in db.query(ProductCost).all() if pc.management_no}
+    _rpp_products = get_rpp_month_products(db, ym, exclude_management_nos=_inactive)
+    _cost_review = build_cost_review_actions(_rpp_products, _individual_cost, done_keys=done_keys, limit=0)
+    product_items = merge_and_limit(product_items, _cost_review, limit=limit)
 
     gap = None
     target_sales = dash.get("target_sales") or 0

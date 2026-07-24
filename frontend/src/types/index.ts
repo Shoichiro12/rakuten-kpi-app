@@ -181,6 +181,25 @@ export interface SuggestionsResponse {
   items: SuggestionItem[]
 }
 
+/* ─── アクションサマリ（スコープ内の課題集中度） ─────────────────── */
+export interface ActionSummaryItem {
+  action_key: string
+  label: string
+  metric: string | null
+  priority: 'critical' | 'recommended' | 'check'
+  affected_count: number
+  impact_estimate: number
+  sample_products: { management_no: string | null; product_name: string | null }[]
+}
+
+export interface ActionSummaryResponse {
+  scope: 'shop' | 'genre'
+  genre: string | null
+  year_month: string | null
+  count: number
+  items: ActionSummaryItem[]
+}
+
 export interface InventoryAlert {
   management_no: string
   product_name: string | null
