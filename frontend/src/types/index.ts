@@ -123,6 +123,16 @@ export interface CategoriesResponse {
   items: Category[]
 }
 
+/** 楽天ジャンルマスタの3階層ツリー { 大分類: { 中分類: [小分類, ...] } } */
+export type GenreTree = Record<string, Record<string, string[]>>
+
+/** カテゴリ選択ピッカーが扱う大/中/小の値 */
+export interface GenreValue {
+  genre_u1: string
+  genre_u2: string
+  genre_u3: string
+}
+
 export interface CostItem {
   management_no: string
   product_name: string | null

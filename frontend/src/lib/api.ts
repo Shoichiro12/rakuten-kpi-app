@@ -226,6 +226,9 @@ export const api = {
         '/master/suggestions/approve-all',
         { method: 'POST', body: JSON.stringify({ management_nos: managementNos }) },
       ),
+    /** 楽天ジャンルマスタの3階層ツリー（カテゴリ選択ピッカー用の参照データ） */
+    genreTree: () =>
+      request<{ tree: import('../types').GenreTree }>('/master/genre-tree').then((d) => d?.tree ?? {}),
     /** カテゴリ一覧 */
     categories: () =>
       request<import('../types').CategoriesResponse>('/master/categories').then((d) => d ?? { count: 0, items: [] }),

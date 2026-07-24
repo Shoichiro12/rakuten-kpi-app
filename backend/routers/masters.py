@@ -27,6 +27,7 @@ from masters import (
     suggest_cost_rate,
     upsert_product,
 )
+from genre_master import get_genre_tree
 
 # ── 商品マスタ・カテゴリ ────────────────────────────────────────────────
 router = APIRouter(prefix="/api/master", tags=["master"])
@@ -204,6 +205,15 @@ def approve_all_suggestions(payload: ApproveAllPayload, db: Session = Depends(ge
     recalculated = recalc_rpp_cost_of_sales(db, touched_cost) if touched_cost else 0
     db.commit()
     return {"approved_count": len(approved), "approved": approved, "recalculated_rows": recalculated}
+
+
+@router.get("/genre-tree")
+def genre_tree():
+    """楽天公式ジャンルマスタ（大/中/小の3階層ツリー）。カテゴリ選択ピッカー用の参照データ。
+
+    形: {"tree": {U1: {U2: [U3, ...]}}}。テナント非依存の公開データなのでDBは介さない。
+    """
+    return {"tree": get_genre_tree()}
 
 
 @router.get("/categories")

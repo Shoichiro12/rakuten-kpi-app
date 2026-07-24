@@ -1,8 +1,9 @@
 import { useEffect, useState, useCallback } from 'react'
 import { Save, CheckCircle, RefreshCw, Plus, Trash2, Pencil, Check, X, Download, Upload, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
 import Header from '../components/layout/Header'
+import GenrePicker from '../components/GenrePicker'
 import { api } from '../lib/api'
-import type { MasterProduct, CostItem, Category, SuggestionItem } from '../types'
+import type { MasterProduct, CostItem, Category, SuggestionItem, GenreTree, GenreValue } from '../types'
 
 /** 管理番号ごとに商品マスタ情報＋適用中の原価率をまとめた1行。 */
 interface Row extends MasterProduct {
@@ -25,7 +26,10 @@ export default function MasterSettings() {
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([])
   const [suggestOpen, setSuggestOpen] = useState(true)
   const [editingSuggestId, setEditingSuggestId] = useState<string | null>(null)
-  const [editSuggest, setEditSuggest] = useState<{ category_id: number | null; cost_pct: number }>({ category_id: null, cost_pct: 60 })
+  const [editSuggest, setEditSuggest] = useState<{ genre: GenreValue; cost_pct: number }>({ genre: { genre_u1: '', genre_u2: '', genre_u3: '' }, cost_pct: 60 })
+
+  // 楽天ジャンルマスタ（カテゴリ選択ピッカー用）
+  const [genreTree, setGenreTree] = useState<GenreTree>({})
 
   // 店舗設定フォーム
   const [shopName, setShopName] = useState('')
@@ -46,12 +50,13 @@ export default function MasterSettings() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [prodRes, costRes, shopRes, catRes, sugRes] = await Promise.all([
+      const [prodRes, costRes, shopRes, catRes, sugRes, treeRes] = await Promise.all([
         api.master.products(),
         api.costs.list(),
         api.shops.me(),
         api.master.categories(),
         api.master.suggestions(),
+        api.master.genreTree(),
       ])
       const costMap = new Map<string, CostItem>()
       for (const c of costRes.items) costMap.set(c.management_no, c)
@@ -67,6 +72,7 @@ export default function MasterSettings() {
       setRows(merged)
       setCategories(catRes.items)
       setSuggestions(sugRes.items)
+      setGenreTree(treeRes)
       setShopName(shopRes.name)
       setCostPct(Math.round((shopRes.default_cost_rate ?? 0.6) * 100))
       setExpensePct(Math.round((shopRes.default_expense_rate ?? 0.15) * 100))
@@ -114,20 +120,26 @@ export default function MasterSettings() {
     }
   }
 
-  const saveCategory = async (r: Row, categoryId: number | null) => {
-    if (categoryId === r.category_id) return
+  /** カテゴリID→大/中/小の値を引く（ピッカーの初期値用） */
+  const genreOfCategory = (id: number | null): GenreValue => {
+    const c = id != null ? categories.find((x) => x.id === id) : null
+    return { genre_u1: c?.genre_u1 ?? '', genre_u2: c?.genre_u2 ?? '', genre_u3: c?.genre_u3 ?? '' }
+  }
+
+  /** 大/中/小の値からカテゴリを find-or-create し、商品へ割当てる（未選択なら未分類）。 */
+  const assignGenre = async (r: Row, g: GenreValue) => {
     try {
+      let categoryId: number | null = null
+      if (g.genre_u1 || g.genre_u2 || g.genre_u3) {
+        const cat = await api.master.createCategory(g) // 同一階層があれば既存を返す＝選択式＋追加
+        categoryId = cat?.id ?? null
+      }
+      if (categoryId === (r.category_id ?? null)) return
       await api.master.updateProduct(r.management_no, { category_id: categoryId })
-      const cat = categoryId != null ? categories.find((c) => c.id === categoryId) : null
-      setRows((prev) => prev.map((x) => x.management_no === r.management_no ? {
-        ...x,
-        category_id: categoryId,
-        genre_u1: cat?.genre_u1 ?? null,
-        genre_u2: cat?.genre_u2 ?? null,
-        genre_u3: cat?.genre_u3 ?? null,
-      } : x))
+      await load() // 新規カテゴリ・行表示を反映
+      flash(`${r.management_no} のカテゴリを更新しました`)
     } catch (e) {
-      console.error('[MasterSettings] カテゴリ更新エラー:', e)
+      console.error('[MasterSettings] カテゴリ割当エラー:', e)
     }
   }
 
@@ -247,8 +259,9 @@ export default function MasterSettings() {
 
   const startEditSuggest = (s: SuggestionItem) => {
     setEditingSuggestId(s.management_no)
+    const catId = s.current.category_id ?? s.suggested.category?.category_id ?? null
     setEditSuggest({
-      category_id: s.current.category_id ?? s.suggested.category?.category_id ?? null,
+      genre: genreOfCategory(catId),
       cost_pct: s.current.cost_rate != null
         ? Math.round(s.current.cost_rate * 100)
         : Math.round(s.suggested.cost_rate.suggested_rate * 100),
@@ -257,10 +270,14 @@ export default function MasterSettings() {
 
   const confirmEditSuggest = async (s: SuggestionItem) => {
     try {
-      // カテゴリ確定（既存の手動編集フローを流用）
-      if ((editSuggest.category_id ?? null) !== (s.current.category_id ?? null)) {
-        await api.master.updateProduct(s.management_no, { category_id: editSuggest.category_id })
+      // カテゴリ確定: ジャンル値から find-or-create して割当（未選択なら未分類）
+      const g = editSuggest.genre
+      let categoryId: number | null = null
+      if (g.genre_u1 || g.genre_u2 || g.genre_u3) {
+        const cat = await api.master.createCategory(g)
+        categoryId = cat?.id ?? null
       }
+      await api.master.updateProduct(s.management_no, { category_id: categoryId })
       // 原価率確定（→ 対象商品のみ再計算）
       const rate = Math.min(Math.max(editSuggest.cost_pct / 100, 0), 1)
       await api.costs.setProduct(s.management_no, rate)
@@ -340,14 +357,12 @@ export default function MasterSettings() {
                               <p className="text-sm font-medium text-gray-900 leading-tight">{s.product_name || '（名称未設定）'}</p>
                               <p className="text-xs text-gray-400 font-mono">{s.management_no}</p>
                             </div>
-                            <select
-                              value={editSuggest.category_id ?? ''}
-                              onChange={(e) => setEditSuggest((p) => ({ ...p, category_id: e.target.value === '' ? null : Number(e.target.value) }))}
-                              className="text-xs border border-gray-200 rounded px-1.5 py-1 max-w-[180px] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                            >
-                              <option value="">未分類</option>
-                              {categories.map((c) => <option key={c.id} value={c.id}>{categoryPath(c)}</option>)}
-                            </select>
+                            <GenrePicker
+                              tree={genreTree}
+                              value={editSuggest.genre}
+                              onChange={(g) => setEditSuggest((p) => ({ ...p, genre: g }))}
+                              compact
+                            />
                             <span className="inline-flex items-center gap-1">
                               <input
                                 type="number" min={0} max={100} step={1}
@@ -521,16 +536,12 @@ export default function MasterSettings() {
                           />
                         </td>
                         <td className="px-3 py-2">
-                          <select
-                            value={r.category_id ?? ''}
-                            onChange={(e) => saveCategory(r, e.target.value === '' ? null : Number(e.target.value))}
-                            className="max-w-[180px] text-xs text-gray-600 border border-gray-200 rounded px-1.5 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          >
-                            <option value="">未分類</option>
-                            {categories.map((c) => (
-                              <option key={c.id} value={c.id}>{categoryPath(c)}</option>
-                            ))}
-                          </select>
+                          <GenrePicker
+                            tree={genreTree}
+                            value={{ genre_u1: r.genre_u1 ?? '', genre_u2: r.genre_u2 ?? '', genre_u3: r.genre_u3 ?? '' }}
+                            onChange={(g) => assignGenre(r, g)}
+                            compact
+                          />
                         </td>
                         <td className="px-3 py-2 text-right whitespace-nowrap">
                           <span className="inline-flex items-center gap-1.5">
@@ -574,27 +585,12 @@ export default function MasterSettings() {
               <p className="text-xs text-gray-400 mt-0.5">大分類 &gt; 中分類 &gt; 小分類。取込みで自動生成されたカテゴリの整理や、手動追加ができます。</p>
             </div>
 
-            {/* 新規作成フォーム */}
+            {/* 新規作成フォーム（楽天ジャンルマスタから選択＋自由入力） */}
             <div className="px-4 py-3 border-b bg-gray-50 flex flex-wrap items-center gap-2">
-              <input
-                value={newCat.genre_u1}
-                onChange={(e) => setNewCat({ ...newCat, genre_u1: e.target.value })}
-                placeholder="大分類"
-                className="w-32 border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <span className="text-gray-300">&gt;</span>
-              <input
-                value={newCat.genre_u2}
-                onChange={(e) => setNewCat({ ...newCat, genre_u2: e.target.value })}
-                placeholder="中分類"
-                className="w-32 border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-              <span className="text-gray-300">&gt;</span>
-              <input
-                value={newCat.genre_u3}
-                onChange={(e) => setNewCat({ ...newCat, genre_u3: e.target.value })}
-                placeholder="小分類"
-                className="w-32 border border-gray-200 rounded px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <GenrePicker
+                tree={genreTree}
+                value={newCat}
+                onChange={(g) => setNewCat(g)}
               />
               <button
                 onClick={addCategory}
