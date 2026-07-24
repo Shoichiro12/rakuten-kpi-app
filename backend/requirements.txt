@@ -15,3 +15,5 @@ PyJWT
 cryptography
 # ローカル開発で backend/.env を読み込む（本番の既存env変数は上書きしない）。
 python-dotenv
+# Stripe 請求（サブスクリプション・Checkout・カスタマーポータル・Webhook）。テストモード運用。
+stripe

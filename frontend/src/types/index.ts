@@ -200,6 +200,28 @@ export interface ActionSummaryResponse {
   items: ActionSummaryItem[]
 }
 
+/* ─── 請求（Stripe） ─────────────────── */
+export interface BillingStatus {
+  enabled: boolean
+  plan: string | null
+  plan_label?: string | null
+  status: string | null
+  trial_end: string | null
+  current_period_end: string | null
+  is_active: boolean
+}
+
+export interface BillingPlan {
+  plan: string
+  label: string
+}
+
+export interface BillingPlansResponse {
+  enabled: boolean
+  trial_days: number
+  plans: BillingPlan[]
+}
+
 export interface InventoryAlert {
   management_no: string
   product_name: string | null

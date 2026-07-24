@@ -264,6 +264,23 @@ export const api = {
       request<import('../types').InventoryAlertsResponse>(`/inventory/alerts${yearMonth ? `?year_month=${yearMonth}` : ''}`)
         .then((d) => d ?? { year_month: null, count: 0, out_count: 0, low_count: 0, threshold_days: 14, items: [] }),
   },
+  /* ─── 請求（Stripe） ─────────────────── */
+  billing: {
+    /** 現在の契約状態（未契約でも200） */
+    status: () =>
+      request<import('../types').BillingStatus>('/billing/status')
+        .then((d) => d ?? { enabled: false, plan: null, status: null, trial_end: null, current_period_end: null, is_active: false }),
+    /** 設定済みプラン一覧＋トライアル日数 */
+    plans: () =>
+      request<import('../types').BillingPlansResponse>('/billing/plans')
+        .then((d) => d ?? { enabled: false, trial_days: 14, plans: [] }),
+    /** Checkout Session を作成しURLを返す（フロントはそこへ遷移） */
+    checkout: (plan: 'standard' | 'consult') =>
+      request<{ url: string }>('/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
+    /** カスタマーポータルのURLを発行 */
+    portal: () =>
+      request<{ url: string }>('/billing/portal', { method: 'POST', body: JSON.stringify({}) }),
+  },
   /* ─── 原価マスタ ─────────────────── */
   costs: {
     /** 商品一覧＋適用中の率＋「個別/デフォルト」区分 */

@@ -37,6 +37,8 @@ _USER_SCOPED_TABLES = {
     "product_categories": [("uq_category", ("genre_u1", "genre_u2", "genre_u3"))],
     "products": [("uq_product", ("shop_id", "management_no"))],
     "product_costs": [("uq_product_cost", ("management_no",))],
+    # 課金（ユニーク制約なし。user_id 列・インデックスの冪等付与とRLS対象化のため登録）
+    "subscriptions": [],
 }
 
 

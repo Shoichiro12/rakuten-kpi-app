@@ -21,7 +21,7 @@ from database import engine, get_db, SessionLocal
 import models
 from models import RppWeekly, MonthlyItemSales, MonthlyAnalysis, Target, RppSales, InventoryStatus, Shop
 from sample_data import generate_sample_data
-from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account, rpp_diagnosis, recommendations, costs, masters, inventory
+from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account, rpp_diagnosis, recommendations, costs, masters, inventory, billing
 from auth import get_current_user, AuthUser, UserContextMiddleware
 from migrations import run_migrations
 
@@ -106,6 +106,9 @@ app.include_router(costs.router, dependencies=_auth)
 app.include_router(masters.router, dependencies=_auth)
 app.include_router(masters.shops_router, dependencies=_auth)
 app.include_router(inventory.router, dependencies=_auth)
+app.include_router(billing.router, dependencies=_auth)
+# Stripe Webhook は Stripe サーバーが叩くため認証を付けない（署名検証で正当性を担保）
+app.include_router(billing.webhook_router)
 
 
 @app.exception_handler(Exception)

@@ -283,3 +283,23 @@ class ProductCost(Base, UserScopedMixin):
     __table_args__ = (
         UniqueConstraint("user_id", "management_no", name="uq_product_cost"),
     )
+
+
+class Subscription(Base, UserScopedMixin):
+    """Stripe サブスクリプションの契約状態（ユーザー単位・1件）。
+
+    課金状態を保持するだけで、プラン別の機能ロックは行わない（別途）。
+    Webhook（customer.subscription.*）で status を同期する。テストモード運用。
+    ユニーク制約は張らず、upsert（ユーザーの1件を取得→無ければ作成）で1件を担保する。
+    """
+    __tablename__ = "subscriptions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    stripe_customer_id = Column(String, index=True)
+    stripe_subscription_id = Column(String, index=True)
+    plan = Column(String)          # "standard" / "consult"
+    status = Column(String)        # trialing / active / past_due / canceled / incomplete 等
+    trial_end = Column(DateTime, nullable=True)
+    current_period_end = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())

@@ -10,6 +10,7 @@ import {
   Megaphone,
   FileDown,
   Boxes,
+  CreditCard,
   LogOut,
   UserCircle,
 } from 'lucide-react'
@@ -23,6 +24,7 @@ const nav = [
   { to: '/master', icon: Boxes, label: '商品マスタ・原価' },
   { to: '/targets', icon: Target, label: '目標設定' },
   { to: '/reports', icon: FileDown, label: 'レポート出力' },
+  { to: '/billing', icon: CreditCard, label: '請求・プラン' },
 ]
 
 interface SidebarProps {
