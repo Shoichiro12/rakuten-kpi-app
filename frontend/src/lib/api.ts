@@ -277,6 +277,9 @@ export const api = {
     /** Checkout Session を作成しURLを返す（フロントはそこへ遷移） */
     checkout: (plan: 'standard' | 'consult') =>
       request<{ url: string }>('/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
+    /** Checkout完了で戻った直後に呼び、契約状態を確定する（session_id 由来） */
+    confirm: (session_id: string) =>
+      request<import('../types').BillingStatus>('/billing/confirm', { method: 'POST', body: JSON.stringify({ session_id }) }),
     /** カスタマーポータルのURLを発行 */
     portal: () =>
       request<{ url: string }>('/billing/portal', { method: 'POST', body: JSON.stringify({}) }),

@@ -52,6 +52,17 @@ def _sub_dict(s) -> dict:
 def billing_status(db: Session = Depends(get_db), _u: AuthUser = Depends(get_current_user)):
     """現在のユーザーの契約状態。未契約でも200で {is_active:false} を返す。"""
     s = db.query(Subscription).first()
+    # 自己修復: 契約はあるが plan が未解決のときだけ Stripe から引き直して補完する
+    # （plan 設定済みなら Stripe API は叩かない）。
+    if s and s.stripe_subscription_id and not s.plan and B.BILLING_ENABLED:
+        stripe = B.get_stripe()
+        if stripe is not None:
+            try:
+                sub = stripe.Subscription.retrieve(s.stripe_subscription_id)
+                _sync_subscription(db, stripe, "customer.subscription.updated", sub)
+                s = db.query(Subscription).first()
+            except Exception:
+                pass
     return {"enabled": B.BILLING_ENABLED, **_sub_dict(s)}
 
 
@@ -95,13 +106,39 @@ def create_checkout(
             },
             client_reference_id=uid,
             customer=customer_id,
-            success_url=f"{base}/billing?checkout=success",
+            success_url=f"{base}/billing?checkout=success&session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{base}/billing?checkout=cancel",
             metadata={"user_id": user.id or "", "plan": payload.plan},
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Checkout作成に失敗しました: {e}")
     return {"url": session.url}
+
+
+class ConfirmPayload(BaseModel):
+    session_id: str
+
+
+@router.post("/confirm")
+def confirm_checkout(
+    payload: ConfirmPayload,
+    db: Session = Depends(get_db),
+    _u: AuthUser = Depends(get_current_user),
+):
+    """Checkout完了で戻ってきた直後に呼ぶ。session_id からセッションを取得して契約状態を確定する。
+
+    Webhook（継続イベント同期）とは独立に、登録直後の状態反映を確実にするための仕組み。
+    """
+    stripe = B.get_stripe()
+    if stripe is None:
+        raise HTTPException(status_code=501, detail="Stripeが未設定です。")
+    try:
+        session = stripe.checkout.Session.retrieve(payload.session_id)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"セッション取得に失敗しました: {e}")
+    _sync_subscription(db, stripe, "checkout.session.completed", session)
+    s = db.query(Subscription).first()
+    return {"enabled": B.BILLING_ENABLED, **_sub_dict(s)}
 
 
 @router.post("/portal")
@@ -209,7 +246,11 @@ def _sync_subscription(db: Session, stripe, etype: str, obj) -> None:
             if data:
                 price = g(data[0], "price") or {}
                 price_id = price.get("id") if hasattr(price, "get") else getattr(price, "id", None)
-            resolved_plan = B.plan_for_price(price_id)
+            # plan は checkout 時にサブスクの metadata へ入れているのでそれを優先し、
+            # 無ければ price_id から解決する（ポータルでのプラン変更等に備える）。
+            sub_meta = g(sub_obj, "metadata") or {}
+            plan_from_meta = sub_meta.get("plan") if hasattr(sub_meta, "get") else None
+            resolved_plan = plan_from_meta or B.plan_for_price(price_id)
             if resolved_plan:
                 s.plan = resolved_plan
             te = g(sub_obj, "trial_end")

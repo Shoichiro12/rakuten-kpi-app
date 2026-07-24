@@ -44,7 +44,15 @@ export default function Billing() {
     }
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    // Checkout完了で戻った直後（?session_id=…）は、まず契約状態を確定してから表示を更新する。
+    const sid = new URLSearchParams(window.location.search).get('session_id')
+    if (sid) {
+      api.billing.confirm(sid).catch(() => {}).finally(() => load())
+    } else {
+      load()
+    }
+  }, [load])
 
   const subscribe = async (plan: string) => {
     setBusy(plan)
