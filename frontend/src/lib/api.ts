@@ -211,6 +211,21 @@ export const api = {
     /** product_name / category_id / is_active の編集 */
     updateProduct: (managementNo: string, data: Partial<Pick<import('../types').MasterProduct, 'product_name' | 'category_id' | 'is_active'>>) =>
       request(`/master/products/${encodeURIComponent(managementNo)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    /** カテゴリ・原価率が未確定の商品の提案キュー（廃盤は除外） */
+    suggestions: () =>
+      request<import('../types').SuggestionsResponse>('/master/suggestions').then((d) => d ?? { count: 0, items: [] }),
+    /** 提案を個別承認（approve_category / approve_cost_rate を個別指定） */
+    approveSuggestion: (managementNo: string, data: { approve_category: boolean; approve_cost_rate: boolean }) =>
+      request<{ management_no: string; applied: { category: boolean; cost_rate: boolean }; recalculated_rows: number }>(
+        `/master/suggestions/${encodeURIComponent(managementNo)}/approve`,
+        { method: 'POST', body: JSON.stringify(data) },
+      ),
+    /** 高信頼提案のみ一括承認（低信頼は対象外） */
+    approveAllSuggestions: (managementNos: string[]) =>
+      request<{ approved_count: number; approved: unknown[]; recalculated_rows: number }>(
+        '/master/suggestions/approve-all',
+        { method: 'POST', body: JSON.stringify({ management_nos: managementNos }) },
+      ),
     /** カテゴリ一覧 */
     categories: () =>
       request<import('../types').CategoriesResponse>('/master/categories').then((d) => d ?? { count: 0, items: [] }),

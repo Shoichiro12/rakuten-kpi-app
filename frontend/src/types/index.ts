@@ -138,6 +138,39 @@ export interface CostsResponse {
   items: CostItem[]
 }
 
+/* ─── 商品マスタ入力支援（自動提案キュー） ─────────────────── */
+/** 提案の信頼度。high=まとめて承認の対象 / low=個別承認のみ */
+export type Confidence = 'high' | 'low'
+
+export interface CategorySuggestion {
+  category_id: number
+  label: string
+  basis: string
+  confidence: Confidence
+}
+
+export interface CostRateSuggestion {
+  suggested_rate: number
+  basis: string
+  confidence: Confidence
+}
+
+export interface SuggestionItem {
+  management_no: string
+  product_name: string | null
+  current: { category_id: number | null; cost_rate: number | null }
+  suggested: {
+    /** カテゴリ確定済みなら null。該当候補なしなら null（新規作成を促す） */
+    category: CategorySuggestion | null
+    cost_rate: CostRateSuggestion
+  }
+}
+
+export interface SuggestionsResponse {
+  count: number
+  items: SuggestionItem[]
+}
+
 export interface InventoryAlert {
   management_no: string
   product_name: string | null

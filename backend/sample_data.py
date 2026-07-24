@@ -1,8 +1,8 @@
 import random
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
-from models import RppWeekly, MonthlyAnalysis, Target, RppSales, MonthlyItemSales
-from masters import get_or_create_default_shop, upsert_product
+from models import RppWeekly, MonthlyAnalysis, Target, RppSales, MonthlyItemSales, Product, ProductCategory, ProductCost
+from masters import get_or_create_default_shop, get_or_create_category, upsert_product, recalc_rpp_cost_of_sales
 
 
 PRODUCTS = [
@@ -16,6 +16,7 @@ PRODUCTS = [
     {"product_url": "https://item.rakuten.co.jp/shop/acc-001/", "management_no": "ACC-001", "product_name": "スポーツソックス 5足セット", "genre": "スポーツ/アクセサリ"},
     {"product_url": "https://item.rakuten.co.jp/shop/acc-002/", "management_no": "ACC-002", "product_name": "スポーツタオル 速乾", "genre": "スポーツ/アクセサリ"},
     {"product_url": "https://item.rakuten.co.jp/shop/acc-003/", "management_no": "ACC-003", "product_name": "プロテインシェイカー 600ml", "genre": "スポーツ/アクセサリ"},
+    {"product_url": "https://item.rakuten.co.jp/shop/acc-004/", "management_no": "ACC-004", "product_name": "スポーツソックス ロング 3足組", "genre": "スポーツ/アクセサリ"},
 ]
 
 PRICE_RANGES = {
@@ -29,6 +30,7 @@ PRICE_RANGES = {
     "ACC-001": (1980, 0.65),
     "ACC-002": (2480, 0.63),
     "ACC-003": (1580, 0.67),
+    "ACC-004": (1780, 0.64),
 }
 
 # ─── RPP診断デモ用シナリオ ────────────────────────────────────────────────
@@ -56,6 +58,7 @@ RPP_SCENARIOS = {
     "ACC-001": {"kind": "insufficient", "ct": (4, 8),     "ctr": (0.9, 1.1), "cvr": (0, 0),     "roas": (0, 0)},
     "ACC-002": {"kind": "good",         "ct": (400, 470), "ctr": (1.9, 2.2), "cvr": (4.3, 4.9), "roas": (300, 360)},
     "ACC-003": {"kind": "cvr_low",      "ct": (250, 300), "ctr": (1.6, 1.8), "cvr": (1.2, 1.4), "roas": (150, 180)},
+    "ACC-004": {"kind": "good",         "ct": (300, 360), "ctr": (1.8, 2.1), "cvr": (3.8, 4.3), "roas": (250, 300)},
 }
 
 
@@ -83,6 +86,7 @@ MONTHLY_ITEM_CONFIG = {
     "ACC-001": {"genre_u3": "ソックス",         "uu": (55, 95),     "stock": 200, "zero_days": 0},   # UU母数不足(<100)
     "ACC-002": {"genre_u3": "タオル",           "uu": (1100, 1500), "stock": 150, "zero_days": 0},
     "ACC-003": {"genre_u3": "ボトル・シェイカー", "uu": (800, 1100),  "stock": 90,  "zero_days": 0},
+    "ACC-004": {"genre_u3": "ソックス",           "uu": (700, 1000),  "stock": 110, "zero_days": 0},
 }
 
 # 廃盤（is_active=False）デモに使う商品。マスタの「廃盤除外」トグル・廃盤バッジ・
@@ -146,6 +150,10 @@ def generate_sample_data(db: Session):
     db.query(MonthlyAnalysis).delete()
     db.query(MonthlyItemSales).delete()
     db.query(Target).delete()
+    # マスタも毎回リセットして提案キュー・廃盤デモを決定的にする（Shopは起動時に別途投入）。
+    db.query(ProductCost).delete()
+    db.query(Product).delete()
+    db.query(ProductCategory).delete()
 
     today = date.today()
     current_week_start = get_week_start(today)
@@ -350,20 +358,60 @@ def generate_sample_data(db: Session):
             expense_rate=0.15,
         ))
 
-    # ── 商品マスタ（products）＋廃盤デモ ──
-    # マスタ機能（廃盤除外トグル・廃盤バッジ・原価連携）はデモでも実データが要る。
-    # sample_data は取込を経由しないため、ここで商品マスタを明示的に起こす。
+    # ── 商品マスタ（products / categories / costs）＋各種デモ ──
+    # マスタ機能（廃盤・原価連携）とマスタ入力支援（自動提案キュー）にデモデータを供給する。
+    # カテゴリは大/中（u1/u2）でまとめる。小分類(u3)まで割ると各商品が単独カテゴリになり
+    # 「同カテゴリ平均」の原価率提案が成立しないため。
+    #
+    # 提案キューにわざと残す商品:
+    #   RUN-002 … カテゴリ未設定・原価率未設定 → カテゴリ提案（既存シューズと一致=高信頼）を検証
+    #   ACC-004 … カテゴリ設定済み・原価率のみ未設定 → 同カテゴリ平均(ACC-001/2/3=3件)からの高信頼提案を検証
+    CATEGORY_UNSET = {"RUN-002"}
+    COST_UNSET = {"RUN-002", "ACC-004"}
+
     shop = get_or_create_default_shop(db)
     for product in PRODUCTS:
+        mno = product["management_no"]
+        g_parts = product["genre"].split("/")
+        u1 = g_parts[0] if len(g_parts) > 0 else None
+        u2 = g_parts[1] if len(g_parts) > 1 else None
+        cat = None if mno in CATEGORY_UNSET else get_or_create_category(db, u1, u2, None)
         prod = upsert_product(
-            db,
-            product["management_no"],
-            shop_id=shop.id,
+            db, mno, shop_id=shop.id,
             product_name=product["product_name"],
             product_url=product["product_url"],
+            category_id=cat.id if cat else None,
         )
-        # 1件だけ廃盤にして「廃盤除外」トグル・廃盤バッジ・取扱停止を検証可能にする。
-        if prod is not None and product["management_no"] == DISCONTINUED_MANAGEMENT_NO:
+        if prod is None:
+            continue
+        # 未分類で残したい商品は明示的に None（upsert は値があるときだけ更新するため）。
+        if mno in CATEGORY_UNSET:
+            prod.category_id = None
+        # 1件だけ廃盤にして廃盤機能（除外トグル・バッジ・取扱停止）を検証（旧モデル想定）。
+        if mno == DISCONTINUED_MANAGEMENT_NO:
             prod.is_active = False
+        # 原価率（個別）: 提案キューのデモ対象以外に設定する（PRICE_RANGES の原価率を流用）。
+        if mno not in COST_UNSET:
+            rate = PRICE_RANGES[mno][1]
+            pc = db.query(ProductCost).filter(ProductCost.management_no == mno).first()
+            if pc is None:
+                db.add(ProductCost(management_no=mno, cost_rate=rate))
+            else:
+                pc.cost_rate = rate
 
+    # カテゴリ未設定デモ商品が「完全一致=高信頼」のカテゴリ提案を受けられるよう、
+    # その商品の小分類まで含む既存カテゴリを用意しておく（取込で既に存在する想定を再現）。
+    for mno in CATEGORY_UNSET:
+        pdef = next((p for p in PRODUCTS if p["management_no"] == mno), None)
+        if pdef is not None:
+            gp = pdef["genre"].split("/")
+            get_or_create_category(
+                db,
+                gp[0] if len(gp) > 0 else None,
+                gp[1] if len(gp) > 1 else None,
+                MONTHLY_ITEM_CONFIG.get(mno, {}).get("genre_u3"),
+            )
+
+    db.flush()
+    recalc_rpp_cost_of_sales(db)  # 個別原価率を RppWeekly に反映
     db.commit()

@@ -21,7 +21,10 @@ from masters import (
     DEFAULT_COST_RATE,
     get_or_create_category,
     get_or_create_default_shop,
+    get_review_queue,
     recalc_rpp_cost_of_sales,
+    suggest_category,
+    suggest_cost_rate,
     upsert_product,
 )
 
@@ -99,6 +102,108 @@ def update_master_product(
         "category_id": prod.category_id,
         "is_active": prod.is_active,
     }
+
+
+# ── 商品マスタ入力支援（自動提案キュー）────────────────────────────────────
+class ApprovePayload(BaseModel):
+    approve_category: bool = False
+    approve_cost_rate: bool = False
+
+
+class ApproveAllPayload(BaseModel):
+    management_nos: list[str] = []
+
+
+@router.get("/suggestions")
+def list_suggestions(db: Session = Depends(get_db)):
+    """カテゴリ・原価率が未確定の商品に「たぶんこれ」提案を付けて返す（廃盤は除外）。"""
+    shop = get_or_create_default_shop(db)
+    items = get_review_queue(db, shop.id)
+    return {"count": len(items), "items": items}
+
+
+@router.post("/suggestions/{management_no}/approve")
+def approve_suggestion(management_no: str, payload: ApprovePayload, db: Session = Depends(get_db)):
+    """提案どおり category_id / ProductCost を確定登録する（個別承認）。
+
+    cost を確定した場合はその商品の RppWeekly を掛け直す。
+    """
+    mno = (management_no or "").strip()
+    shop = get_or_create_default_shop(db)
+    prod = (
+        db.query(Product)
+        .filter(Product.shop_id == shop.id, Product.management_no == mno)
+        .first()
+    )
+    if prod is None:
+        raise HTTPException(status_code=404, detail=f"商品が見つかりません: {mno}")
+
+    applied = {"category": False, "cost_rate": False}
+    if payload.approve_category and prod.category_id is None:
+        sug = suggest_category(db, shop.id, mno)
+        if sug is not None:
+            prod.category_id = sug["category_id"]
+            applied["category"] = True
+
+    if payload.approve_cost_rate:
+        sug = suggest_cost_rate(db, shop.id, mno)
+        rate = sug["suggested_rate"]
+        pc = db.query(ProductCost).filter(ProductCost.management_no == mno).first()
+        if pc is None:
+            db.add(ProductCost(management_no=mno, cost_rate=rate))
+        else:
+            pc.cost_rate = rate
+        applied["cost_rate"] = True
+
+    db.flush()
+    recalculated = recalc_rpp_cost_of_sales(db, {mno}) if applied["cost_rate"] else 0
+    db.commit()
+    return {"management_no": mno, "applied": applied, "recalculated_rows": recalculated}
+
+
+@router.post("/suggestions/approve-all")
+def approve_all_suggestions(payload: ApproveAllPayload, db: Session = Depends(get_db)):
+    """一括承認。安全弁として confidence="high" の提案のみを対象にする。
+
+    店舗デフォルトへのフォールバック等の低信頼提案は一括承認では確定せず、個別承認に委ねる。
+    """
+    shop = get_or_create_default_shop(db)
+    approved: list[dict] = []
+    touched_cost: set = set()
+    for raw in payload.management_nos:
+        mno = (raw or "").strip()
+        if not mno:
+            continue
+        prod = (
+            db.query(Product)
+            .filter(Product.shop_id == shop.id, Product.management_no == mno)
+            .first()
+        )
+        if prod is None:
+            continue
+        applied = {"category": False, "cost_rate": False}
+
+        if prod.category_id is None:
+            cs = suggest_category(db, shop.id, mno)
+            if cs and cs["confidence"] == "high":
+                prod.category_id = cs["category_id"]
+                applied["category"] = True
+
+        has_cost = db.query(ProductCost).filter(ProductCost.management_no == mno).first() is not None
+        if not has_cost:
+            rs = suggest_cost_rate(db, shop.id, mno)
+            if rs and rs["confidence"] == "high":
+                db.add(ProductCost(management_no=mno, cost_rate=rs["suggested_rate"]))
+                touched_cost.add(mno)
+                applied["cost_rate"] = True
+
+        if applied["category"] or applied["cost_rate"]:
+            approved.append({"management_no": mno, "applied": applied})
+
+    db.flush()
+    recalculated = recalc_rpp_cost_of_sales(db, touched_cost) if touched_cost else 0
+    db.commit()
+    return {"approved_count": len(approved), "approved": approved, "recalculated_rows": recalculated}
 
 
 @router.get("/categories")

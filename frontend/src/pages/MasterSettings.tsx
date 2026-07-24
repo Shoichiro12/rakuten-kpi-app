@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Save, CheckCircle, RefreshCw, Plus, Trash2, Pencil, Check, X, Download, Upload } from 'lucide-react'
+import { Save, CheckCircle, RefreshCw, Plus, Trash2, Pencil, Check, X, Download, Upload, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
 import Header from '../components/layout/Header'
 import { api } from '../lib/api'
-import type { MasterProduct, CostItem, Category } from '../types'
+import type { MasterProduct, CostItem, Category, SuggestionItem } from '../types'
 
 /** 管理番号ごとに商品マスタ情報＋適用中の原価率をまとめた1行。 */
 interface Row extends MasterProduct {
@@ -20,6 +20,12 @@ export default function MasterSettings() {
   const [loading, setLoading] = useState(false)
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
   const [showInactive, setShowInactive] = useState(true)
+
+  // 提案キュー（マスタ入力支援）
+  const [suggestions, setSuggestions] = useState<SuggestionItem[]>([])
+  const [suggestOpen, setSuggestOpen] = useState(true)
+  const [editingSuggestId, setEditingSuggestId] = useState<string | null>(null)
+  const [editSuggest, setEditSuggest] = useState<{ category_id: number | null; cost_pct: number }>({ category_id: null, cost_pct: 60 })
 
   // 店舗設定フォーム
   const [shopName, setShopName] = useState('')
@@ -40,11 +46,12 @@ export default function MasterSettings() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [prodRes, costRes, shopRes, catRes] = await Promise.all([
+      const [prodRes, costRes, shopRes, catRes, sugRes] = await Promise.all([
         api.master.products(),
         api.costs.list(),
         api.shops.me(),
         api.master.categories(),
+        api.master.suggestions(),
       ])
       const costMap = new Map<string, CostItem>()
       for (const c of costRes.items) costMap.set(c.management_no, c)
@@ -59,6 +66,7 @@ export default function MasterSettings() {
       merged.sort((a, b) => a.management_no.localeCompare(b.management_no))
       setRows(merged)
       setCategories(catRes.items)
+      setSuggestions(sugRes.items)
       setShopName(shopRes.name)
       setCostPct(Math.round((shopRes.default_cost_rate ?? 0.6) * 100))
       setExpensePct(Math.round((shopRes.default_expense_rate ?? 0.15) * 100))
@@ -204,6 +212,74 @@ export default function MasterSettings() {
     }
   }
 
+  // 提案キュー操作 ─────────────────────────────
+  /** 高信頼の提案（未設定かつ confidence=high）を1つでも持つか */
+  const hasHigh = (s: SuggestionItem) =>
+    (s.current.category_id == null && s.suggested.category?.confidence === 'high') ||
+    (s.current.cost_rate == null && s.suggested.cost_rate.confidence === 'high')
+  const highCount = suggestions.filter(hasHigh).length
+
+  const approveOne = async (s: SuggestionItem) => {
+    const approveCategory = s.current.category_id == null && !!s.suggested.category
+    const approveCost = s.current.cost_rate == null
+    if (!approveCategory && !approveCost) return
+    try {
+      await api.master.approveSuggestion(s.management_no, {
+        approve_category: approveCategory,
+        approve_cost_rate: approveCost,
+      })
+      await load()
+      flash(`${s.management_no} を承認しました`)
+    } catch (e) {
+      console.error('[MasterSettings] 提案承認エラー:', e)
+    }
+  }
+
+  const approveAllHigh = async () => {
+    try {
+      const res = await api.master.approveAllSuggestions(suggestions.map((s) => s.management_no))
+      await load()
+      flash(`高信頼の提案を ${res?.approved_count ?? 0} 件承認しました`)
+    } catch (e) {
+      console.error('[MasterSettings] 一括承認エラー:', e)
+    }
+  }
+
+  const startEditSuggest = (s: SuggestionItem) => {
+    setEditingSuggestId(s.management_no)
+    setEditSuggest({
+      category_id: s.current.category_id ?? s.suggested.category?.category_id ?? null,
+      cost_pct: s.current.cost_rate != null
+        ? Math.round(s.current.cost_rate * 100)
+        : Math.round(s.suggested.cost_rate.suggested_rate * 100),
+    })
+  }
+
+  const confirmEditSuggest = async (s: SuggestionItem) => {
+    try {
+      // カテゴリ確定（既存の手動編集フローを流用）
+      if ((editSuggest.category_id ?? null) !== (s.current.category_id ?? null)) {
+        await api.master.updateProduct(s.management_no, { category_id: editSuggest.category_id })
+      }
+      // 原価率確定（→ 対象商品のみ再計算）
+      const rate = Math.min(Math.max(editSuggest.cost_pct / 100, 0), 1)
+      await api.costs.setProduct(s.management_no, rate)
+      setEditingSuggestId(null)
+      await load()
+      flash(`${s.management_no} を確定しました`)
+    } catch (e) {
+      console.error('[MasterSettings] 編集確定エラー:', e)
+    }
+  }
+
+  const confidenceBadge = (c: 'high' | 'low') => (
+    <span className={`ml-1 text-[10px] px-1 py-0.5 rounded font-medium ${
+      c === 'high' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'
+    }`}>
+      {c === 'high' ? '高信頼' : '要確認'}
+    </span>
+  )
+
   const visibleRows = showInactive ? rows : rows.filter((r) => r.is_active)
   const inactiveCount = rows.filter((r) => !r.is_active).length
 
@@ -228,6 +304,112 @@ export default function MasterSettings() {
 
       <div className="flex-1 overflow-auto p-6 bg-gray-50">
         <div className="max-w-4xl mx-auto space-y-6">
+          {/* 未確認の提案（マスタ入力支援） */}
+          {suggestions.length > 0 && (
+            <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b bg-amber-50 flex items-center justify-between gap-3 flex-wrap">
+                <button
+                  onClick={() => setSuggestOpen((v) => !v)}
+                  className="flex items-center gap-2 text-sm font-semibold text-amber-800"
+                >
+                  <Sparkles size={15} />
+                  未確認の提案（{suggestions.length}件）
+                  {suggestOpen ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                </button>
+                {highCount > 0 && (
+                  <button
+                    onClick={approveAllHigh}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors"
+                  >
+                    <Check size={13} />高信頼の提案をまとめて承認（{highCount}）
+                  </button>
+                )}
+              </div>
+
+              {suggestOpen && (
+                <>
+                  <p className="px-4 py-2 text-xs text-gray-400 border-b bg-gray-50/60">
+                    取込で自動生成された商品のうち、カテゴリ・原価率が未確定のものです。「要確認」（低信頼）の提案は一括承認の対象外で、個別承認・編集のみになります。
+                  </p>
+                  <ul className="divide-y divide-gray-100">
+                    {suggestions.map((s) => (
+                      <li key={s.management_no} className="px-4 py-3">
+                        {editingSuggestId === s.management_no ? (
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <div className="min-w-[150px]">
+                              <p className="text-sm font-medium text-gray-900 leading-tight">{s.product_name || '（名称未設定）'}</p>
+                              <p className="text-xs text-gray-400 font-mono">{s.management_no}</p>
+                            </div>
+                            <select
+                              value={editSuggest.category_id ?? ''}
+                              onChange={(e) => setEditSuggest((p) => ({ ...p, category_id: e.target.value === '' ? null : Number(e.target.value) }))}
+                              className="text-xs border border-gray-200 rounded px-1.5 py-1 max-w-[180px] focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            >
+                              <option value="">未分類</option>
+                              {categories.map((c) => <option key={c.id} value={c.id}>{categoryPath(c)}</option>)}
+                            </select>
+                            <span className="inline-flex items-center gap-1">
+                              <input
+                                type="number" min={0} max={100} step={1}
+                                value={editSuggest.cost_pct}
+                                onChange={(e) => setEditSuggest((p) => ({ ...p, cost_pct: Number(e.target.value) }))}
+                                className="w-16 text-right text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                              <span className="text-gray-400 text-xs">%</span>
+                            </span>
+                            <div className="ml-auto flex items-center gap-1">
+                              <button onClick={() => confirmEditSuggest(s)} className="flex items-center gap-1 px-2.5 py-1 bg-gray-900 hover:bg-gray-800 text-white text-xs rounded"><Check size={13} />確定</button>
+                              <button onClick={() => setEditingSuggestId(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded" title="取消"><X size={15} /></button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 flex-wrap">
+                            <div className="min-w-[150px]">
+                              <p className="text-sm font-medium text-gray-900 leading-tight">{s.product_name || '（名称未設定）'}</p>
+                              <p className="text-xs text-gray-400 font-mono">{s.management_no}</p>
+                            </div>
+                            <div className="flex-1 min-w-[170px] text-xs">
+                              <span className="text-gray-400">カテゴリ: </span>
+                              {s.current.category_id != null ? (
+                                <span className="text-gray-400">設定済み</span>
+                              ) : s.suggested.category ? (
+                                <span className="text-gray-700">
+                                  {s.suggested.category.label}{confidenceBadge(s.suggested.category.confidence)}
+                                  <span className="text-gray-400 ml-1">{s.suggested.category.basis}</span>
+                                </span>
+                              ) : (
+                                <span className="text-amber-600">提案なし（新規カテゴリ作成が必要）</span>
+                              )}
+                            </div>
+                            <div className="min-w-[150px] text-xs">
+                              <span className="text-gray-400">原価率: </span>
+                              {s.current.cost_rate != null ? (
+                                <span className="text-gray-400">設定済み {Math.round(s.current.cost_rate * 100)}%</span>
+                              ) : (
+                                <span className="text-gray-700">
+                                  {Math.round(s.suggested.cost_rate.suggested_rate * 100)}%{confidenceBadge(s.suggested.cost_rate.confidence)}
+                                  <span className="text-gray-400 ml-1">{s.suggested.cost_rate.basis}</span>
+                                </span>
+                              )}
+                            </div>
+                            <div className="ml-auto flex items-center gap-1.5">
+                              <button onClick={() => approveOne(s)} className="flex items-center gap-1 px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors">
+                                <Check size={13} />承認
+                              </button>
+                              <button onClick={() => startEditSuggest(s)} className="flex items-center gap-1 px-2.5 py-1 border text-gray-600 hover:bg-gray-50 text-xs rounded transition-colors">
+                                <Pencil size={12} />編集して確定
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              )}
+            </div>
+          )}
+
           {/* 店舗設定 */}
           <div className="bg-white rounded-xl border shadow-sm p-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">店舗設定（デフォルト値）</h3>
