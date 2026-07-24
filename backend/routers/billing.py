@@ -57,12 +57,16 @@ def billing_status(db: Session = Depends(get_db), _u: AuthUser = Depends(get_cur
     if s and s.stripe_subscription_id and not s.plan and B.BILLING_ENABLED:
         stripe = B.get_stripe()
         if stripe is not None:
+            import logging as _lg
+            _log = _lg.getLogger("billing")
+            _log.warning("reconcile開始: sub=%s", s.stripe_subscription_id)
             try:
                 sub = stripe.Subscription.retrieve(s.stripe_subscription_id)
                 _sync_subscription(db, stripe, "customer.subscription.updated", sub)
                 s = db.query(Subscription).first()
-            except Exception:
-                pass
+                _log.warning("reconcile完了: plan=%r status=%r", getattr(s, "plan", None), getattr(s, "status", None))
+            except Exception as _e:
+                _log.warning("reconcile失敗: %s: %s", type(_e).__name__, _e)
     return {"enabled": B.BILLING_ENABLED, **_sub_dict(s)}
 
 
