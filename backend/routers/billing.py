@@ -57,16 +57,12 @@ def billing_status(db: Session = Depends(get_db), _u: AuthUser = Depends(get_cur
     if s and s.stripe_subscription_id and not s.plan and B.BILLING_ENABLED:
         stripe = B.get_stripe()
         if stripe is not None:
-            import logging as _lg
-            _log = _lg.getLogger("billing")
-            _log.warning("reconcile開始: sub=%s", s.stripe_subscription_id)
             try:
                 sub = stripe.Subscription.retrieve(s.stripe_subscription_id)
                 _sync_subscription(db, stripe, "customer.subscription.updated", sub)
                 s = db.query(Subscription).first()
-                _log.warning("reconcile完了: plan=%r status=%r", getattr(s, "plan", None), getattr(s, "status", None))
-            except Exception as _e:
-                _log.warning("reconcile失敗: %s: %s", type(_e).__name__, _e)
+            except Exception:
+                pass
     return {"enabled": B.BILLING_ENABLED, **_sub_dict(s)}
 
 
@@ -116,6 +112,13 @@ def create_checkout(
         )
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Checkout作成に失敗しました: {e}")
+
+    # plan は checkout 時点で確定しているのでDBへ先に記録する（後段のStripeオブジェクト解析に依存しない）。
+    if s is None:
+        s = Subscription()
+        db.add(s)
+    s.plan = payload.plan
+    db.commit()
     return {"url": session.url}
 
 
@@ -252,18 +255,18 @@ def _sync_subscription(db: Session, stripe, etype: str, obj) -> None:
                 price_id = price.get("id") if hasattr(price, "get") else getattr(price, "id", None)
             # plan は checkout 時にサブスクの metadata へ入れているのでそれを優先し、
             # 無ければ price_id から解決する（ポータルでのプラン変更等に備える）。
-            sub_meta = g(sub_obj, "metadata") or {}
-            plan_from_meta = sub_meta.get("plan") if hasattr(sub_meta, "get") else None
+            # plan は checkout時にサブスクの metadata へ入れている。StripeObject は .get が
+            # 効かない版があるため属性アクセスを優先して読む。無ければ price_id から解決。
+            sub_meta = g(sub_obj, "metadata")
+            plan_from_meta = None
+            if sub_meta is not None:
+                plan_from_meta = getattr(sub_meta, "plan", None)
+                if not plan_from_meta and hasattr(sub_meta, "get"):
+                    try:
+                        plan_from_meta = sub_meta.get("plan")
+                    except Exception:
+                        plan_from_meta = None
             resolved_plan = plan_from_meta or B.plan_for_price(price_id)
-            try:
-                import logging as _lg3
-                _meta_dump = dict(sub_meta) if hasattr(sub_meta, "keys") else sub_meta
-                _lg3.getLogger("billing").warning(
-                    "plan解決: price_id=%r env_std=%r meta_plan=%r meta=%r resolved=%r data件数=%d",
-                    price_id, B.price_for_plan("standard"), plan_from_meta, _meta_dump, resolved_plan, len(data),
-                )
-            except Exception:
-                pass
             if resolved_plan:
                 s.plan = resolved_plan
             te = g(sub_obj, "trial_end")
