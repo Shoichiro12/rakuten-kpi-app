@@ -255,6 +255,15 @@ def _sync_subscription(db: Session, stripe, etype: str, obj) -> None:
             sub_meta = g(sub_obj, "metadata") or {}
             plan_from_meta = sub_meta.get("plan") if hasattr(sub_meta, "get") else None
             resolved_plan = plan_from_meta or B.plan_for_price(price_id)
+            try:
+                import logging as _lg3
+                _meta_dump = dict(sub_meta) if hasattr(sub_meta, "keys") else sub_meta
+                _lg3.getLogger("billing").warning(
+                    "plan解決: price_id=%r env_std=%r meta_plan=%r meta=%r resolved=%r data件数=%d",
+                    price_id, B.price_for_plan("standard"), plan_from_meta, _meta_dump, resolved_plan, len(data),
+                )
+            except Exception:
+                pass
             if resolved_plan:
                 s.plan = resolved_plan
             te = g(sub_obj, "trial_end")
