@@ -2,6 +2,7 @@ import random
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
 from models import RppWeekly, MonthlyAnalysis, Target, RppSales, MonthlyItemSales
+from masters import get_or_create_default_shop, upsert_product
 
 
 PRODUCTS = [
@@ -83,6 +84,10 @@ MONTHLY_ITEM_CONFIG = {
     "ACC-002": {"genre_u3": "タオル",           "uu": (1100, 1500), "stock": 150, "zero_days": 0},
     "ACC-003": {"genre_u3": "ボトル・シェイカー", "uu": (800, 1100),  "stock": 90,  "zero_days": 0},
 }
+
+# 廃盤（is_active=False）デモに使う商品。マスタの「廃盤除外」トグル・廃盤バッジ・
+# 取扱停止アクションを検証するため、特別パターン（低母数/欠品/僅少）と重複しない商品を選ぶ。
+DISCONTINUED_MANAGEMENT_NO = "SPW-002"
 
 
 def get_week_start(d: date) -> date:
@@ -344,5 +349,21 @@ def generate_sample_data(db: Session):
             target_av=7000,
             expense_rate=0.15,
         ))
+
+    # ── 商品マスタ（products）＋廃盤デモ ──
+    # マスタ機能（廃盤除外トグル・廃盤バッジ・原価連携）はデモでも実データが要る。
+    # sample_data は取込を経由しないため、ここで商品マスタを明示的に起こす。
+    shop = get_or_create_default_shop(db)
+    for product in PRODUCTS:
+        prod = upsert_product(
+            db,
+            product["management_no"],
+            shop_id=shop.id,
+            product_name=product["product_name"],
+            product_url=product["product_url"],
+        )
+        # 1件だけ廃盤にして「廃盤除外」トグル・廃盤バッジ・取扱停止を検証可能にする。
+        if prod is not None and product["management_no"] == DISCONTINUED_MANAGEMENT_NO:
+            prod.is_active = False
 
     db.commit()
