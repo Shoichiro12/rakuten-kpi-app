@@ -7,7 +7,7 @@ from sqlalchemy import func
 from database import get_db
 from models import RppWeekly, Target
 from calculations import calc_kpis, calc_change_rate
-from evaluation import MIN_ACCESS_SAMPLE
+from access_definitions import MIN_ACCESS_SAMPLE, is_reliable
 from shop_metrics import get_shop_monthly
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -250,7 +250,7 @@ def get_alerts(
 
     # 100UUルール（要件No.6）: アクセス母数が閾値未満の期間は、CVR・客単価の
     # 評価・アラートを保留する（母数不足で統計的に信用できないため）。
-    low_sample = kpis["ct"] < MIN_ACCESS_SAMPLE
+    low_sample = not is_reliable(kpis["ct"])
     if low_sample:
         alerts.append({
             "type": "warning",

@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import RppWeekly
 from calculations import calc_kpis
+from access_definitions import is_reliable
 from masters import inactive_management_nos
 
 router = APIRouter(prefix="/api/products", tags=["products"])
@@ -106,10 +107,14 @@ def list_products(
             "is_active": (a["management_no"] not in all_inactive) if a["management_no"] else True,
             **kpis,
             "limit_cpo_exceeded": kpis["cpo"] > kpis["limit_cpo"] if kpis["limit_cpo"] > 0 else False,
+            # この一覧はRPP軸（RppWeekly.ct＝クリック数）。母数が閾値未満ならCVR・客単価は
+            # 参考値（要件No.5/No.6）。reliable=false の商品はフロントで注記を出す。
+            "access_axis": "rpp_click",
+            "reliable": is_reliable(kpis["ct"]),
         })
 
     result.sort(key=lambda x: x["gross"], reverse=True)
-    return {"products": result, "count": len(result)}
+    return {"products": result, "count": len(result), "access_axis": "rpp_click"}
 
 
 @router.get("/trend/{management_no}")

@@ -3,6 +3,7 @@ import { AlertTriangle, TrendingUp, PackageX } from 'lucide-react'
 import Header from '../components/layout/Header'
 import PeriodSelector from '../components/PeriodSelector'
 import KPIChart from '../components/dashboard/KPIChart'
+import ReliabilityNote from '../components/ReliabilityNote'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
 import { usePeriodState } from '../lib/usePeriodState'
@@ -193,7 +194,10 @@ export default function ProductKPIPage() {
                                   <span className="ml-1.5 align-middle px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 text-[10px] font-medium">廃盤</span>
                                 )}
                               </p>
-                              <p className="text-xs text-gray-400">{p.management_no}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="text-xs text-gray-400">{p.management_no}</p>
+                                <ReliabilityNote reliable={p.reliable} accessAxis={p.access_axis} variant="badge" />
+                              </div>
                             </div>
                           </div>
                         </td>
@@ -251,6 +255,11 @@ export default function ProductKPIPage() {
                     </div>
                   ))}
                 </div>
+                <ReliabilityNote
+                  reliable={selectedProduct.reliable}
+                  accessAxis={selectedProduct.access_axis}
+                  className="mt-2"
+                />
               </div>
 
               {productTrend.length > 0 && (

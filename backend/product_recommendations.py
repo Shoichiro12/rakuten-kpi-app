@@ -17,7 +17,7 @@ docs/VISION.md が目指すのは AIストアマネージャーなので、
 
 from typing import Optional
 
-from evaluation import MIN_ACCESS_SAMPLE
+from access_definitions import MIN_ACCESS_SAMPLE, is_reliable  # noqa: F401
 
 # レビュー評価の警戒ライン（楽天の平均的な水準を踏まえた保守的な閾値）
 LOW_REVIEW_SCORE = 3.5
@@ -139,7 +139,7 @@ def _rule_low_cvr(row, shop, days_in_month: int) -> Optional[dict]:
     改善インパクトは「店舗平均CVRまで戻した場合の増加売上」で見積もる。
     """
     access = row.access_uu or 0
-    if access < MIN_ACCESS_SAMPLE:
+    if not is_reliable(access):
         return None
     shop_cvr = (shop or {}).get("cvr") or 0
     cvr = row.cvr or 0
@@ -175,7 +175,7 @@ def _rule_low_cvr(row, shop, days_in_month: int) -> Optional[dict]:
 def _rule_no_review(row, shop, days_in_month: int) -> Optional[dict]:
     """アクセスがあるのにレビューが無い商品。レビューはCVRの主要因。"""
     access = row.access_uu or 0
-    if access < MIN_ACCESS_SAMPLE or (row.review_count or 0) > 0:
+    if not is_reliable(access) or (row.review_count or 0) > 0:
         return None
     sales = row.sales or 0
     if sales <= 0:
@@ -237,7 +237,7 @@ def _rule_high_potential(row, shop, days_in_month: int) -> Optional[dict]:
     if shop_cvr <= 0 or cvr <= 0:
         return None
     # 母数が極端に小さい商品はCVRが偶然高く出るため除外する
-    if access < MIN_ACCESS_SAMPLE:
+    if not is_reliable(access):
         return None
     if cvr < shop_cvr * CVR_HIGH_RATIO:
         return None

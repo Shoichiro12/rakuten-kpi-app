@@ -15,7 +15,8 @@ from sqlalchemy.orm import Session
 
 from database import get_db
 from models import RppWeekly, Target
-from evaluation import judge_metric, evaluate_matrix, MIN_ACCESS_SAMPLE
+from evaluation import judge_metric, evaluate_matrix
+from access_definitions import is_reliable
 from shop_metrics import get_shop_monthly
 
 router = APIRouter(prefix="/api/evaluation", tags=["evaluation"])
@@ -153,9 +154,14 @@ def get_matrix(
     cvr_j = judge_metric("cvr", "転換率（CVR）", current["cvr"], t_cvr, _py("cvr"))
     av_j = judge_metric("av", "客単価", current["av"], t_av, _py("av"))
 
+    # アクセス軸を明示する（要件No.5）。shop軸=訪問UU / rpp軸=RPPクリック数。
+    access_axis = "site_uu" if axis == "shop" else "rpp_click"
     # 100UUルール（要件No.6）: アクセス母数不足時はCVR・客単価を評価対象外にする
-    low_sample = current["access"] < MIN_ACCESS_SAMPLE
-    result = evaluate_matrix(sales_j, access_j, cvr_j, av_j, low_sample=low_sample)
+    low_sample = not is_reliable(current["access"])
+    result = evaluate_matrix(
+        sales_j, access_j, cvr_j, av_j,
+        low_sample=low_sample, access_axis=access_axis,
+    )
 
     return {
         "period": period,
@@ -163,6 +169,7 @@ def get_matrix(
         "has_data": True,
         "has_target": target is not None,
         "axis": axis,
+        "access_axis": access_axis,
         "evaluation": result,
     }
 

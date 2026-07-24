@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import RppWeekly, Target, MonthlyItemSales
 from calculations import calc_kpis, calc_change_rate
+from access_definitions import is_reliable
 from shop_metrics import get_shop_monthly
 
 router = APIRouter(prefix="/api/gap", tags=["gap"])
@@ -183,10 +184,13 @@ def _build_shop_products(items, prev_items, genre: Optional[str]) -> dict:
             "prev": prev_kpis,
             "changes": changes,
             "limit_cpo_exceeded": False,
+            # site_uu 軸。母数（訪問UU）が閾値未満ならCVR・客単価は参考値（要件No.5/No.6）。
+            "access_axis": "site_uu",
+            "reliable": is_reliable(kpis.get("access")),
         })
 
     result.sort(key=lambda x: x["current"]["gross"], reverse=True)
-    return {"products": result, "axis": "shop"}
+    return {"products": result, "axis": "shop", "access_axis": "site_uu"}
 
 
 def get_week_start(d: date) -> date:
@@ -389,10 +393,16 @@ def gap_genre(
                 "current": kpis,
                 "prev": prev_kpis,
                 "changes": changes,
+                # site_uu 軸。母数（訪問UU）が閾値未満ならCVR・客単価は参考値（要件No.5/No.6）。
+                "access_axis": "site_uu",
+                "reliable": is_reliable(kpis.get("access")),
                 **_genre_path_parts(genre_key, level),
             })
         shop_result.sort(key=lambda x: x["current"]["gross"], reverse=True)
-        return {"genres": shop_result, "level": level, "parent": parent, "axis": "shop"}
+        return {
+            "genres": shop_result, "level": level, "parent": parent,
+            "axis": "shop", "access_axis": "site_uu",
+        }
 
     def group_by_genre(rows):
         """level・parent に基づいてジャンルキーを解決し集計する。"""
@@ -438,12 +448,15 @@ def gap_genre(
             "current": kpis,
             "prev": prev_kpis,
             "changes": changes,
+            # rpp_click 軸。母数（クリック数）が閾値未満ならCVR・客単価は参考値（要件No.5/No.6）。
+            "access_axis": "rpp_click",
+            "reliable": is_reliable(kpis.get("ct")),
             # --- 追加キー（階層情報） ---
             **path_info,
         })
 
     result.sort(key=lambda x: x["current"]["gross"], reverse=True)
-    return {"genres": result, "level": level, "parent": parent}
+    return {"genres": result, "level": level, "parent": parent, "access_axis": "rpp_click"}
 
 
 @router.get("/product")
@@ -568,10 +581,13 @@ def gap_product(
             "prev": prev_kpis,
             "changes": changes,
             "limit_cpo_exceeded": kpis["cpo"] > kpis["limit_cpo"] if kpis["limit_cpo"] > 0 else False,
+            # rpp_click 軸。母数（クリック数）が閾値未満ならCVR・客単価は参考値（要件No.5/No.6）。
+            "access_axis": "rpp_click",
+            "reliable": is_reliable(kpis.get("ct")),
         })
 
     result.sort(key=lambda x: x["current"]["gross"], reverse=True)
-    return {"products": result}
+    return {"products": result, "access_axis": "rpp_click"}
 
 
 def _prev_month(ym: str) -> str:
@@ -641,6 +657,9 @@ def get_kpi_tree(
         actual_av = round((actual_gross / actual_cv) if actual_cv > 0 else 0, 0)
         access_label = "クリック数（RPP）"
 
+    # アクセス軸を明示する（要件No.5）。shop=訪問UU / rpp=RPPクリック数。
+    access_axis = "site_uu" if shop else "rpp_click"
+
     t_sales = target.target_sales if target else 0
     t_sales = target.target_sales if target else 0
     t_access = target.target_access if target else 0
@@ -661,6 +680,9 @@ def get_kpi_tree(
     return {
         "has_target": target is not None,
         "axis": "shop" if shop else "rpp",
+        "access_axis": access_axis,
+        # アクセス母数が信用に足るか（要件No.6）。false ならCVR・客単価は参考値。
+        "reliable": is_reliable(actual_access),
         "kgi": node("売上目標", "kgi", actual_gross, t_sales, "currency"),
         "access": node(access_label, "access", actual_access, t_access, "number"),
         "cvr": node("転換率（CVR）", "cvr", actual_cvr, t_cvr, "percent"),

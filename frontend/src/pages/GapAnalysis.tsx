@@ -7,15 +7,18 @@ import StepIndicator from '../components/gap/StepIndicator'
 import GenreCards from '../components/gap/GenreCards'
 import ActionPanel from '../components/gap/ActionPanel'
 import EvaluationMatrix from '../components/EvaluationMatrix'
+import ReliabilityNote from '../components/ReliabilityNote'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
 import { usePeriodState } from '../lib/usePeriodState'
-import type { KPIs, GenreKPI, KPITree, EvaluationResult } from '../types'
+import type { KPIs, GenreKPI, KPITree, EvaluationResult, AccessAxis } from '../types'
+import { ACCESS_AXIS_LABEL } from '../types'
 
 interface ShopData { current: KPIs; prev: KPIs | null; changes: Record<string, number | null> }
 interface ProductItem {
   product_url: string; management_no: string; product_name: string; genre: string
   current: KPIs; prev: KPIs | null; changes: Record<string, number | null>; limit_cpo_exceeded: boolean
+  access_axis?: AccessAxis; reliable?: boolean
 }
 
 function ChangeCell({ value }: { value: number | null | undefined }) {
@@ -33,11 +36,15 @@ export default function GapAnalysis() {
 
   const [treeData, setTreeData] = useState<KPITree | null>(null)
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null)
+  // 評価マトリクスのアクセス軸（'shop'=商品分析UU／'rpp'=RPPクリック）。バッジ表示に使う。
+  const [evalAxis, setEvalAxis] = useState<'shop' | 'rpp' | undefined>(undefined)
   const [shopData, setShopData] = useState<ShopData | null>(null)
   const [genreData, setGenreData] = useState<GenreKPI[]>([])
   // 集計軸（'shop'=商品分析／null=RPP）。月次と週次でCVRの母数が変わるため保持する。
   const [genreAxis, setGenreAxis] = useState<string | null>(null)
   const [productData, setProductData] = useState<ProductItem[]>([])
+  // 商品テーブルのアクセス軸（要件No.5）。列見出しに軸を明示する。
+  const [productAxis, setProductAxis] = useState<AccessAxis | undefined>(undefined)
   const [loading, setLoading] = useState(false)
   const [excludeInactive, setExcludeInactive] = useState(false)  // 廃盤を集計から除外するか
 
@@ -58,6 +65,7 @@ export default function GapAnalysis() {
       setGenreData(genre?.genres ?? [])
       setGenreAxis(genre?.axis ?? null)
       setEvaluation(evalRes?.evaluation ?? null)
+      setEvalAxis(evalRes?.axis)
     } catch (e) {
       console.error('[GapAnalysis] データ取得エラー:', e)
       // エラー時は既存の表示を維持しつつ、空状態に戻す
@@ -72,11 +80,13 @@ export default function GapAnalysis() {
 
   const loadProducts = useCallback(async (genre?: string) => {
     try {
-      const prod = await api.gap.product(period, dateParam, genre, includeInactive) as { products?: ProductItem[] } | null
+      const prod = await api.gap.product(period, dateParam, genre, includeInactive) as { products?: ProductItem[]; access_axis?: AccessAxis } | null
       setProductData(prod?.products ?? [])
+      setProductAxis(prod?.access_axis)
     } catch (e) {
       console.error('[GapAnalysis] 商品データ取得エラー:', e)
       setProductData([])
+      setProductAxis(undefined)
     }
   }, [period, dateParam, includeInactive])
 
@@ -141,7 +151,7 @@ export default function GapAnalysis() {
           <StepIndicator currentStep={step} onStepClick={handleStepClick} />
 
           {/* 評価マトリクス（17パターン・目標×YoY統一判定） */}
-          {evaluation && <EvaluationMatrix evaluation={evaluation} />}
+          {evaluation && <EvaluationMatrix evaluation={evaluation} axis={evalAxis} />}
 
           {/* ロジックツリー */}
           <div className="bg-white rounded-xl border shadow-sm p-5">
@@ -176,6 +186,13 @@ export default function GapAnalysis() {
               <p className="mt-3 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                 💡 「目標設定」画面でKGI/KPI目標を設定すると、達成率・GAP分析が有効になります
               </p>
+            )}
+            {treeData && (
+              <ReliabilityNote
+                reliable={treeData.reliable}
+                accessAxis={treeData.access_axis}
+                className="mt-3"
+              />
             )}
           </div>
 
@@ -215,7 +232,9 @@ export default function GapAnalysis() {
                       <th className="px-3 py-2.5 text-right">売上</th>
                       <th className="px-3 py-2.5 text-right">前期比</th>
                       <th className="px-3 py-2.5 text-right">GP</th>
-                      <th className="px-3 py-2.5 text-right">アクセス</th>
+                      <th className="px-3 py-2.5 text-right">
+                        {productAxis ? ACCESS_AXIS_LABEL[productAxis] : 'アクセス'}
+                      </th>
                       <th className="px-3 py-2.5 text-right">CV</th>
                       <th className="px-3 py-2.5 text-right">CVR</th>
                       <th className="px-3 py-2.5 text-right">ROAS</th>
@@ -250,7 +269,10 @@ export default function GapAnalysis() {
                               {p.limit_cpo_exceeded && <AlertTriangle size={12} className="text-red-500 shrink-0" />}
                               <div>
                                 <p className="font-medium text-gray-900 text-xs leading-tight">{p.product_name}</p>
-                                <p className="text-gray-400 text-xs">{p.management_no}</p>
+                                <div className="flex items-center gap-1.5">
+                                  <p className="text-gray-400 text-xs">{p.management_no}</p>
+                                  <ReliabilityNote reliable={p.reliable} accessAxis={p.access_axis} variant="badge" />
+                                </div>
                               </div>
                             </div>
                           </td>

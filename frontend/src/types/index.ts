@@ -1,3 +1,17 @@
+/**
+ * アクセス指標の軸（要件No.5）。母数が異なるため混在させない。
+ * - rpp_click: RppWeekly.ct（RPP広告クリック数）。cvr = cv/ct（クリック→注文）
+ * - site_uu  : MonthlyItemSales.access_uu（店舗ページ訪問UU）。cvr = cv/uu（訪問→注文）
+ * バックエンド backend/access_definitions.py が単一の真実。
+ */
+export type AccessAxis = 'rpp_click' | 'site_uu'
+
+/** アクセス軸の表示ラベル（UIで「アクセス」単独表示を避けるため統一） */
+export const ACCESS_AXIS_LABEL: Record<AccessAxis, string> = {
+  rpp_click: 'アクセス（RPPクリック）',
+  site_uu: 'アクセス（UU）',
+}
+
 export interface KPIs {
   gross: number
   cost_of_sales: number
@@ -152,6 +166,10 @@ export interface ProductKPI extends KPIs {
   week_start: string | null
   limit_cpo_exceeded: boolean
   is_active?: boolean
+  /** アクセス指標の軸（要件No.5） */
+  access_axis?: AccessAxis
+  /** アクセス母数が閾値以上か。false ならCVR・客単価は参考値（要件No.6） */
+  reliable?: boolean
 }
 
 export interface GenreKPI {
@@ -159,6 +177,10 @@ export interface GenreKPI {
   current: KPIs
   prev: KPIs | null
   changes: Record<string, number | null>
+  /** アクセス指標の軸（要件No.5） */
+  access_axis?: AccessAxis
+  /** アクセス母数が閾値以上か。false ならCVR・客単価は参考値（要件No.6） */
+  reliable?: boolean
 }
 
 export interface KPITreeNode {
@@ -174,6 +196,12 @@ export interface KPITreeNode {
 
 export interface KPITree {
   has_target: boolean
+  /** 集計データ軸: shop=店舗全体UU（商品分析） / rpp=RPP広告クリック数 */
+  axis?: 'shop' | 'rpp'
+  /** アクセス指標の軸（要件No.5） */
+  access_axis?: AccessAxis
+  /** アクセス母数が閾値以上か。false ならCVR・客単価は参考値（要件No.6） */
+  reliable?: boolean
   kgi: KPITreeNode
   access: KPITreeNode
   cvr: KPITreeNode
@@ -215,6 +243,8 @@ export interface EvaluationResult {
   low_sample?: boolean
   /** 母数不足の閾値（デフォルト100） */
   min_access?: number
+  /** アクセス指標の軸（要件No.5） */
+  access_axis?: AccessAxis
 }
 
 export interface EvaluationMatrixResponse {
@@ -224,6 +254,8 @@ export interface EvaluationMatrixResponse {
   has_target?: boolean
   /** アクセスのデータ軸: shop=店舗全体UU（商品分析） / rpp=RPP広告クリック数 */
   axis?: 'shop' | 'rpp'
+  /** アクセス指標の軸（要件No.5） */
+  access_axis?: AccessAxis
   evaluation: EvaluationResult | null
 }
 

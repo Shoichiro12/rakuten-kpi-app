@@ -1,7 +1,7 @@
 import random
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
-from models import RppWeekly, MonthlyAnalysis, Target, RppSales
+from models import RppWeekly, MonthlyAnalysis, Target, RppSales, MonthlyItemSales
 
 
 PRODUCTS = [
@@ -55,6 +55,33 @@ RPP_SCENARIOS = {
     "ACC-001": {"kind": "insufficient", "ct": (4, 8),     "ctr": (0.9, 1.1), "cvr": (0, 0),     "roas": (0, 0)},
     "ACC-002": {"kind": "good",         "ct": (400, 470), "ctr": (1.9, 2.2), "cvr": (4.3, 4.9), "roas": (300, 360)},
     "ACC-003": {"kind": "cvr_low",      "ct": (250, 300), "ctr": (1.6, 1.8), "cvr": (1.2, 1.4), "roas": (150, 180)},
+}
+
+
+# ─── 月次商品分析（MonthlyItemSales）デモ用シナリオ ──────────────────────────
+# 商品分析レポート（site_uu 軸）側の検証パターンを商品ごとに仕込む。
+# RPP軸（RppWeekly.ct）とは母数が別なので、ここでもUU母数不足・在庫課題を作る。
+#
+#   access_uu   … 店舗ページ実訪問UU（site_uu 軸の母数）。100未満で reliable=false。
+#   stock_count … 在庫数。0=欠品 / 一桁=僅少。
+#   zero_stock_days … 当月の在庫切れ日数。>0 で在庫アラート・機会損失対象。
+#   genre_u3    … 小分類（RPPのgenreは大/中の2階層のみのため月次側で補完）。
+#
+# 仕込む代表パターン:
+#   ACC-001 … UU 60台（<100）→ site_uu 軸で reliable=false（低母数の参考値表示）
+#   BAG-002 … 在庫0・在庫切れ8日 → 欠品＆機会損失アラート
+#   SPW-003 … 在庫3（僅少）→ 在庫僅少表示
+MONTHLY_ITEM_CONFIG = {
+    "RUN-001": {"genre_u3": "ロードランニング", "uu": (2800, 3400), "stock": 120, "zero_days": 0},
+    "RUN-002": {"genre_u3": "初心者ランニング", "uu": (2200, 2700), "stock": 80,  "zero_days": 0},
+    "SPW-001": {"genre_u3": "トップス",         "uu": (1500, 1900), "stock": 45,  "zero_days": 0},
+    "SPW-002": {"genre_u3": "ボトムス",         "uu": (1300, 1700), "stock": 30,  "zero_days": 0},
+    "SPW-003": {"genre_u3": "セットアップ",     "uu": (900, 1200),  "stock": 3,   "zero_days": 0},   # 在庫僅少
+    "BAG-001": {"genre_u3": "トートバッグ",     "uu": (700, 1000),  "stock": 60,  "zero_days": 0},
+    "BAG-002": {"genre_u3": "ボストンバッグ",   "uu": (600, 900),   "stock": 0,   "zero_days": 8},   # 欠品＋在庫切れ
+    "ACC-001": {"genre_u3": "ソックス",         "uu": (55, 95),     "stock": 200, "zero_days": 0},   # UU母数不足(<100)
+    "ACC-002": {"genre_u3": "タオル",           "uu": (1100, 1500), "stock": 150, "zero_days": 0},
+    "ACC-003": {"genre_u3": "ボトル・シェイカー", "uu": (800, 1100),  "stock": 90,  "zero_days": 0},
 }
 
 
@@ -112,6 +139,7 @@ def generate_sample_data(db: Session):
     db.query(RppWeekly).delete()
     db.query(RppSales).delete()
     db.query(MonthlyAnalysis).delete()
+    db.query(MonthlyItemSales).delete()
     db.query(Target).delete()
 
     today = date.today()
@@ -244,6 +272,59 @@ def generate_sample_data(db: Session):
                 sales=round(sales, 0),
                 access_count=access,
                 cv=cv_monthly,
+            ))
+
+    # ── 月次商品分析（MonthlyItemSales / 新スキーマ）──
+    # site_uu 軸（アクセスUU）の集計・GAP分析・商品別KPI・在庫アラート・
+    # 100UUルール（reliable=false）をこのデータで検証する。
+    for month_offset in range(2):
+        month_date = date(today.year, today.month, 1)
+        if month_offset == 1:
+            if month_date.month == 1:
+                month_date = date(month_date.year - 1, 12, 1)
+            else:
+                month_date = date(month_date.year, month_date.month - 1, 1)
+        year_month = month_date.strftime("%Y-%m")
+        factor = 1.0 if month_offset == 0 else 0.9
+
+        for product in PRODUCTS:
+            mgmt_no = product["management_no"]
+            unit_price, cost_rate = PRICE_RANGES[mgmt_no]
+            cfg = MONTHLY_ITEM_CONFIG[mgmt_no]
+
+            # ジャンルを大/中に分割し、小分類はconfigで補完（RPPは大/中の2階層のみ）
+            g_parts = product["genre"].split("/")
+            genre_u1 = g_parts[0] if len(g_parts) > 0 else "未分類"
+            genre_u2 = g_parts[1] if len(g_parts) > 1 else "未分類"
+            genre_u3 = cfg["genre_u3"]
+
+            access_uu = int(rng.randint(*cfg["uu"]) * factor)
+            # 転換率は商品ごとに0.8〜3.0%の範囲でばらつかせる（UU→注文）
+            cvr = round(rng.uniform(0.8, 3.0), 2)
+            cv = max(0, round(access_uu * cvr / 100))
+            sales = round(cv * unit_price * rng.uniform(0.95, 1.05), 0)
+            zero_days = cfg["zero_days"]
+
+            db.add(MonthlyItemSales(
+                year_month=year_month,
+                management_no=mgmt_no,
+                product_url=product["product_url"],
+                product_name=product["product_name"],
+                genre_u1=genre_u1,
+                genre_u2=genre_u2,
+                genre_u3=genre_u3,
+                price=unit_price,
+                stock_count=cfg["stock"],
+                access_uu=access_uu,
+                access_count=int(access_uu * rng.uniform(1.1, 1.4)),  # 件数はUUより多い
+                cvr=cvr,
+                cv=cv,
+                sales=sales,
+                sales_qty=cv,
+                avg_price=unit_price,
+                zero_stock_days=zero_days,
+                review_count=rng.randint(0, 40),
+                review_score=round(rng.uniform(3.2, 4.9), 1),
             ))
 
     for month_offset in range(2):

@@ -13,10 +13,10 @@ No.1「17パターン評価マトリクス」の中核モジュール。
 
 from typing import Optional
 
-# NATIONS講座ルール: アクセス母数がこの値未満の商品・ジャンル・期間は
-# CVR・客単価が統計的に信用できないため評価対象から除外する（要件No.6）。
-# ActionPanel（商品レベル）と同一の閾値。全画面で共通利用する。
-MIN_ACCESS_SAMPLE = 100
+# アクセス定義・信頼性判定は access_definitions.py が単一の真実（要件No.5/No.6）。
+# MIN_ACCESS_SAMPLE / is_reliable はそこから import して使う。
+# （後方互換: 既存の `from evaluation import MIN_ACCESS_SAMPLE` を壊さないため再公開する）
+from access_definitions import MIN_ACCESS_SAMPLE, is_reliable, AccessAxis  # noqa: F401
 
 
 def judge_metric(
@@ -105,6 +105,7 @@ def evaluate_matrix(
     cvr: dict,
     av: dict,
     low_sample: bool = False,
+    access_axis: Optional[AccessAxis] = None,
 ) -> dict:
     """judge_metric の結果4つから評価マトリクスを構築する。
 
@@ -112,6 +113,8 @@ def evaluate_matrix(
         low_sample : アクセス母数が MIN_ACCESS_SAMPLE 未満の場合 True（要件No.6）。
                      CVR・客単価を評価対象外（excluded）とし、アクセス対策に
                      フォーカスを固定する。
+        access_axis : アクセス指標の軸（"rpp_click" | "site_uu"）。どちらの母数で
+                     判定したかをレスポンスに明示する（要件No.5）。
 
     Returns:
         pattern_no : 1〜16（判定可能時）/ 17（判定不可）
@@ -122,6 +125,7 @@ def evaluate_matrix(
         metrics    : 各KPIの判定詳細
         undetermined : 判定不可だったKPIキー（目標もYoYも無い）
         low_sample / min_access : 母数不足フラグと閾値
+        access_axis : アクセス指標の軸
     """
     metrics = {"sales": sales, "access": access, "cvr": cvr, "av": av}
 
@@ -150,6 +154,7 @@ def evaluate_matrix(
             "undetermined": undetermined,
             "low_sample": low_sample,
             "min_access": MIN_ACCESS_SAMPLE,
+            "access_axis": access_axis,
         }
 
     # 母数不足時はアクセスのみで簡易評価（売上×アクセスの2軸）
@@ -175,6 +180,7 @@ def evaluate_matrix(
             "undetermined": undetermined,
             "low_sample": True,
             "min_access": MIN_ACCESS_SAMPLE,
+            "access_axis": access_axis,
         }
 
     sales_ok = sales["achieved"]

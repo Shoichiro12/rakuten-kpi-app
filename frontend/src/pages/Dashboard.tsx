@@ -81,7 +81,7 @@ export default function Dashboard() {
     roi: { metric: 'roi' as const, label: 'ROI(%)', color: '#9333ea', formatter: (v: number) => `${v.toFixed(1)}%` },
     cvr: { metric: 'cvr' as const, label: 'CVR(%)', color: '#ea580c', formatter: (v: number) => `${v.toFixed(2)}%` },
     roas: { metric: 'roas' as const, label: 'ROAS(%)', color: '#0891b2', formatter: (v: number) => `${v.toFixed(1)}%` },
-    ct: { metric: 'ct' as const, label: 'アクセス(CT)', color: '#0d9488', formatter: (v: number) => v.toLocaleString() },
+    ct: { metric: 'ct' as const, label: 'アクセス（RPPクリック）', color: '#0d9488', formatter: (v: number) => v.toLocaleString() },
     cpc: { metric: 'cpc' as const, label: 'CPC(円)', color: '#dc2626', formatter: (v: number) => `¥${v.toLocaleString()}` },
   }
 
