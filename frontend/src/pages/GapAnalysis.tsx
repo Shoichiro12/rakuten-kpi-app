@@ -39,17 +39,19 @@ export default function GapAnalysis() {
   const [genreAxis, setGenreAxis] = useState<string | null>(null)
   const [productData, setProductData] = useState<ProductItem[]>([])
   const [loading, setLoading] = useState(false)
+  const [excludeInactive, setExcludeInactive] = useState(false)  // 廃盤を集計から除外するか
 
   const dateParam = period === 'monthly' ? dateValue.slice(0, 7) : dateValue
+  const includeInactive = !excludeInactive
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const [tree, shop, genre, evalRes] = await Promise.all([
         api.gap.kpiTree(period, dateParam) as Promise<KPITree | null>,
-        api.gap.shop(period, dateParam) as Promise<ShopData | null>,
-        api.gap.genre(period, dateParam) as Promise<{ genres?: GenreKPI[]; axis?: string | null } | null>,
-        api.evaluation.matrix(period, dateParam).catch(() => null),
+        api.gap.shop(period, dateParam, includeInactive) as Promise<ShopData | null>,
+        api.gap.genre(period, dateParam, includeInactive) as Promise<{ genres?: GenreKPI[]; axis?: string | null } | null>,
+        api.evaluation.matrix(period, dateParam, includeInactive).catch(() => null),
       ])
       setTreeData(tree ?? null)
       setShopData(shop ?? null)
@@ -66,17 +68,17 @@ export default function GapAnalysis() {
     } finally {
       setLoading(false)
     }
-  }, [period, dateParam])
+  }, [period, dateParam, includeInactive])
 
   const loadProducts = useCallback(async (genre?: string) => {
     try {
-      const prod = await api.gap.product(period, dateParam, genre) as { products?: ProductItem[] } | null
+      const prod = await api.gap.product(period, dateParam, genre, includeInactive) as { products?: ProductItem[] } | null
       setProductData(prod?.products ?? [])
     } catch (e) {
       console.error('[GapAnalysis] 商品データ取得エラー:', e)
       setProductData([])
     }
-  }, [period, dateParam])
+  }, [period, dateParam, includeInactive])
 
 
   useEffect(() => { load() }, [load])
@@ -111,12 +113,23 @@ export default function GapAnalysis() {
         title="GAP分析"
         subtitle="KGI・KPIロジックツリーから課題を特定し改善アクションへ"
         actions={
-          <PeriodSelector
-            period={period}
-            onPeriodChange={setPeriod}
-            dateValue={dateValue}
-            onDateChange={setDateValue}
-          />
+          <>
+            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={excludeInactive}
+                onChange={(e) => setExcludeInactive(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              廃盤を除外
+            </label>
+            <PeriodSelector
+              period={period}
+              onPeriodChange={setPeriod}
+              dateValue={dateValue}
+              onDateChange={setDateValue}
+            />
+          </>
         }
       />
 

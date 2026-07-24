@@ -156,10 +156,10 @@ export const api = {
       request(`/dashboard/trend?weeks=${weeks}`),
   },
   evaluation: {
-    /** 17パターン評価マトリクス（目標×YoY統一判定） */
-    matrix: (period: string, date?: string) =>
+    /** 17パターン評価マトリクス（目標×YoY統一判定）。includeInactive=false で廃盤除外 */
+    matrix: (period: string, date?: string, includeInactive?: boolean) =>
       request<import('../types').EvaluationMatrixResponse>(
-        `/evaluation/matrix?period=${period}${date ? `&date=${date}` : ''}`,
+        `/evaluation/matrix?period=${period}${date ? `&date=${date}` : ''}${includeInactive === undefined ? '' : `&include_inactive=${includeInactive}`}`,
       ),
     /** アクセス逆算プラン（目標売上→必要アクセス→不足分→想定追加広告費） */
     accessPlan: (period: string, date?: string) =>
@@ -168,18 +168,18 @@ export const api = {
       ),
   },
   gap: {
-    shop: (period: string, date?: string) =>
-      request(`/gap/shop?period=${period}${date ? `&date=${date}` : ''}`),
-    genre: (period: string, date?: string) =>
-      request(`/gap/genre?period=${period}${date ? `&date=${date}` : ''}`),
-    product: (period: string, date?: string, genre?: string) =>
-      request(`/gap/product?period=${period}${date ? `&date=${date}` : ''}${genre ? `&genre=${encodeURIComponent(genre)}` : ''}`),
+    shop: (period: string, date?: string, includeInactive?: boolean) =>
+      request(`/gap/shop?period=${period}${date ? `&date=${date}` : ''}${includeInactive === undefined ? '' : `&include_inactive=${includeInactive}`}`),
+    genre: (period: string, date?: string, includeInactive?: boolean) =>
+      request(`/gap/genre?period=${period}${date ? `&date=${date}` : ''}${includeInactive === undefined ? '' : `&include_inactive=${includeInactive}`}`),
+    product: (period: string, date?: string, genre?: string, includeInactive?: boolean) =>
+      request(`/gap/product?period=${period}${date ? `&date=${date}` : ''}${genre ? `&genre=${encodeURIComponent(genre)}` : ''}${includeInactive === undefined ? '' : `&include_inactive=${includeInactive}`}`),
     kpiTree: (period: string, date?: string) =>
       request(`/gap/kpi-tree?period=${period}${date ? `&date=${date}` : ''}`),
   },
   products: {
-    list: (period: string, date?: string, genre?: string) =>
-      request(`/products?period=${period}${date ? `&date=${date}` : ''}${genre ? `&genre=${encodeURIComponent(genre)}` : ''}`),
+    list: (period: string, date?: string, genre?: string, includeInactive = false) =>
+      request(`/products?period=${period}${date ? `&date=${date}` : ''}${genre ? `&genre=${encodeURIComponent(genre)}` : ''}${includeInactive ? '&include_inactive=true' : ''}`),
     trend: (managementNo: string, weeks = 8) =>
       request(`/products/trend/${encodeURIComponent(managementNo)}?weeks=${weeks}`),
     genres: () => request('/products/genres'),
@@ -188,6 +188,76 @@ export const api = {
     list: () => request('/targets'),
     upsert: (data: object) =>
       request('/targets', { method: 'POST', body: JSON.stringify(data) }),
+  },
+  /* ─── 店舗マスタ（単一店舗前提） ─────────────────── */
+  shops: {
+    /** 現ユーザーのデフォルト店舗（原価率・経費率のデフォルト等） */
+    me: () => request<import('../types').Shop>('/shops/me'),
+    /** 店舗名・デフォルト原価率・デフォルト経費率・発注アラート閾値の更新 */
+    update: (data: Partial<Pick<import('../types').Shop, 'name' | 'default_cost_rate' | 'default_expense_rate' | 'restock_lead_days'>>) =>
+      request<import('../types').Shop>('/shops/me', { method: 'PUT', body: JSON.stringify(data) }),
+  },
+  /* ─── 商品マスタ・カテゴリ ─────────────────── */
+  master: {
+    /** 商品マスタ一覧。opts未指定=全件（稼働中＋廃盤）。active/categoryId で絞り込み可 */
+    products: (opts: { active?: boolean; categoryId?: number } = {}) => {
+      const q = new URLSearchParams()
+      if (opts.active !== undefined) q.set('is_active', String(opts.active))
+      if (opts.categoryId != null) q.set('category_id', String(opts.categoryId))
+      const qs = q.toString()
+      return request<import('../types').MasterProductsResponse>(`/master/products${qs ? `?${qs}` : ''}`)
+        .then((d) => d ?? { count: 0, items: [] })
+    },
+    /** product_name / category_id / is_active の編集 */
+    updateProduct: (managementNo: string, data: Partial<Pick<import('../types').MasterProduct, 'product_name' | 'category_id' | 'is_active'>>) =>
+      request(`/master/products/${encodeURIComponent(managementNo)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    /** カテゴリ一覧 */
+    categories: () =>
+      request<import('../types').CategoriesResponse>('/master/categories').then((d) => d ?? { count: 0, items: [] }),
+    /** カテゴリ作成（同一階層があれば既存を返す） */
+    createCategory: (data: { genre_u1?: string | null; genre_u2?: string | null; genre_u3?: string | null }) =>
+      request<import('../types').Category>('/master/categories', { method: 'POST', body: JSON.stringify(data) }),
+    /** カテゴリのリネーム */
+    updateCategory: (id: number, data: { genre_u1?: string | null; genre_u2?: string | null; genre_u3?: string | null }) =>
+      request<import('../types').Category>(`/master/categories/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
+    /** カテゴリ削除（参照商品は未分類化） */
+    deleteCategory: (id: number) =>
+      request<{ deleted_id: number; detached_products: number }>(`/master/categories/${id}`, { method: 'DELETE' }),
+    /** 商品マスタをCSV（BOM付きUTF-8）でダウンロード */
+    exportCsv: () => downloadCsv('/master/products/export', 'product_master.csv'),
+    /** 商品マスタCSVを一括取込み（管理番号キーにupsert） */
+    importCsv: async (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      let r: Response
+      try {
+        r = await fetch(`${BASE}/master/products/import`, { method: 'POST', body: form, headers: await authHeaders() })
+      } catch (e) {
+        console.error('[API] ネットワークエラー (master.importCsv):', e)
+        throw new Error('サーバーに接続できませんでした。バックエンドが起動しているか確認してください。')
+      }
+      return await parseJson(r) as { updated: number; created: number; cost_set: number; recalculated_rows: number; processed: number } | undefined
+    },
+  },
+  /* ─── 在庫アラート ─────────────────── */
+  inventory: {
+    /** 欠品・在庫僅少を機会損失順で（最新月 or 指定月、廃盤除外） */
+    alerts: (yearMonth?: string) =>
+      request<import('../types').InventoryAlertsResponse>(`/inventory/alerts${yearMonth ? `?year_month=${yearMonth}` : ''}`)
+        .then((d) => d ?? { year_month: null, count: 0, out_count: 0, low_count: 0, threshold_days: 14, items: [] }),
+  },
+  /* ─── 原価マスタ ─────────────────── */
+  costs: {
+    /** 商品一覧＋適用中の率＋「個別/デフォルト」区分 */
+    list: () => request<import('../types').CostsResponse>('/costs').then((d) => d ?? { default_cost_rate: 0.6, count: 0, items: [] }),
+    /** 店舗デフォルト原価率を更新（→ RppWeekly 再計算） */
+    setDefault: (rate: number) =>
+      request<{ default_cost_rate: number; recalculated_rows: number }>('/costs/default', { method: 'PUT', body: JSON.stringify({ default_cost_rate: rate }) }),
+    /** 商品別原価率を設定/更新（→ 対象商品のみ再計算） */
+    setProduct: (managementNo: string, rate: number, memo?: string) =>
+      request<{ management_no: string; cost_rate: number; recalculated_rows: number }>(`/costs/${encodeURIComponent(managementNo)}`, { method: 'PUT', body: JSON.stringify({ cost_rate: rate, memo }) }),
+    /** 現在の率を RppWeekly に掛け直す */
+    recalc: () => request<{ recalculated_rows: number }>('/costs/recalc', { method: 'POST', body: JSON.stringify({}) }),
   },
   import: {
     /** まとめて取込み: CSV/zip 複数ファイルを種別自動判別で一括インポート */

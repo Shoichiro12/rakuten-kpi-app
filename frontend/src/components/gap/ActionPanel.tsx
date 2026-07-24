@@ -168,8 +168,8 @@ export default function ActionPanel({ product, shopKpis, weekKey, onClose }: Act
   }
 
   const toggleInventory = async () => {
-    // 自動連携中は手動トグル不可（月次商品分析データの在庫数が正）
-    if (inventoryInfo?.source === 'auto') return
+    // 自動連携中（月次在庫数が正）・廃盤（取扱停止）は手動トグル不可
+    if (inventoryInfo?.source === 'auto' || inventoryInfo?.source === 'inactive') return
     try {
       const inv = await api.actions.toggleInventory(product.product_url) as { has_inventory?: boolean } | null
       setHasInventory(inv?.has_inventory ?? hasInventory)
@@ -235,7 +235,14 @@ export default function ActionPanel({ product, shopKpis, weekKey, onClose }: Act
               <Package size={14} className={hasInventory ? 'text-green-600' : 'text-red-500'} />
               <p className="text-xs font-semibold text-gray-700">大前提：在庫ステータス</p>
             </div>
-            {inventoryInfo?.source === 'auto' ? (
+            {inventoryInfo?.source === 'inactive' ? (
+              <span
+                className="text-xs px-2.5 py-1 rounded-full font-medium bg-gray-200 text-gray-600"
+                title="商品マスタで廃盤（取扱停止）に設定されています"
+              >
+                ⛔ 取扱停止
+              </span>
+            ) : inventoryInfo?.source === 'auto' ? (
               <span
                 className={`text-xs px-2.5 py-1 rounded-full font-medium ${
                   hasInventory ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
@@ -267,7 +274,11 @@ export default function ActionPanel({ product, shopKpis, weekKey, onClose }: Act
               )}
             </p>
           )}
-          {!hasInventory && (
+          {inventoryInfo?.source === 'inactive' ? (
+            <p className="mt-1.5 text-xs text-gray-600 bg-gray-100 rounded p-2">
+              この商品は商品マスタで廃盤（取扱停止）に設定されています。改善アクションの対象外です。
+            </p>
+          ) : !hasInventory && (
             <p className="mt-1.5 text-xs text-red-600 bg-red-50 rounded p-2">
               在庫なしの場合は仕入れ調整を最優先で対応してください
             </p>

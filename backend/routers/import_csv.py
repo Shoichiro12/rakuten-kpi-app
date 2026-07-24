@@ -14,6 +14,7 @@ import pandas as pd
 
 from database import get_db
 from models import RppWeekly, MonthlyAnalysis, MonthlyItemSales, RppSales, InventoryStatus
+from masters import get_or_create_default_shop, get_or_create_category, upsert_product, make_cost_resolver
 
 router = APIRouter(prefix="/api/import", tags=["import"])
 
@@ -707,6 +708,58 @@ def _sync_rpp_from_monthly(db: Session) -> int:
     return updated
 
 
+def _sync_products_from_rpp(db: Session, rpp_sales_recs: list[dict]) -> int:
+    """RPP実データ取込で出てきた management_no を商品マスタ（products）へ upsert する。
+
+    RPP（楽天RMS RPPレポート）にはジャンル情報が無いため category_id=None のまま。
+    is_active は upsert_product 側で上書きしない（手動フラグを取込で消さない）。
+    戻り値は処理した distinct 商品数。
+    """
+    if not rpp_sales_recs:
+        return 0
+    shop = get_or_create_default_shop(db)
+    seen: set[str] = set()
+    for rec in rpp_sales_recs:
+        mno = (rec.get("item_code") or "").strip()
+        if not mno or mno in seen:
+            continue
+        seen.add(mno)
+        upsert_product(
+            db, mno, shop_id=shop.id,
+            product_name=(rec.get("product_name") or None),
+            product_url=(rec.get("item_url") or None),
+            category_id=None,
+        )
+    return len(seen)
+
+
+def _sync_products_from_monthly(db: Session, records: list[dict]) -> int:
+    """月次商品分析取込で出てきた management_no を商品マスタ（products）へ upsert する。
+
+    ジャンルは genre_u1/u2/u3 を product_categories に find-or-create して category_id に紐付ける。
+    is_active は upsert_product 側で上書きしない。戻り値は処理した distinct 商品数。
+    """
+    if not records:
+        return 0
+    shop = get_or_create_default_shop(db)
+    seen: set[str] = set()
+    for rec in records:
+        mno = (rec.get("management_no") or "").strip()
+        if not mno or mno in seen:
+            continue
+        seen.add(mno)
+        cat = get_or_create_category(
+            db, rec.get("genre_u1"), rec.get("genre_u2"), rec.get("genre_u3")
+        )
+        upsert_product(
+            db, mno, shop_id=shop.id,
+            product_name=(rec.get("product_name") or None),
+            product_url=(rec.get("product_url") or None),
+            category_id=cat.id if cat else None,
+        )
+    return len(seen)
+
+
 def _import_rpp_bytes(content: bytes, db: Session, overwrite: bool = False) -> dict:
     """RMS実ファイル形式のRPP CSVバイト列をパースして取り込む。
 
@@ -778,10 +831,20 @@ def _import_rpp_bytes(content: bytes, db: Session, overwrite: bool = False) -> d
                 guard_notes.append(f"{ym}の月次由来の集計行{purged}件を週次データで置き換え（二重計上防止）")
     # ─────────────────────────────────────────────────────────────────
 
+    # ── 原価の焼き込み ────────────────────────────────────────────────
+    # cost_of_sales = gross × resolve_rate(management_no)（従来の 0.0 固定を廃止）。
+    # 解決順: ProductCost.cost_rate（商品別）→ Shop.default_cost_rate（店舗デフォルト）→ 0.6。
+    # これにより calc_kpis の GP / GPR / LimitCPO / ROI / Rev が自然に機能し始める。
+    _resolve_rate = make_cost_resolver(db)
+    for _rec in rpp_weekly_recs:
+        _rec["cost_of_sales"] = round(_rec.get("gross", 0) * _resolve_rate(_rec.get("management_no")), 0)
+
     inserted, updated = _upsert_rpp_sales(db, rpp_sales_recs)
     _upsert_rpp_weekly(db, rpp_weekly_recs)
     # 商品分析データがあればジャンル・商品名を補完（RPPには両列が無いため）
     _sync_rpp_from_monthly(db)
+    # 商品マスタへ upsert（RPP由来はジャンル情報が無いため category_id=None）
+    _sync_products_from_rpp(db, rpp_sales_recs)
     db.commit()
 
     period_types = sorted({r["period_type"] for r in rpp_sales_recs})
@@ -1156,6 +1219,8 @@ def _import_monthly_items_bytes(content: bytes, db: Session, overwrite: bool = F
                 db.add(InventoryStatus(product_url=purl, has_inventory=False))
     # 取込んだジャンル・商品名を既存のRPPデータにも紐付ける（取込み順序に依存しない）
     _sync_rpp_from_monthly(db)
+    # 商品マスタへ upsert（ジャンルを product_categories に正規化して紐付け）
+    _sync_products_from_monthly(db, records)
     db.commit()
     return {
         "message": f"{year_month}のデータをインポートしました（新規: {inserted}件 / 更新: {updated}件）",

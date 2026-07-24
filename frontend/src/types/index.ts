@@ -68,6 +68,82 @@ export interface Target {
   expense_rate: number
 }
 
+export interface Shop {
+  id: number
+  name: string
+  mall_type: string
+  default_cost_rate: number
+  default_expense_rate: number
+  restock_lead_days: number
+  is_active: boolean
+}
+
+export interface MasterProduct {
+  id: number
+  management_no: string
+  product_name: string | null
+  product_url: string | null
+  shop_id: number | null
+  category_id: number | null
+  genre_u1: string | null
+  genre_u2: string | null
+  genre_u3: string | null
+  is_active: boolean
+  updated_at: string | null
+}
+
+export interface MasterProductsResponse {
+  count: number
+  items: MasterProduct[]
+}
+
+export interface Category {
+  id: number
+  genre_u1: string | null
+  genre_u2: string | null
+  genre_u3: string | null
+}
+
+export interface CategoriesResponse {
+  count: number
+  items: Category[]
+}
+
+export interface CostItem {
+  management_no: string
+  product_name: string | null
+  cost_rate: number
+  source: 'product' | 'default'
+  memo: string | null
+  is_active: boolean | null
+}
+
+export interface CostsResponse {
+  default_cost_rate: number
+  count: number
+  items: CostItem[]
+}
+
+export interface InventoryAlert {
+  management_no: string
+  product_name: string | null
+  status: 'out' | 'low'
+  stock_count: number
+  zero_stock_days: number
+  days_left: number | null
+  sales: number
+  value_at_risk: number
+}
+
+export interface InventoryAlertsResponse {
+  year_month: string | null
+  count: number
+  out_count: number
+  low_count: number
+  threshold_days: number
+  items: InventoryAlert[]
+}
+
 export interface ProductKPI extends KPIs {
   product_url: string
   management_no: string
@@ -75,6 +151,7 @@ export interface ProductKPI extends KPIs {
   genre: string
   week_start: string | null
   limit_cpo_exceeded: boolean
+  is_active?: boolean
 }
 
 export interface GenreKPI {
@@ -178,9 +255,11 @@ export interface AccessPlanResponse {
 /* ─── 在庫ステータス（自動連携対応） ──────────────────────────── */
 
 export interface InventoryInfo {
-  product_url: string
+  product_url: string | null
+  management_no?: string | null
   has_inventory: boolean
-  source: 'auto' | 'manual'
+  is_active?: boolean | null
+  source: 'auto' | 'manual' | 'inactive'
   stock_count: number | null
   zero_stock_days: number | null
   year_month: string | null

@@ -14,9 +14,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import ActionLog, MonthlyItemSales
+from models import ActionLog, MonthlyItemSales, Shop
 from recommendations import build_recommendations
-from product_recommendations import build_product_recommendations
+from product_recommendations import build_product_recommendations, RESTOCK_ALERT_DAYS
 
 router = APIRouter(prefix="/api/recommendations", tags=["recommendations"])
 
@@ -89,13 +89,23 @@ def get_recommendations(
     product_rows = db.query(MonthlyItemSales).filter(
         MonthlyItemSales.year_month == ym
     ).all()
+    # 廃盤（is_active=False）商品は「今日やるべきこと」の対象から外す
+    # （売っていない商品に改善提案を出さない）。
+    from masters import inactive_management_nos
+    _inactive = inactive_management_nos(db)
+    if _inactive:
+        product_rows = [r for r in product_rows if r.management_no not in _inactive]
     days_in_month = _cal.monthrange(int(ym[:4]), int(ym[5:7]))[1]
+    # 発注アラート閾値は店舗設定（restock_lead_days）を優先。未設定は既定14日。
+    _shop_row = db.query(Shop).first()
+    restock_days = (_shop_row.restock_lead_days if _shop_row and _shop_row.restock_lead_days else RESTOCK_ALERT_DAYS)
     product_items = build_product_recommendations(
         items=product_rows,
         shop=dash.get("shop"),
         days_in_month=days_in_month,
         done_keys=done_keys,
         limit=limit,
+        restock_days=restock_days,
     )
 
     gap = None

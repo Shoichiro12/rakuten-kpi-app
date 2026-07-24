@@ -10,6 +10,7 @@ import GapAnalysis from './pages/GapAnalysis'
 import ProductKPI from './pages/ProductKPI'
 import DataImport from './pages/DataImport'
 import TargetSetting from './pages/TargetSetting'
+import MasterSettings from './pages/MasterSettings'
 import RppAnalysis from './pages/RppAnalysis'
 import Reports from './pages/Reports'
 import AccountSettings from './pages/AccountSettings'
@@ -32,6 +33,7 @@ function AppRoutes({ userEmail }: { userEmail: string | null }) {
         <Route path="/products" element={<ProductKPI />} />
         <Route path="/import" element={<DataImport />} />
         <Route path="/targets" element={<TargetSetting />} />
+        <Route path="/master" element={<MasterSettings />} />
         <Route path="/rpp" element={<RppAnalysis />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/account" element={<AccountSettings userEmail={userEmail} />} />

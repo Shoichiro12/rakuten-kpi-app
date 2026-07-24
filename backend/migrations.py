@@ -30,7 +30,33 @@ _USER_SCOPED_TABLES = {
     "inventory_status": [("uq_inventory_user_product", ("product_url",))],
     "monthly_item_sales": [("uq_monthly_item", ("management_no", "year_month"))],
     "rpp_sales": [("uq_rpp_sales", ("period_type", "date_from", "date_to", "item_code"))],
+    # ── マスタテーブル（参照レイヤー） ──────────────────────────────
+    # create_all で新規作成される際は user_id 列・user_id 込みユニーク制約つきで作られるが、
+    # 既存DBへの後付けや制約張替え・インデックス付与を冪等に担保するため登録しておく。
+    "shops": [],
+    "product_categories": [("uq_category", ("genre_u1", "genre_u2", "genre_u3"))],
+    "products": [("uq_product", ("shop_id", "management_no"))],
+    "product_costs": [("uq_product_cost", ("management_no",))],
 }
+
+
+# user_id 以外で、後から追加した通常カラム（既存DBへ冪等にALTERで足す）。
+# {テーブル名: [(列名, 型DDL), ...]}
+_EXTRA_COLUMNS = {
+    "shops": [("restock_lead_days", "INTEGER DEFAULT 14")],
+}
+
+
+def _add_extra_columns(conn, inspector):
+    """モデルに後から追加した通常カラムを、無ければ ALTER TABLE で足す（冪等）。"""
+    for table, cols in _EXTRA_COLUMNS.items():
+        if table not in inspector.get_table_names():
+            continue
+        existing = {c["name"] for c in inspector.get_columns(table)}
+        for name, ddl in cols:
+            if name not in existing:
+                conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}"))
+                logger.info("migrations: %s に %s 列を追加", table, name)
 
 
 def _add_user_id_columns(conn, inspector, dialect: str):
@@ -143,6 +169,7 @@ def run_migrations(engine):
     try:
         with engine.begin() as conn:
             inspector = inspect(conn)
+            _add_extra_columns(conn, inspector)
             _add_user_id_columns(conn, inspector, dialect)
             if dialect == "postgresql":
                 # 列追加後の状態を見るため inspector を作り直す

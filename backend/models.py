@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, Date, DateTime, Boolean, UniqueConstraint, func
+from sqlalchemy import Column, Integer, Float, String, Date, DateTime, Boolean, ForeignKey, UniqueConstraint, func
 from database import Base
 from tenancy import UserScopedMixin
 
@@ -208,4 +208,78 @@ class ActionLog(Base, UserScopedMixin):
 
     __table_args__ = (
         UniqueConstraint("user_id", "action_key", "period_key", name="uq_action_log"),
+    )
+
+
+# ─── マスタテーブル（参照レイヤー・商品の「今の状態」管理） ────────────────────
+# 既存の巨大なトランザクションテーブル（rpp_weekly / monthly_item_sales / rpp_sales 等）は
+# 取込CSVのスナップショットとしてそのまま残し、以下4テーブルを参照レイヤーとして追加する。
+#
+# 【マルチテナント方針】
+# tenancy.py の規約どおり、新規モデルも必ず UserScopedMixin を継承して user_id を持たせる。
+# 継承しないと全ユーザー共有（テナント間データ混線）になる。ユニーク制約も user_id 込みにし、
+# migrations._USER_SCOPED_TABLES へ登録して本番Postgresでの制約張替え・RLS強制の対象にする。
+# shop_id は単一店舗前提のいまは「現ユーザーのデフォルト店舗」をアプリ側で解決して入れる
+# （固定の 1 は使わない。ユーザーごとに shops.id が異なるため）。
+
+
+class Shop(Base, UserScopedMixin):
+    """店舗マスタ。いまは単一店舗のプレースホルダー、将来のマルチモール対応の受け皿。"""
+    __tablename__ = "shops"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    mall_type = Column(String, default="rakuten")   # rakuten / yahoo / amazon...（将来用、今は未使用）
+    default_cost_rate = Column(Float, default=0.6)
+    default_expense_rate = Column(Float, default=0.15)
+    restock_lead_days = Column(Integer, default=14)  # 在庫がこの日数分を切ったら発注アラート
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=func.now())
+
+
+class ProductCategory(Base, UserScopedMixin):
+    """カテゴリマスタ（ジャンル階層の正規化）。"""
+    __tablename__ = "product_categories"
+
+    id = Column(Integer, primary_key=True, index=True)
+    genre_u1 = Column(String)
+    genre_u2 = Column(String)
+    genre_u3 = Column(String)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "genre_u1", "genre_u2", "genre_u3", name="uq_category"),
+    )
+
+
+class Product(Base, UserScopedMixin):
+    """商品マスタ（商品の「今の状態」を管理）。"""
+    __tablename__ = "products"
+
+    id = Column(Integer, primary_key=True, index=True)
+    shop_id = Column(Integer, ForeignKey("shops.id"), nullable=True)
+    management_no = Column(String, nullable=False)
+    product_name = Column(String)
+    product_url = Column(String)
+    category_id = Column(Integer, ForeignKey("product_categories.id"), nullable=True)
+    is_active = Column(Boolean, default=True)   # 廃盤・取扱停止フラグ（手動管理・取込で上書きしない）
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "shop_id", "management_no", name="uq_product"),
+    )
+
+
+class ProductCost(Base, UserScopedMixin):
+    """原価マスタ（商品別原価率）。"""
+    __tablename__ = "product_costs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    management_no = Column(String, nullable=False)
+    cost_rate = Column(Float, nullable=False)   # 0〜1
+    memo = Column(String)
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "management_no", name="uq_product_cost"),
     )

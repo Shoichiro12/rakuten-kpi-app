@@ -15,8 +15,14 @@ from sqlalchemy.orm import Session
 from models import MonthlyItemSales
 
 
-def get_shop_monthly(db: Session, year_month: str) -> Optional[dict]:
+def get_shop_monthly(
+    db: Session,
+    year_month: str,
+    exclude_management_nos: Optional[set] = None,
+) -> Optional[dict]:
     """指定年月の店舗全体実績（商品分析レポート合算）を返す。
+
+    exclude_management_nos を渡すと、その管理番号（例: 廃盤商品）を合算から除外する。
 
     Returns:
         sales  : 店舗全体売上（合計）
@@ -26,11 +32,14 @@ def get_shop_monthly(db: Session, year_month: str) -> Optional[dict]:
         av     : 客単価 = sales ÷ cv
         いずれもデータが無い月は None。
     """
-    rows = db.query(
+    q = db.query(
         MonthlyItemSales.sales,
         MonthlyItemSales.access_uu,
         MonthlyItemSales.cv,
-    ).filter(MonthlyItemSales.year_month == year_month).all()
+    ).filter(MonthlyItemSales.year_month == year_month)
+    if exclude_management_nos:
+        q = q.filter(MonthlyItemSales.management_no.notin_(list(exclude_management_nos)))
+    rows = q.all()
 
     if not rows:
         return None

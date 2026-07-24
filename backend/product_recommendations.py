@@ -27,6 +27,8 @@ MIN_REVIEWS_FOR_SCORE = 5
 CVR_LOW_RATIO = 0.85
 # 店舗平均CVRに対して「明らかに高い＝伸ばす価値あり」とみなす比率
 CVR_HIGH_RATIO = 1.15
+# 在庫がこの日数分を切ったら「欠品前に発注」を促す（先読み発注アラート）
+RESTOCK_ALERT_DAYS = 14
 
 
 def _name(row) -> str:
@@ -70,6 +72,62 @@ def _rule_stock_out(row, shop, days_in_month: int) -> Optional[dict]:
         "impact_value": loss,
         "effort": "10分",
         "badges": [f"在庫切れ {zero_days}日"],
+        "link": "/products",
+    }
+
+
+def _rule_low_stock(row, shop, days_in_month: int) -> Optional[dict]:
+    """在庫僅少の先読み発注アラート（欠品「前」）。
+
+    _rule_stock_out が「既に欠品した」事後アラートなのに対し、こちらは
+    まだ在庫はあるが販売ペースからすると近く欠品する商品を、欠品する前に拾う。
+    欠品してからでは広告費が無駄打ちになり検索順位も落ちるため、先回りが効く。
+
+    残り日数の推定: 在庫数 ÷ 1日あたり販売点数（当月の点数 ÷ 当月日数）。
+    需要が無い商品（販売ゼロ）は発注不要なので対象外。既に欠品している商品
+    （zero_stock_days>0 または stock_count<=0）は _rule_stock_out に任せる。
+    """
+    stock = row.stock_count or 0
+    zero_days = row.zero_stock_days or 0
+    if stock <= 0 or zero_days > 0:
+        return None
+
+    # 販売ペース: 点数（sales_qty）優先、無ければ件数（cv）で代替
+    qty = (row.sales_qty or 0) or (row.cv or 0)
+    if qty <= 0:
+        return None
+    per_day = qty / max(1, days_in_month)
+    if per_day <= 0:
+        return None
+
+    # 発注アラート閾値は店舗設定（shop['restock_days']）を優先。未設定は既定14日。
+    threshold = (shop or {}).get("restock_days") or RESTOCK_ALERT_DAYS
+    days_left = stock / per_day
+    if days_left >= threshold:
+        return None
+
+    cv = row.cv or 0
+    av = (row.sales or 0) / cv if cv > 0 else (row.avg_price or 0)
+    # 欠品すると止まる売上規模（当月ペースを月換算）。優先順位付けの金額インパクト。
+    value_at_risk = per_day * av * days_in_month
+    weekly = per_day * 7 * av
+    days_left_i = int(days_left)
+
+    return {
+        "key": f"low_stock:{row.management_no}",
+        "priority": "recommended",
+        "metric": "stock",
+        "product_name": _name(row),
+        "management_no": row.management_no,
+        "title": f"「{_name(row)}」を発注する（在庫僅少）",
+        "reason": (
+            f"在庫 {stock:,}点、直近の販売ペースだと約{days_left_i}日で欠品します。"
+            "欠品すると広告費が無駄打ちになり検索順位も落ちるため、今のうちに発注してください。"
+        ),
+        "impact": f"欠品すると週あたり約{_yen(weekly)}の売上が止まります",
+        "impact_value": value_at_risk,
+        "effort": "10分",
+        "badges": [f"残り約{days_left_i}日", f"在庫{stock:,}点"],
         "link": "/products",
     }
 
@@ -216,6 +274,7 @@ def _rule_high_potential(row, shop, days_in_month: int) -> Optional[dict]:
 
 _PRODUCT_RULES = [
     _rule_stock_out,
+    _rule_low_stock,
     _rule_low_cvr,
     _rule_no_review,
     _rule_low_review_score,
@@ -231,14 +290,20 @@ def build_product_recommendations(
     days_in_month: int = 30,
     done_keys: Optional[set] = None,
     limit: int = 3,
+    restock_days: int = RESTOCK_ALERT_DAYS,
 ) -> list:
     """商品別の推奨アクションを金額インパクト順に返す。
 
     同一商品から複数の課題が出た場合は、最もインパクトの大きい1件に絞る。
     1商品について複数の指示を同時に出すと、結局どれも実行されないため。
+
+    restock_days は在庫僅少の発注アラート閾値（店舗設定由来）。
     """
     done = done_keys or set()
     by_product: dict = {}
+    # 各ルールが参照できるよう、閾値を shop dict に載せる（shop=None でも渡せるように）
+    shop = dict(shop) if shop else {}
+    shop.setdefault("restock_days", restock_days)
 
     for row in items or []:
         for rule in _PRODUCT_RULES:

@@ -9,6 +9,7 @@ import {
   HelpCircle,
   Megaphone,
   FileDown,
+  Boxes,
   LogOut,
   UserCircle,
 } from 'lucide-react'
@@ -19,6 +20,7 @@ const nav = [
   { to: '/products', icon: Package, label: '商品別KPI' },
   { to: '/rpp', icon: Megaphone, label: 'RPP広告実績' },
   { to: '/import', icon: Upload, label: 'データ取込み' },
+  { to: '/master', icon: Boxes, label: '商品マスタ・原価' },
   { to: '/targets', icon: Target, label: '目標設定' },
   { to: '/reports', icon: FileDown, label: 'レポート出力' },
 ]

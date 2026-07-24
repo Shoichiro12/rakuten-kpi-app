@@ -1,12 +1,12 @@
 import { useEffect, useState, useCallback } from 'react'
-import { AlertTriangle, TrendingUp } from 'lucide-react'
+import { AlertTriangle, TrendingUp, PackageX } from 'lucide-react'
 import Header from '../components/layout/Header'
 import PeriodSelector from '../components/PeriodSelector'
 import KPIChart from '../components/dashboard/KPIChart'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
 import { usePeriodState } from '../lib/usePeriodState'
-import type { ProductKPI, TrendPoint } from '../types'
+import type { ProductKPI, TrendPoint, InventoryAlert } from '../types'
 
 export default function ProductKPIPage() {
   const { period, dateValue, setPeriod, setDateValue } = usePeriodState()
@@ -16,13 +16,21 @@ export default function ProductKPIPage() {
   const [selectedProduct, setSelectedProduct] = useState<ProductKPI | null>(null)
   const [productTrend, setProductTrend] = useState<TrendPoint[]>([])
   const [loading, setLoading] = useState(false)
+  const [showInactive, setShowInactive] = useState(false)   // 廃盤商品も表示するか
+  const [invAlerts, setInvAlerts] = useState<InventoryAlert[]>([])
+
+  useEffect(() => {
+    api.inventory.alerts()
+      .then((d) => setInvAlerts(d.items ?? []))
+      .catch((e: unknown) => { console.error('[ProductKPI] 在庫アラート取得エラー:', e); setInvAlerts([]) })
+  }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const dateParam = period === 'monthly' ? dateValue.slice(0, 7) : dateValue
       const [prod, genreList] = await Promise.all([
-        api.products.list(period, dateParam, selectedGenre || undefined) as Promise<{ products?: ProductKPI[] } | null>,
+        api.products.list(period, dateParam, selectedGenre || undefined, showInactive) as Promise<{ products?: ProductKPI[] } | null>,
         api.products.genres() as Promise<{ genres?: string[] } | null>,
       ])
       setProducts(prod?.products ?? [])
@@ -34,7 +42,7 @@ export default function ProductKPIPage() {
     } finally {
       setLoading(false)
     }
-  }, [period, dateValue, selectedGenre])
+  }, [period, dateValue, selectedGenre, showInactive])
 
   useEffect(() => { load() }, [load])
 
@@ -74,6 +82,42 @@ export default function ProductKPIPage() {
         <div className="flex gap-6 h-full">
           {/* 商品一覧 */}
           <div className="flex-1 min-w-0 space-y-3">
+            {/* 在庫アラート（欠品・在庫僅少を機会損失順） */}
+            {invAlerts.length > 0 && (
+              <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">
+                <div className="px-4 py-2.5 border-b bg-amber-50 flex items-center gap-2">
+                  <PackageX size={15} className="text-amber-600" />
+                  <p className="text-sm font-semibold text-amber-800">
+                    在庫アラート {invAlerts.length}件
+                    <span className="ml-2 font-normal text-amber-600 text-xs">
+                      欠品 {invAlerts.filter(a => a.status === 'out').length} / 僅少 {invAlerts.filter(a => a.status === 'low').length}
+                    </span>
+                  </p>
+                </div>
+                <ul className="divide-y divide-gray-50 max-h-56 overflow-y-auto">
+                  {invAlerts.map((a) => (
+                    <li key={a.management_no} className="px-4 py-2 flex items-center gap-3 text-sm">
+                      <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${a.status === 'out' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                        {a.status === 'out' ? '欠品' : '僅少'}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate text-gray-800">{a.product_name || a.management_no}</p>
+                        <p className="text-[11px] text-gray-400">
+                          {a.status === 'out'
+                            ? (a.zero_stock_days > 0 ? `在庫0日数 ${a.zero_stock_days}日` : '在庫なし')
+                            : `残り約${a.days_left ?? '—'}日（在庫${a.stock_count.toLocaleString()}点）`}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-right text-xs text-gray-500">
+                        <span className="text-gray-400">機会損失 </span>
+                        <span className="font-semibold text-gray-700">約{formatCurrency(a.value_at_risk)}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+
             {/* ジャンルフィルター */}
             <div className="flex gap-2 flex-wrap">
               <button
@@ -95,6 +139,15 @@ export default function ProductKPIPage() {
                   {g}
                 </button>
               ))}
+              <label className="ml-auto flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={showInactive}
+                  onChange={e => setShowInactive(e.target.checked)}
+                  className="rounded border-gray-300"
+                />
+                廃盤も表示
+              </label>
             </div>
 
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
@@ -134,7 +187,12 @@ export default function ProductKPIPage() {
                               <AlertTriangle size={13} className="text-red-500 mt-0.5 shrink-0" />
                             )}
                             <div>
-                              <p className="font-medium text-gray-900 leading-tight">{p.product_name}</p>
+                              <p className="font-medium text-gray-900 leading-tight">
+                                {p.product_name}
+                                {p.is_active === false && (
+                                  <span className="ml-1.5 align-middle px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 text-[10px] font-medium">廃盤</span>
+                                )}
+                              </p>
                               <p className="text-xs text-gray-400">{p.management_no}</p>
                             </div>
                           </div>

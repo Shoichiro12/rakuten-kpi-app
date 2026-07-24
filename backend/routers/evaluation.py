@@ -62,6 +62,7 @@ def _agg(rows) -> Optional[dict]:
 def get_matrix(
     period: Literal["weekly", "monthly"] = Query("weekly"),
     date_str: Optional[str] = Query(None, alias="date"),
+    include_inactive: bool = Query(True, description="Falseで廃盤（is_active=False）商品を集計から除外"),
     db: Session = Depends(get_db),
 ):
     """ショップ全体の評価マトリクスを返す。
@@ -69,6 +70,9 @@ def get_matrix(
     - monthly: 当月実績 vs 月次目標、YoYは前年同月
     - weekly : 週実績 vs 月次目標の日割り按分（目標×7÷当月日数）、YoYは52週前
     """
+    from masters import inactive_management_nos
+    # 既定(True)は従来どおり全商品込み。Falseで廃盤を集計から除外する。
+    inactive = set() if include_inactive else inactive_management_nos(db)
     today = date.today()
 
     if period == "weekly":
@@ -91,20 +95,24 @@ def get_matrix(
         ).all()
         period_label = year_month
 
+    if inactive:
+        current_rows = [r for r in current_rows if r.management_no not in inactive]
+        prev_year_rows = [r for r in prev_year_rows if r.management_no not in inactive]
+
     current = _agg(current_rows)
     prev_year = _agg(prev_year_rows)
 
     # 月次は商品分析レポート（店舗全体売上・UU）を正とする。無い月はRPP軸のまま。
     axis = "rpp"
     if period == "monthly":
-        shop_cur = get_shop_monthly(db, year_month)
+        shop_cur = get_shop_monthly(db, year_month, exclude_management_nos=inactive or None)
         if shop_cur:
             axis = "shop"
             current = {
                 "gross": shop_cur["sales"], "access": shop_cur["access"],
                 "cvr": shop_cur["cvr"], "av": shop_cur["av"],
             }
-            shop_py = get_shop_monthly(db, py_ym)
+            shop_py = get_shop_monthly(db, py_ym, exclude_management_nos=inactive or None)
             prev_year = {
                 "gross": shop_py["sales"], "access": shop_py["access"],
                 "cvr": shop_py["cvr"], "av": shop_py["av"],

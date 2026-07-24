@@ -218,8 +218,12 @@ def agg_rows(rows) -> Optional[dict]:
 def gap_shop(
     period: Literal["weekly", "monthly"] = Query("weekly"),
     date_str: Optional[str] = Query(None, alias="date"),
+    include_inactive: bool = Query(True, description="Falseで廃盤（is_active=False）商品を集計から除外"),
     db: Session = Depends(get_db),
 ):
+    from masters import inactive_management_nos
+    # 既定(True)は従来どおり全商品込みでKGIは不変。Falseで廃盤を除外できる。
+    inactive = set() if include_inactive else inactive_management_nos(db)
     today = date.today()
     if period == "weekly":
         current_week = get_week_start(date.fromisoformat(date_str) if date_str else today)
@@ -238,13 +242,17 @@ def gap_shop(
             RppWeekly.week_start >= prev_start, RppWeekly.week_start < prev_end
         ).all()
 
+    if inactive:
+        current_rows = [r for r in current_rows if r.management_no not in inactive]
+        prev_rows = [r for r in prev_rows if r.management_no not in inactive]
+
     # 月次はSTEP2・STEP3と同じく商品分析＝店舗全体を正とする。
     # ここだけRPP専用のままだと、RPP未取込の月に current が null になり、
     # STEP3が shopData.current.ctr を参照して画面全体がクラッシュする。
     if period != "weekly":
-        shop_cur = get_shop_monthly(db, ym)
+        shop_cur = get_shop_monthly(db, ym, exclude_management_nos=inactive or None)
         if shop_cur:
-            shop_prev = get_shop_monthly(db, prev_ym)
+            shop_prev = get_shop_monthly(db, prev_ym, exclude_management_nos=inactive or None)
 
             def _to_kpis(s: dict) -> dict:
                 return {
@@ -296,6 +304,7 @@ def gap_genre(
     date_str: Optional[str] = Query(None, alias="date"),
     level: Literal["u1", "u2", "u3"] = Query("u1"),
     parent: Optional[str] = Query(None),
+    include_inactive: bool = Query(True, description="Falseで廃盤（is_active=False）商品を集計から除外"),
     db: Session = Depends(get_db),
 ):
     """ジャンル別GAP分析（階層ドリルダウン対応）。
@@ -341,6 +350,15 @@ def gap_genre(
         prev_rows = db.query(RppWeekly).filter(
             RppWeekly.week_start >= prev_start, RppWeekly.week_start < prev_end
         ).all()
+
+    # 廃盤除外（既定 include_inactive=True は全込みで従来どおり）。
+    from masters import inactive_management_nos
+    _inactive = set() if include_inactive else inactive_management_nos(db)
+    if _inactive:
+        current_rows = [r for r in current_rows if r.management_no not in _inactive]
+        prev_rows = [r for r in prev_rows if r.management_no not in _inactive]
+        shop_cur_items = [r for r in shop_cur_items if r.management_no not in _inactive]
+        shop_prev_items = [r for r in shop_prev_items if r.management_no not in _inactive]
 
     def _matches_parent(genre_key: str) -> bool:
         """parent フィルタとの一致判定。parent が None の場合は常に True。"""
@@ -433,9 +451,13 @@ def gap_product(
     period: Literal["weekly", "monthly"] = Query("weekly"),
     date_str: Optional[str] = Query(None, alias="date"),
     genre: Optional[str] = Query(None),
+    include_inactive: bool = Query(False, description="Trueで廃盤（is_active=False）商品も含める"),
     db: Session = Depends(get_db),
 ):
+    from masters import inactive_management_nos
     today = date.today()
+    # 商品別ドリルダウンからは廃盤商品を既定で除外する。
+    inactive = set() if include_inactive else inactive_management_nos(db)
     if period == "weekly":
         current_week = get_week_start(date.fromisoformat(date_str) if date_str else today)
         prev_week = current_week - timedelta(weeks=1)
@@ -456,6 +478,9 @@ def gap_product(
             shop_prev = db.query(MonthlyItemSales).filter(
                 MonthlyItemSales.year_month == prev_ym
             ).all()
+            if inactive:
+                shop_items = [r for r in shop_items if r.management_no not in inactive]
+                shop_prev = [r for r in shop_prev if r.management_no not in inactive]
             return _build_shop_products(shop_items, shop_prev, genre)
 
     if genre:
@@ -520,6 +545,9 @@ def gap_product(
 
     result = []
     for key, a in current_map.items():
+        # 廃盤商品を除外（include_inactive=True のときは inactive が空なので通過）
+        if a["management_no"] and a["management_no"] in inactive:
+            continue
         kpis = calc_kpis(a["gross"], a["cost_of_sales"], a["ad_cost"], a["cv"], a["ct"], ctr=a["ctr"])
         prev_agg = prev_map.get(key)
         prev_kpis = calc_kpis(

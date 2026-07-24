@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import RppWeekly
 from calculations import calc_kpis
+from masters import inactive_management_nos
 
 router = APIRouter(prefix="/api/products", tags=["products"])
 
@@ -32,9 +33,14 @@ def list_products(
     period: Literal["weekly", "monthly"] = Query("weekly"),
     date_str: Optional[str] = Query(None, alias="date"),
     genre: Optional[str] = Query(None),
+    include_inactive: bool = Query(False, description="Trueで廃盤（is_active=False）商品も含める"),
     db: Session = Depends(get_db),
 ):
     today = date.today()
+    # 廃盤商品は既定で商品KPI一覧から除外する（マスタ未登録の管理番号は稼働中扱い）。
+    # is_active バッジ表示のため廃盤集合は常に把握し、除外に使うかだけを切り替える。
+    all_inactive = inactive_management_nos(db)
+    inactive = set() if include_inactive else all_inactive
 
     if period == "weekly":
         target_date = date.fromisoformat(date_str) if date_str else today
@@ -86,6 +92,9 @@ def list_products(
 
     result = []
     for a in agg.values():
+        # 廃盤商品を除外（include_inactive=True のときは inactive が空なので通過）
+        if a["management_no"] and a["management_no"] in inactive:
+            continue
         ctr = a["_ctr_sum"] / a["ct"] if a["ct"] > 0 else 0.0
         kpis = calc_kpis(a["gross"], a["cost_of_sales"], a["ad_cost"], a["cv"], a["ct"], ctr=ctr)
         result.append({
@@ -94,6 +103,7 @@ def list_products(
             "product_name": a["product_name"],
             "genre": a["genre"],
             "week_start": a["week_start"].isoformat() if period == "weekly" else None,
+            "is_active": (a["management_no"] not in all_inactive) if a["management_no"] else True,
             **kpis,
             "limit_cpo_exceeded": kpis["cpo"] > kpis["limit_cpo"] if kpis["limit_cpo"] > 0 else False,
         })

@@ -27,6 +27,7 @@ export default function TargetSetting() {
     expense_rate: 0.15,
   })
   const [targets, setTargets] = useState<Target[]>([])
+  const [costRate, setCostRate] = useState(0.6)   // 店舗デフォルト原価率（/api/shops/me から取得）
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(false)
 
@@ -39,6 +40,14 @@ export default function TargetSetting() {
       .catch((e: unknown) => {
         console.error('[TargetSetting] 目標一覧取得エラー:', e)
         setTargets([])
+      })
+    // 原価率は店舗マスタのデフォルト値を使う（固定の60%仮定をやめる）
+    api.shops.me()
+      .then((shop) => {
+        if (shop && typeof shop.default_cost_rate === 'number') setCostRate(shop.default_cost_rate)
+      })
+      .catch((e: unknown) => {
+        console.error('[TargetSetting] 店舗設定取得エラー:', e)
       })
   }, [])
 
@@ -80,7 +89,7 @@ export default function TargetSetting() {
     setForm(f => ({ ...f, [key]: value }))
   }
 
-  const estimatedGP = form.target_sales * (1 - (form.expense_rate + 0.6))
+  const estimatedGP = form.target_sales * (1 - (form.expense_rate + costRate))
   const estimatedRev = estimatedGP - form.target_sales * form.expense_rate
 
   return (
@@ -194,7 +203,7 @@ export default function TargetSetting() {
 
           {/* 試算 */}
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-            <p className="text-sm font-semibold text-blue-800 mb-3">目標値の試算（原価率60%を仮定）</p>
+            <p className="text-sm font-semibold text-blue-800 mb-3">目標値の試算（原価率{Math.round(costRate * 100)}%を適用）</p>
             <div className="grid grid-cols-2 gap-3 text-sm">
               <div>
                 <p className="text-blue-600 text-xs">売上目標</p>

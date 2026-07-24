@@ -17,17 +17,33 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from database import engine, get_db
+from database import engine, get_db, SessionLocal
 import models
-from models import RppWeekly, MonthlyItemSales, MonthlyAnalysis, Target, RppSales, InventoryStatus
+from models import RppWeekly, MonthlyItemSales, MonthlyAnalysis, Target, RppSales, InventoryStatus, Shop
 from sample_data import generate_sample_data
-from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account, rpp_diagnosis, recommendations
+from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account, rpp_diagnosis, recommendations, costs, masters, inventory
 from auth import get_current_user, AuthUser, UserContextMiddleware
 from migrations import run_migrations
 
 models.Base.metadata.create_all(bind=engine)
 # 既存DBへの user_id 列追加・ユニーク制約の張り替え等（冪等）
 run_migrations(engine)
+
+# 初回起動時のデフォルト店舗投入。
+# マルチテナントでは「全体で1行」ではなく「ユーザーごとに1行」なので、本番（認証あり）では
+# 各ユーザーの初回アクセス時に遅延生成する（masters.get_or_create_default_shop）。
+# ローカル/開発（SUPABASE_JWT_SECRET 未設定＝認証無効＝全データ user_id NULL の単一テナント）
+# のときだけ、起動時に user_id NULL の店舗を1行だけ入れておく。
+if not os.environ.get("SUPABASE_JWT_SECRET"):
+    _db = SessionLocal()
+    try:
+        if _db.query(Shop).count() == 0:
+            _db.add(Shop(name="メイン店舗", mall_type="rakuten"))
+            _db.commit()
+    except Exception:
+        _db.rollback()
+    finally:
+        _db.close()
 
 app = FastAPI(title="楽天KPI管理API", version="1.0.0")
 
@@ -61,6 +77,10 @@ app.include_router(evaluation.router, dependencies=_auth)
 app.include_router(recommendations.router, dependencies=_auth)
 app.include_router(export.router, dependencies=_auth)
 app.include_router(account.router, dependencies=_auth)
+app.include_router(costs.router, dependencies=_auth)
+app.include_router(masters.router, dependencies=_auth)
+app.include_router(masters.shops_router, dependencies=_auth)
+app.include_router(inventory.router, dependencies=_auth)
 
 
 @app.exception_handler(Exception)
