@@ -239,6 +239,18 @@ def _sync_subscription(db: Session, stripe, etype: str, obj) -> None:
     token = current_user_id.set(uid)
     try:
         s = db.query(Subscription).first()
+        # 別契約のイベントで既存契約を上書きしない（要: 他顧客・CLIのテストイベント対策）。
+        # 既に契約があり、customer も subscription も一致しないイベントは無視する。
+        if s is not None and (s.stripe_customer_id or s.stripe_subscription_id):
+            incoming_sub = g(sub_obj, "id") if sub_obj is not None else None
+            same_customer = customer_id and s.stripe_customer_id == customer_id
+            same_sub = incoming_sub and s.stripe_subscription_id == incoming_sub
+            if not (same_customer or same_sub):
+                import logging as _lg
+                _lg.getLogger("billing").info(
+                    "別契約のイベントのため無視: customer=%s sub=%s", customer_id, incoming_sub
+                )
+                return
         if s is None:
             s = Subscription()
             db.add(s)
