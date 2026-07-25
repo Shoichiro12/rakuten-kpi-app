@@ -280,6 +280,9 @@ export const api = {
     /** Checkout完了で戻った直後に呼び、契約状態を確定する（session_id 由来） */
     confirm: (session_id: string) =>
       request<import('../types').BillingStatus>('/billing/confirm', { method: 'POST', body: JSON.stringify({ session_id }) }),
+    /** Stripeを正としてDBの契約状態を引き直す（プラン変更が反映されない時の手動同期） */
+    refresh: () =>
+      request<import('../types').BillingStatus>('/billing/refresh', { method: 'POST', body: JSON.stringify({}) }),
     /** カスタマーポータルのURLを発行 */
     portal: () =>
       request<{ url: string }>('/billing/portal', { method: 'POST', body: JSON.stringify({}) }),

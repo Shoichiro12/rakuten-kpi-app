@@ -133,13 +133,28 @@ export default function Billing() {
                   </p>
                 </div>
               </div>
-              <button
-                onClick={openPortal}
-                disabled={busy === 'portal'}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <ExternalLink size={15} /> プラン・支払い方法を管理する
-              </button>
+              <div className="flex items-center gap-2 flex-wrap">
+                <button
+                  onClick={openPortal}
+                  disabled={busy === 'portal'}
+                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+                >
+                  <ExternalLink size={15} /> プラン・支払い方法を管理する
+                </button>
+                <button
+                  onClick={async () => {
+                    setBusy('refresh')
+                    try { await api.billing.refresh(); await load(); setMsg(null) }
+                    catch { setMsg('最新状態の取得に失敗しました。') }
+                    finally { setBusy(null) }
+                  }}
+                  disabled={busy === 'refresh'}
+                  className="flex items-center gap-1.5 px-3 py-2 border text-gray-600 hover:bg-gray-50 disabled:opacity-60 text-sm rounded-lg transition-colors"
+                  title="Stripeの最新状態を取り直します"
+                >
+                  {busy === 'refresh' ? '更新中…' : '最新の状態に更新'}
+                </button>
+              </div>
               <p className="text-xs text-gray-400 mt-2">Stripeのカスタマーポータルで支払い方法の変更・プラン変更・解約ができます。</p>
             </div>
           )}

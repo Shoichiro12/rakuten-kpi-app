@@ -52,17 +52,26 @@ def _sub_dict(s) -> dict:
 def billing_status(db: Session = Depends(get_db), _u: AuthUser = Depends(get_current_user)):
     """現在のユーザーの契約状態。未契約でも200で {is_active:false} を返す。"""
     s = db.query(Subscription).first()
-    # 自己修復: 契約はあるが plan が未解決のときだけ Stripe から引き直して補完する
-    # （plan 設定済みなら Stripe API は叩かない）。
-    if s and s.stripe_subscription_id and not s.plan and B.BILLING_ENABLED:
-        stripe = B.get_stripe()
-        if stripe is not None:
-            try:
-                sub = stripe.Subscription.retrieve(s.stripe_subscription_id)
-                _sync_subscription(db, stripe, "customer.subscription.updated", sub)
-                s = db.query(Subscription).first()
-            except Exception:
-                pass
+    return {"enabled": B.BILLING_ENABLED, **_sub_dict(s)}
+
+
+@router.post("/refresh")
+def refresh_status(db: Session = Depends(get_db), _u: AuthUser = Depends(get_current_user)):
+    """Stripe を正としてDBの契約状態を引き直す（プラン変更が反映されない時の手動同期）。
+
+    通常は Webhook で自動同期されるが、Webhook 未設定・取りこぼし時の復旧手段として用意する。
+    """
+    s = db.query(Subscription).first()
+    if not s or not s.stripe_subscription_id:
+        return {"enabled": B.BILLING_ENABLED, **_sub_dict(s)}
+    stripe = B.get_stripe()
+    if stripe is not None:
+        try:
+            sub = stripe.Subscription.retrieve(s.stripe_subscription_id, expand=["items.data.price"])
+            _sync_subscription(db, stripe, "customer.subscription.updated", sub)
+            s = db.query(Subscription).first()
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"同期に失敗しました: {e}")
     return {"enabled": B.BILLING_ENABLED, **_sub_dict(s)}
 
 
@@ -265,10 +274,25 @@ def _sync_subscription(db: Session, stripe, etype: str, obj) -> None:
             if data:
                 price = g(data[0], "price") or {}
                 price_id = price.get("id") if hasattr(price, "get") else getattr(price, "id", None)
+            # items が空で price を取れないイベントがあるため、サブスクを取得し直して補う
+            # （ポータルでのプラン変更を確実に反映するために必要）。
+            if not price_id:
+                sub_id_for_fetch = g(sub_obj, "id")
+                if sub_id_for_fetch:
+                    try:
+                        full = stripe.Subscription.retrieve(sub_id_for_fetch, expand=["items.data.price"])
+                        fitems = getattr(full, "items", None)
+                        fdata = getattr(fitems, "data", None) or []
+                        if fdata:
+                            fprice = getattr(fdata[0], "price", None)
+                            price_id = getattr(fprice, "id", None)
+                    except Exception:
+                        pass
             # plan は checkout 時にサブスクの metadata へ入れているのでそれを優先し、
             # 無ければ price_id から解決する（ポータルでのプラン変更等に備える）。
-            # plan は checkout時にサブスクの metadata へ入れている。StripeObject は .get が
-            # 効かない版があるため属性アクセスを優先して読む。無ければ price_id から解決。
+            # plan は「現在の price_id」を最優先で解決する。ポータルでプラン変更されると
+            # metadata は作成時のまま古くなるため、metadata はフォールバックに留める。
+            # （StripeObject は .get が効かない版があるため属性アクセスを優先して読む）
             sub_meta = g(sub_obj, "metadata")
             plan_from_meta = None
             if sub_meta is not None:
@@ -278,7 +302,7 @@ def _sync_subscription(db: Session, stripe, etype: str, obj) -> None:
                         plan_from_meta = sub_meta.get("plan")
                     except Exception:
                         plan_from_meta = None
-            resolved_plan = plan_from_meta or B.plan_for_price(price_id)
+            resolved_plan = B.plan_for_price(price_id) or plan_from_meta
             if resolved_plan:
                 s.plan = resolved_plan
             te = g(sub_obj, "trial_end")
