@@ -11,6 +11,15 @@ export const supabase: SupabaseClient | null =
 /** 認証が有効か（Supabase設定が存在するか）。false ならログイン画面を出さない。 */
 export const authEnabled = supabase !== null
 
+/**
+ * Googleログインボタンを表示するか。
+ * 既定は false（非表示）。Supabase側でGoogleプロバイダを有効化し、Google Cloud で
+ * OAuthクライアントを用意したうえで、環境変数 VITE_ENABLE_GOOGLE_LOGIN=1 を設定すると出る。
+ * 未設定のまま出すと、押しても Supabase 側でエラーになるだけなので既定で隠しておく。
+ */
+export const googleLoginEnabled =
+  authEnabled && (import.meta.env.VITE_ENABLE_GOOGLE_LOGIN as string | undefined) === '1'
+
 /** 現在のセッションのアクセストークン（JWT）。未ログイン/認証無効なら null。 */
 export async function getAccessToken(): Promise<string | null> {
   if (!supabase) return null

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { LogIn, Loader2, Send } from 'lucide-react'
-import { supabase } from '../lib/supabase'
+import { supabase, googleLoginEnabled } from '../lib/supabase'
 
 type Mode = 'signin' | 'signup' | 'forgot'
 
@@ -108,8 +108,8 @@ export default function Login() {
           <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
         </div>
 
-        {/* Googleログイン（パスワード再設定モードでは出さない） */}
-        {mode !== 'forgot' && (
+        {/* Googleログイン（既定は非表示。VITE_ENABLE_GOOGLE_LOGIN=1 かつ再設定モード以外で表示） */}
+        {googleLoginEnabled && mode !== 'forgot' && (
           <>
             <button
               type="button"
