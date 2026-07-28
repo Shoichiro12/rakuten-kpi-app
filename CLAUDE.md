@@ -136,6 +136,15 @@ CSVパースは `backend/routers/import_csv.py`。エンコーディング/ス�
 ### フロントエンド（`frontend/`）
 
 - `src/App.tsx` がルーティング（`/`=Dashboard, `/gap`=GapAnalysis, `/products`=ProductKPI, `/import`=DataImport, `/targets`=TargetSetting, `/rpp`=RppAnalysis）。
+- **法的ページ（`/legal/tokushoho`, `/legal/privacy`, `/legal/terms`）は認証ゲートの外側にルーティングしている。** `App.tsx` では `<Route path="*">` の中に認証チェック＋アプリ本体（`Shell`）を置き、`/legal/*` はその手前で解決する構造。特定商取引法は「購入前」の表示を求めており、Stripeの審査でも購入手続きに入る前から到達できるURLであることが確認されるため、**ログイン必須の場所に移さないこと。** 文面のプレースホルダーと公開前チェックは `docs/本番デプロイ_チェックリスト.md` を参照。
+- 価格（月額 ¥20,000税抜 / ¥22,000税込）の表示箇所は `backend/billing.py` の `PLAN_AMOUNT_LABEL`（＋診断が突き合わせる `PLAN_AMOUNT_JPY`＝税込22000 / `PLAN_AMOUNT_EXCL_TAX_JPY`＝税抜20000）・特商法ページ・利用規約 第3条の3箇所。改定時はStripeのpriceと合わせて全部直す。**総額表示義務があるので税込金額を主表記から外さない**（税抜のみの表示にしない。税抜・税込は同じ視認性で並列表示）。
+- **消費税は Stripe Tax（自動税計算）を使わない**（2026-07 に方針変更）。取引ごと0.5%の手数料がかかるため。代わりに次の2つを組み合わせる。
+  - Price は【税込 ¥22,000】(`unit_amount=22000`・内税)で登録する。
+  - **無料の「税率」(Tax rates)を手動で1つ作り**（10%・`inclusive=true`・日本）、Checkout の `subscription_data.default_tax_rates` に渡す（env `STRIPE_TAX_RATE_ID`）。これで請求書に「消費税 10% ¥2,000（内税）」の内訳が出る（総額は¥22,000のまま）。**適格請求書発行事業者として登録済みなので、顧客の仕入税額控除のために内訳が必要。** 登録番号(T+13桁)はStripeの請求書テンプレート側に設定する（コードでは扱わない）。
+  - ⚠️ **`default_tax_rates` と `automatic_tax` は併用できない。** Stripe Tax を有効にするとCheckout作成が拒否される。`automatic_tax` は渡さない（既定=無効）。
+  - ⚠️ **envに税率を設定しても既存の契約には遡って適用されない。** 税率を追加・変更したら契約を作り直す必要がある。診断が契約側の `default_tax_rates` を検査する。
+- **Managed Payments は明示的に無効化する**（`managed_payments={"enabled": False}` を Checkout に渡す）。Stripeアカウントでは**既定で有効**で、有効だと `default_tax_rates` が `Unsupported parameter` で拒否される。使わない理由は、**Managed Payments が日本国内取引の税務を代行しないから**（Stripeのドキュメントに、間接税を扱うのはシンガポールB2B国内と日本の全国内取引を「除く」国と明記）。国内向けの当サービスでは消費税の責任は自分に残る一方、税率指定と請求書発行はStripe側に握られ、適格請求書（登録番号・税額内訳）を自分で制御できなくなる。アカウント設定でも切れるが、既定が有効なのでコード側で明示しておく。
+  - ⚠️ **`PLAN_AMOUNT_EXCL_TAX_JPY`（税抜20000）は表示のための手計算値**で、Stripeの設定から導かれる値ではない（22000 ÷ 1.1）。**消費税率が変わっても自動追従しない。** 税率改定時は Stripeのprice金額・`PLAN_AMOUNT_JPY`・`PLAN_AMOUNT_EXCL_TAX_JPY`・`TAX_RATE`・`PLAN_AMOUNT_LABEL`・特商法ページ・利用規約を**すべて手で**直す。診断が税抜表示と税込金額の整合性を検査するので、価格まわりを触ったら `GET /api/billing/diagnose` を必ず実行する。
 - **すべてのAPI呼び出しは `src/lib/api.ts` の `request()` / `parseJson()` ヘルパー経由にする。** `res.text()` → 空ならフォールバック → `JSON.parse` をtry/catch、`Failed to fetch` も捕捉して日本語メッセージ化し、空レスポンスやパース失敗でUIをクラッシュさせない。新しいfetchを直書きしない（FormDataアップロードも同パターンを踏襲）。
 - 各ページ・グラフ（Recharts）は空配列/undefined時に「データなし」を表示するガードを入れる。
 - 型は `src/types/index.ts` に集約。

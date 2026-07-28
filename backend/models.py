@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, Float, String, Date, DateTime, Boolean, ForeignKey, UniqueConstraint, func
+from sqlalchemy import Column, Integer, Float, String, Text, Date, DateTime, Boolean, ForeignKey, UniqueConstraint, func
 from database import Base
 from tenancy import UserScopedMixin
 
@@ -297,9 +297,29 @@ class Subscription(Base, UserScopedMixin):
     id = Column(Integer, primary_key=True, index=True)
     stripe_customer_id = Column(String, index=True)
     stripe_subscription_id = Column(String, index=True)
-    plan = Column(String)          # "standard" / "consult"
+    plan = Column(String)          # 常に "standard"（単一プラン化。"consult" は旧契約のみ）
     status = Column(String)        # trialing / active / past_due / canceled / incomplete 等
     trial_end = Column(DateTime, nullable=True)
     current_period_end = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+
+class ConsultingInquiry(Base, UserScopedMixin):
+    """ECコンサルの問い合わせ（アプリ課金には乗せず個別契約にするため）。
+
+    ログイン中のユーザーからの問い合わせとして記録が残る。一次通知チャネルは
+    NOTIFY_EMAIL 宛のメール（notifications.send_inquiry_notification）で、
+    閲覧用の管理画面は用意していない（過去分の確認はDBを直接見る運用）。
+    """
+    __tablename__ = "consulting_inquiries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String, nullable=False)
+    company_name = Column(String, nullable=False)
+    scale_hint = Column(String)              # 自由記述（月商目安・店舗数など）
+    contact_email = Column(String, nullable=False)
+    contact_phone = Column(String, nullable=True)
+    message = Column(Text, nullable=True)
+    status = Column(String, default="new")   # new / contacted / closed（今は new 固定・将来の管理用）
+    created_at = Column(DateTime, default=func.now())

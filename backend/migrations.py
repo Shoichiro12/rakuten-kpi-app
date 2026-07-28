@@ -39,6 +39,8 @@ _USER_SCOPED_TABLES = {
     "product_costs": [("uq_product_cost", ("management_no",))],
     # 課金（ユニーク制約なし。user_id 列・インデックスの冪等付与とRLS対象化のため登録）
     "subscriptions": [],
+    # コンサル問い合わせ（同上）
+    "consulting_inquiries": [],
 }
 
 

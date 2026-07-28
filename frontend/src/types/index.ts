@@ -214,6 +214,75 @@ export interface BillingStatus {
 export interface BillingPlan {
   plan: string
   label: string
+  /** カード表示用の金額文字列（例: "¥20,000（税抜） / ¥22,000（税込）"）。請求額は Stripe の price が正 */
+  price_label?: string
+}
+
+/** 課金設定の診断結果（GET /api/billing/diagnose）。切り分け用 */
+export interface BillingDiagnosis {
+  ok: boolean
+  checks: { level: 'ok' | 'warn' | 'error'; message: string }[]
+  config: {
+    billing_enabled: boolean
+    trial_days: number
+    price_id: string | null
+    /** 手動の税率ID（請求書に消費税の内訳を出すため。Stripe Taxは使わない） */
+    tax_rate_id?: string | null
+    webhook_secret_set: boolean
+    app_base_url: string
+    key_livemode?: boolean | null
+  }
+  /** 手動の税率の設定内容 */
+  tax_rate?: {
+    id: string | null
+    display_name: string | null
+    percentage: number | null
+    inclusive: boolean | null
+    active: boolean | null
+    country: string | null
+    livemode: boolean | null
+  } | null
+  price: {
+    id: string
+    type: string | null
+    recurring: { interval: string | null; interval_count: number | null } | null
+    unit_amount: number | null
+    currency: string | null
+    active: boolean | null
+    livemode: boolean | null
+    product_id: string | null
+    product_name: string | null
+    /** exclusive=外税（unit_amountは税抜）/ inclusive=内税（税込）/ unspecified=未設定 */
+    tax_behavior?: string | null
+  } | null
+  subscription: {
+    id: string
+    status: string | null
+    trial_start: string | null
+    trial_end: string | null
+    cancel_at_period_end: boolean | null
+    price_id: string | null
+    interval: string | null
+    interval_count: number | null
+    current_period_end: string | null
+    /** 自動税計算(Stripe Tax)。この設計では無効が正しい */
+    automatic_tax_enabled?: boolean | null
+    /** 契約に付いている手動税率のID。空だとその契約の請求書に内訳が出ない */
+    default_tax_rate_ids?: string[]
+  } | null
+  db: Record<string, unknown> | null
+  db_vs_stripe: { field: string; db: string | null; stripe: string | null }[]
+  livemode_mismatch?: boolean
+}
+
+/** コンサル問い合わせフォームの送信内容 */
+export interface ConsultingInquiryPayload {
+  name: string
+  company_name: string
+  scale_hint?: string | null
+  contact_email: string
+  contact_phone?: string | null
+  message?: string | null
 }
 
 export interface BillingPlansResponse {

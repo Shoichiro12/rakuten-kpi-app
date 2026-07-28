@@ -1,8 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { CreditCard, Check, ExternalLink, Sparkles, AlertTriangle } from 'lucide-react'
 import Header from '../components/layout/Header'
+import ConsultingInquiryForm from '../components/ConsultingInquiryForm'
 import { api } from '../lib/api'
-import type { BillingStatus, BillingPlan } from '../types'
+import type { BillingStatus, BillingPlan, BillingDiagnosis } from '../types'
 
 const STATUS_LABEL: Record<string, string> = {
   trialing: 'トライアル中',
@@ -25,6 +27,8 @@ export default function Billing() {
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
+  const [showInquiry, setShowInquiry] = useState(false)
+  const [diag, setDiag] = useState<BillingDiagnosis | null>(null)
 
   // ?checkout=success / cancel の戻り表示
   const params = new URLSearchParams(window.location.search)
@@ -48,22 +52,49 @@ export default function Billing() {
     // Checkout完了で戻った直後（?session_id=…）は、まず契約状態を確定してから表示を更新する。
     const sid = new URLSearchParams(window.location.search).get('session_id')
     if (sid) {
-      api.billing.confirm(sid).catch(() => {}).finally(() => load())
+      // 同期に失敗したまま黙ってプラン選択画面に戻ると「登録したのにサブスクに
+      // なっていない」ように見えてしまう。失敗は必ず画面に出す。
+      api.billing
+        .confirm(sid)
+        .catch((e) => {
+          console.error('[Billing] confirmエラー:', e)
+          setMsg(
+            'Stripeでの登録は完了していますが、アプリ側への反映に失敗しました。'
+            + '「最新の状態に更新」を押すか、時間をおいて再読み込みしてください。',
+          )
+        })
+        .finally(() => load())
     } else {
       load()
     }
   }, [load])
 
-  const subscribe = async (plan: string) => {
-    setBusy(plan)
+  const subscribe = async () => {
+    setBusy('checkout')
     setMsg(null)
     try {
-      const res = await api.billing.checkout(plan as 'standard' | 'consult')
+      const res = await api.billing.checkout()
       if (res?.url) window.location.href = res.url
       else setMsg('Checkoutの作成に失敗しました。')
     } catch (e) {
+      // Stripeが返す理由（Priceがアーカイブ済み・price IDが存在しない等）を隠さず出す。
+      // 固定文言に潰すと「キーの問題」と誤誘導して原因究明が遅れる。
       console.error('[Billing] checkoutエラー:', e)
-      setMsg('Checkoutの作成に失敗しました。Stripeキーの設定を確認してください。')
+      const detail = e instanceof Error ? e.message : String(e)
+      setMsg(`Checkoutの作成に失敗しました。${detail}`)
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  const runDiagnose = async () => {
+    setBusy('diagnose')
+    setMsg(null)
+    try {
+      setDiag(await api.billing.diagnose())
+    } catch (e) {
+      console.error('[Billing] diagnoseエラー:', e)
+      setMsg('診断の実行に失敗しました。')
     } finally {
       setBusy(null)
     }
@@ -83,10 +114,12 @@ export default function Billing() {
   }
 
   const active = status?.is_active
+  // プランは単一。/billing/plans は price ID 設定済みのものだけ返すので実質0〜1件。
+  const plan: BillingPlan | undefined = plans[0]
 
   return (
     <div className="flex flex-col h-full">
-      <Header title="請求・プラン" subtitle={active ? '契約中' : 'プランを選んでください'} />
+      <Header title="請求・プラン" subtitle={active ? '契約中' : 'ご利用プランのご案内'} />
 
       <div className="flex-1 overflow-auto p-6 bg-gray-50">
         <div className="max-w-3xl mx-auto space-y-5">
@@ -159,39 +192,147 @@ export default function Billing() {
             </div>
           )}
 
-          {/* 未契約: プランカード */}
+          {/* 未契約: プランカード（プランは1つだけ） */}
           {!active && status?.enabled && (
-            <>
-              <p className="text-sm text-gray-500">
-                すべてのプランに<span className="font-semibold text-gray-700">{trialDays}日間の無料トライアル</span>が付きます。トライアル中の解約で料金はかかりません。
-              </p>
-              <div className="grid sm:grid-cols-2 gap-4">
-                {plans.map((p) => (
-                  <div key={p.plan} className="bg-white rounded-xl border shadow-sm p-5 flex flex-col">
-                    <div className="flex items-center gap-2 mb-1">
-                      {p.plan === 'consult' && <Sparkles size={16} className="text-amber-500" />}
-                      <h3 className="text-base font-bold text-gray-900">{p.label}</h3>
-                    </div>
-                    <span className="inline-flex w-fit items-center text-[11px] px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-700 mb-3">
-                      {trialDays}日間無料
-                    </span>
-                    <p className="text-xs text-gray-500 mb-4 flex-1">
-                      料金・詳細は次の決済画面（Stripe）で確認できます。
-                    </p>
-                    <button
-                      onClick={() => subscribe(p.plan)}
-                      disabled={busy === p.plan}
-                      className="flex items-center justify-center gap-2 px-4 py-2 bg-rakuten-red hover:opacity-90 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-opacity"
-                    >
-                      {busy === p.plan ? '準備中…' : 'このプランで始める'}
-                    </button>
-                  </div>
-                ))}
+            <div className="bg-white rounded-xl border shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="text-base font-bold text-gray-900">{plan?.label ?? 'ウレシル 月額プラン'}</h3>
+                <span className="text-[11px] px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-700">
+                  {trialDays}日間無料
+                </span>
               </div>
-              <p className="text-xs text-gray-400">
+              {/* 総額表示義務のため、税込金額を主表記から外さない。
+                  税抜・税込は同じ文字サイズ・同じ視認性で並列表示する。 */}
+              <p className="text-xl sm:text-2xl font-bold text-gray-900 mb-1">
+                月額 {plan?.price_label ?? '¥20,000（税抜） / ¥22,000（税込）'}
+              </p>
+              <p className="text-xs text-gray-500 mb-4">
+                {trialDays}日間の無料トライアル付き。トライアル中に解約すれば料金はかかりません。
+                機能制限はなく、すべての分析機能をご利用いただけます。
+              </p>
+              <button
+                onClick={subscribe}
+                disabled={busy === 'checkout'}
+                className="flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 bg-rakuten-red hover:opacity-90 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-opacity"
+              >
+                {busy === 'checkout' ? '準備中…' : `${trialDays}日間の無料トライアルを始める`}
+              </button>
+              {/* 購入手続きに入る前に、価格・支払条件・解約条件へ到達できるようにする
+                  （特定商取引法の要請。Stripeの審査でも確認される） */}
+              <p className="text-xs text-gray-500 mt-3">
+                お申し込みの前に{' '}
+                <Link to="/legal/tokushoho" className="text-blue-600 hover:underline">特定商取引法に基づく表記</Link>
+                {' '}と{' '}
+                <Link to="/legal/terms" className="text-blue-600 hover:underline">利用規約</Link>
+                {' '}をご確認ください。
+              </p>
+              <p className="text-xs text-gray-400 mt-2">
                 決済は Stripe の安全な画面で行われます。テストモードでは番号 4242 4242 4242 4242（有効期限は未来・任意のCVV）で登録できます。
               </p>
-            </>
+            </div>
+          )}
+
+          {/* コンサル: アプリの課金には乗せず、個別契約（問い合わせ→ヒアリング→見積り） */}
+          {showInquiry ? (
+            <ConsultingInquiryForm onClose={() => setShowInquiry(false)} />
+          ) : (
+            <div className="bg-white rounded-xl border shadow-sm p-5 flex flex-col sm:flex-row sm:items-center gap-3">
+              <Sparkles size={18} className="text-amber-500 shrink-0" />
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-gray-800">運用まで一緒にやってほしい方へ</h3>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  ECコンサルは個別契約です。店舗の規模・課題をお聞きしてお見積りをご提示します（¥150,000〜）。
+                </p>
+              </div>
+              <button
+                onClick={() => setShowInquiry(true)}
+                className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+              >
+                コンサルをご希望の方はこちら
+              </button>
+            </div>
+          )}
+
+          {/* 設定診断: Priceが月次か、トライアルが付いているか、DBとStripeが一致しているかを
+              まとめて確認する。「サブスクになっていない気がする」の切り分け用。 */}
+          {status?.enabled && (
+            <div className="bg-white rounded-xl border shadow-sm p-5">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-800">課金設定の診断</h3>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Priceが月次か・トライアルが付いているか・Stripeとアプリの状態が一致しているかを確認します。
+                  </p>
+                </div>
+                <button
+                  onClick={runDiagnose}
+                  disabled={busy === 'diagnose'}
+                  className="px-3 py-2 border text-gray-600 hover:bg-gray-50 disabled:opacity-60 text-sm rounded-lg transition-colors whitespace-nowrap"
+                >
+                  {busy === 'diagnose' ? '診断中…' : '診断する'}
+                </button>
+              </div>
+
+              {diag && (
+                <div className="mt-4 space-y-3">
+                  <ul className="space-y-1.5">
+                    {diag.checks.map((c, i) => (
+                      <li
+                        key={i}
+                        className={`text-xs rounded px-2.5 py-1.5 border ${
+                          c.level === 'error'
+                            ? 'bg-red-50 border-red-200 text-red-700'
+                            : c.level === 'warn'
+                              ? 'bg-amber-50 border-amber-200 text-amber-700'
+                              : 'bg-green-50 border-green-200 text-green-700'
+                        }`}
+                      >
+                        {c.message}
+                      </li>
+                    ))}
+                  </ul>
+                  <div className="grid sm:grid-cols-2 gap-2 text-xs">
+                    <div className="bg-gray-50 rounded p-2.5">
+                      <p className="text-gray-500 mb-1">設定</p>
+                      <p className="text-gray-800">トライアル: {diag.config.trial_days}日</p>
+                      <p className="text-gray-800 break-all">Price: {diag.config.price_id ?? '—'}</p>
+                      <p className="text-gray-800">
+                        モード: {diag.config.key_livemode == null ? '—' : diag.config.key_livemode ? '本番' : 'テスト'}
+                      </p>
+                    </div>
+                    <div className="bg-gray-50 rounded p-2.5">
+                      <p className="text-gray-500 mb-1">Stripe側のPrice</p>
+                      <p className="text-gray-800">
+                        種別: {diag.price?.recurring ? `継続（${diag.price.recurring.interval}）` : diag.price ? '一括（one_time）' : '—'}
+                      </p>
+                      <p className="text-gray-800">
+                        {/* 円は zero-decimal currency なので unit_amount がそのまま円額。
+                            外税(exclusive)なら unit_amount は税抜なので明示する。 */}
+                        金額: {diag.price?.unit_amount != null
+                          ? diag.price.currency === 'jpy'
+                            ? `¥${diag.price.unit_amount.toLocaleString()}${
+                                diag.price.tax_behavior === 'exclusive' ? '（税抜・外税）'
+                                : diag.price.tax_behavior === 'inclusive' ? '（税込・内税）'
+                                : ''}`
+                            : `${diag.price.unit_amount.toLocaleString()} ${diag.price.currency}`
+                          : '—'}
+                      </p>
+                      <p className="text-gray-800">
+                        消費税の内訳: {diag.tax_rate
+                          ? `${diag.tax_rate.percentage}%${diag.tax_rate.inclusive ? '・内税' : '・外税'}`
+                          : '税率未設定'}
+                      </p>
+                      <p className="text-gray-800">
+                        自動税計算(Stripe Tax): {diag.subscription?.automatic_tax_enabled == null
+                          ? '—'
+                          : diag.subscription.automatic_tax_enabled ? '有効' : '無効'}
+                      </p>
+                      <p className="text-gray-800">契約: {diag.subscription?.status ?? '未契約'}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
 
           {loading && !status && <p className="text-sm text-gray-400">読み込み中…</p>}

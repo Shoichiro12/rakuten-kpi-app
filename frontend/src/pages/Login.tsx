@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { LogIn, Loader2, Send } from 'lucide-react'
 import { supabase, googleLoginEnabled } from '../lib/supabase'
 
@@ -100,7 +101,7 @@ export default function Login() {
     mode === 'signin' ? 'ログインしてください' : mode === 'signup' ? 'アカウントを作成' : 'パスワードを再設定'
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 p-4">
       <div className="w-full max-w-sm bg-white rounded-2xl border shadow-sm p-7">
         <div className="text-center mb-6">
           <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">楽天EC</p>
@@ -202,6 +203,14 @@ export default function Login() {
             </button>
           )}
         </div>
+      </div>
+
+      {/* 法的ページへのリンク。登録前（購入前）に到達できる必要があるため、
+          ログイン画面にも置いておく。 */}
+      <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center mt-5 text-[11px] text-gray-400">
+        <Link to="/legal/tokushoho" className="hover:text-gray-600 hover:underline">特定商取引法に基づく表記</Link>
+        <Link to="/legal/privacy" className="hover:text-gray-600 hover:underline">プライバシーポリシー</Link>
+        <Link to="/legal/terms" className="hover:text-gray-600 hover:underline">利用規約</Link>
       </div>
     </div>
   )

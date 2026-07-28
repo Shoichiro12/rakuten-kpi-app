@@ -274,9 +274,9 @@ export const api = {
     plans: () =>
       request<import('../types').BillingPlansResponse>('/billing/plans')
         .then((d) => d ?? { enabled: false, trial_days: 14, plans: [] }),
-    /** Checkout Session を作成しURLを返す（フロントはそこへ遷移） */
-    checkout: (plan: 'standard' | 'consult') =>
-      request<{ url: string }>('/billing/checkout', { method: 'POST', body: JSON.stringify({ plan }) }),
+    /** Checkout Session を作成しURLを返す（フロントはそこへ遷移）。プランは単一なので引数なし */
+    checkout: () =>
+      request<{ url: string }>('/billing/checkout', { method: 'POST', body: JSON.stringify({}) }),
     /** Checkout完了で戻った直後に呼び、契約状態を確定する（session_id 由来） */
     confirm: (session_id: string) =>
       request<import('../types').BillingStatus>('/billing/confirm', { method: 'POST', body: JSON.stringify({ session_id }) }),
@@ -286,6 +286,14 @@ export const api = {
     /** カスタマーポータルのURLを発行 */
     portal: () =>
       request<{ url: string }>('/billing/portal', { method: 'POST', body: JSON.stringify({}) }),
+    /** 【切り分け用】Stripe側の設定・契約状態とDBを突き合わせた診断結果 */
+    diagnose: () => request<import('../types').BillingDiagnosis>('/billing/diagnose'),
+  },
+  /* ─── コンサル問い合わせ ───────────── */
+  consulting: {
+    /** 問い合わせを送信（保存＋担当者への通知メール） */
+    inquiry: (payload: import('../types').ConsultingInquiryPayload) =>
+      request<{ ok: boolean }>('/consulting/inquiries', { method: 'POST', body: JSON.stringify(payload) }),
   },
   /* ─── 原価マスタ ─────────────────── */
   costs: {

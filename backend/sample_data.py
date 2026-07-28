@@ -145,6 +145,10 @@ def _week_metrics(rng: random.Random, mgmt_no: str, week_offset: int) -> dict:
 
 
 def generate_sample_data(db: Session):
+    # 意図的に対象外のテーブル:
+    #   subscriptions          … 実際のStripe契約状態。ダミーを入れると課金画面が嘘をつく。
+    #   consulting_inquiries   … 問い合わせの受信記録。アプリ内に閲覧画面が無く（通知メールが
+    #                            一次チャネル）、ダミーを足してもデモ・動作確認に寄与しない。
     db.query(RppWeekly).delete()
     db.query(RppSales).delete()
     db.query(MonthlyAnalysis).delete()
