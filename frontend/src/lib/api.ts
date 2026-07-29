@@ -295,6 +295,12 @@ export const api = {
     inquiry: (payload: import('../types').ConsultingInquiryPayload) =>
       request<{ ok: boolean }>('/consulting/inquiries', { method: 'POST', body: JSON.stringify(payload) }),
   },
+  /* ─── フィードバック（不具合報告・要望） ─── */
+  feedback: {
+    /** フィードバックを送信（保存＋担当者への通知メール） */
+    send: (payload: import('../types').FeedbackPayload) =>
+      request<{ ok: boolean }>('/feedback', { method: 'POST', body: JSON.stringify(payload) }),
+  },
   /* ─── 原価マスタ ─────────────────── */
   costs: {
     /** 商品一覧＋適用中の率＋「個別/デフォルト」区分 */

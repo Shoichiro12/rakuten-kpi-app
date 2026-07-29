@@ -5,6 +5,7 @@ import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
 import ErrorBoundary from './components/ErrorBoundary'
 import OnboardingModal from './components/OnboardingModal'
+import FeedbackModal from './components/FeedbackModal'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import GapAnalysis from './pages/GapAnalysis'
@@ -53,6 +54,9 @@ const ONBOARDING_KEY = 'rakuten-kpi-onboarding-v1'
 
 export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
+  // フィードバック窓口（不具合報告・要望）。BrowserRouter内でuseLocationを使うため
+  // モーダル自体はルーター配下で描画する
+  const [showFeedback, setShowFeedback] = useState(false)
   // 認証: 無効(ローカル)なら常に通す。有効なら Supabase セッションの有無でゲート。
   const [session, setSession] = useState<Session | null>(null)
   const [authReady, setAuthReady] = useState(!authEnabled)
@@ -104,7 +108,12 @@ export default function App() {
   return (
     <BrowserRouter>
       <div className="flex h-screen overflow-hidden bg-gray-50">
-        <Sidebar onOpenHelp={reopenOnboarding} userEmail={session?.user?.email ?? null} onSignOut={signOut} />
+        <Sidebar
+          onOpenHelp={reopenOnboarding}
+          onOpenFeedback={() => setShowFeedback(true)}
+          userEmail={session?.user?.email ?? null}
+          onSignOut={signOut}
+        />
         {/* main 自体はスクロールさせず、内側のラッパーをスクロール領域にする。
             こうするとフッター（法的ページへのリンク）が常に画面下に残る。
             各ページの `h-full` は flex-1 + min-h-0 の親に対して解決される。 */}
@@ -118,6 +127,9 @@ export default function App() {
 
       {showOnboarding && (
         <OnboardingModal onComplete={completeOnboarding} />
+      )}
+      {showFeedback && (
+        <FeedbackModal onClose={() => setShowFeedback(false)} />
       )}
     </BrowserRouter>
   )

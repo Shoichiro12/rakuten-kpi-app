@@ -41,6 +41,8 @@ _USER_SCOPED_TABLES = {
     "subscriptions": [],
     # コンサル問い合わせ（同上）
     "consulting_inquiries": [],
+    # フィードバック（不具合報告・要望。同上）
+    "feedbacks": [],
 }
 
 

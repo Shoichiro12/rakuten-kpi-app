@@ -8,6 +8,7 @@ import {
   Target,
   HelpCircle,
   Megaphone,
+  MessageSquarePlus,
   FileDown,
   Boxes,
   CreditCard,
@@ -29,11 +30,13 @@ const nav = [
 
 interface SidebarProps {
   onOpenHelp: () => void
+  /** フィードバック窓口（不具合報告・要望）を開く */
+  onOpenFeedback: () => void
   userEmail?: string | null
   onSignOut?: () => void
 }
 
-export default function Sidebar({ onOpenHelp, userEmail, onSignOut }: SidebarProps) {
+export default function Sidebar({ onOpenHelp, onOpenFeedback, userEmail, onSignOut }: SidebarProps) {
   return (
     <aside className="w-56 min-h-screen bg-gray-900 text-white flex flex-col shrink-0">
       <div className="px-4 py-5 border-b border-gray-700">
@@ -79,6 +82,13 @@ export default function Sidebar({ onOpenHelp, userEmail, onSignOut }: SidebarPro
         >
           <HelpCircle size={16} />
           使い方ガイド
+        </button>
+        <button
+          onClick={onOpenFeedback}
+          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+        >
+          <MessageSquarePlus size={16} />
+          不具合・要望を送る
         </button>
         {userEmail && (
           <button

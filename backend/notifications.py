@@ -93,3 +93,55 @@ def send_inquiry_notification(inquiry) -> None:
     except Exception as e:
         # ここで落とすとフォーム送信がユーザー側でエラーになるため、ログのみ。
         logger.error("問い合わせ通知メールの送信に失敗しました: %s", e, exc_info=True)
+
+
+_FEEDBACK_CATEGORY_LABELS = {
+    "bug": "不具合の報告",
+    "request": "改善の要望",
+    "other": "その他",
+}
+
+
+def send_feedback_notification(feedback) -> None:
+    """アプリ内フィードバックの内容を NOTIFY_EMAIL 宛に送信する。
+
+    問い合わせ通知と同じ方針: 送信失敗・env未設定でも例外は上げない。
+    引数は models.Feedback。
+    """
+    if not smtp_configured():
+        logger.warning(
+            "SMTPが未設定のためフィードバック通知メールをスキップしました: id=%s category=%s",
+            getattr(feedback, "id", None),
+            getattr(feedback, "category", None),
+        )
+        return
+
+    def v(attr: str) -> str:
+        val = getattr(feedback, attr, None)
+        return str(val) if val not in (None, "") else "（なし）"
+
+    category = _FEEDBACK_CATEGORY_LABELS.get(
+        getattr(feedback, "category", ""), getattr(feedback, "category", "不明"))
+    subject = f"【ウレシル フィードバック】{category}"
+    body = "\n".join([
+        "アプリ内からフィードバックが届きました。",
+        "",
+        f"種別　　　: {category}",
+        f"画面　　　: {v('page')}",
+        f"利用者　　: {v('user_email')}",
+        "",
+        "内容:",
+        v("message"),
+        "",
+        "-" * 40,
+        f"ID　　　　: {getattr(feedback, 'id', None)}",
+        f"ユーザーID: {getattr(feedback, 'user_id', None)}",
+        f"ブラウザ　: {v('user_agent')}",
+        f"受信日時　: {getattr(feedback, 'created_at', None)}",
+    ])
+
+    try:
+        _send(subject, body)
+        logger.info("フィードバック通知メールを送信しました: id=%s", getattr(feedback, "id", None))
+    except Exception as e:
+        logger.error("フィードバック通知メールの送信に失敗しました: %s", e, exc_info=True)

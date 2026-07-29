@@ -275,6 +275,14 @@ export interface BillingDiagnosis {
   livemode_mismatch?: boolean
 }
 
+/** フィードバック（不具合報告・要望）の送信内容 */
+export interface FeedbackPayload {
+  category: 'bug' | 'request' | 'other'
+  message: string
+  /** 送信時に開いていた画面のパス（自動添付） */
+  page?: string | null
+}
+
 /** コンサル問い合わせフォームの送信内容 */
 export interface ConsultingInquiryPayload {
   name: string

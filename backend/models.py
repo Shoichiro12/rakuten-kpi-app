@@ -323,3 +323,23 @@ class ConsultingInquiry(Base, UserScopedMixin):
     message = Column(Text, nullable=True)
     status = Column(String, default="new")   # new / contacted / closed（今は new 固定・将来の管理用）
     created_at = Column(DateTime, default=func.now())
+
+
+class Feedback(Base, UserScopedMixin):
+    """アプリ内の不具合報告・要望（フィードバック窓口）。
+
+    利用者の声を拾うための窓口。一次通知チャネルは NOTIFY_EMAIL 宛のメール
+    （notifications.send_feedback_notification）。閲覧用の管理画面は作らない
+    （件数が増えたら検討。過去分はDBを直接見る運用）。
+    user_email はフロントから送らせず、JWT（AuthUser.email）から入れる。
+    """
+    __tablename__ = "feedbacks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String, nullable=False, default="bug")  # bug / request / other
+    message = Column(Text, nullable=False)
+    page = Column(String)                    # 送信時に開いていた画面のパス（例: /gap）
+    user_email = Column(String)              # JWT由来（返信用）
+    user_agent = Column(String)              # ブラウザ情報（不具合の再現用）
+    status = Column(String, default="new")   # new / triaged / done（今は new 固定・将来の管理用）
+    created_at = Column(DateTime, default=func.now())
