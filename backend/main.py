@@ -10,6 +10,16 @@ try:
 except ImportError:
     pass
 
+# アプリ側ロガー（notifications 等）の INFO ログを本番（Render）でも出す。
+# uvicorn はルートロガーにハンドラを付けないため、これが無いと WARNING 未満は
+# 「最終手段ハンドラ」に落ちて捨てられ、メール送信成功などの INFO ログが残らない。
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+)
+
 from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, FileResponse

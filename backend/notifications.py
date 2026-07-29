@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """メール通知（SMTP）。
 
-現在の用途はコンサル問い合わせの受信通知のみ。問い合わせの一次チャネルが
+用途はコンサル問い合わせとアプリ内フィードバックの受信通知。問い合わせの一次チャネルが
 このメールなので「届かないより、遅れても届く」を優先し、送信失敗はログに
 残すだけで例外を上げない（フォーム送信自体は成功させる）。
 
@@ -15,14 +15,32 @@
 import logging
 import os
 import smtplib
+from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from email.utils import formataddr
 
 logger = logging.getLogger("notifications")
 
+_JST = timezone(timedelta(hours=9))
+
 
 def _env(key: str) -> str:
     return (os.environ.get(key) or "").strip()
+
+
+def _fmt_jst(dt) -> str:
+    """DBに入っているUTC日時（naive想定）をJST表記の文字列にする。
+
+    メールを受け取った側が「今の話か」を即断できるようJSTで表示する。
+    datetime以外（None・文字列など）はそのまま文字列化して返す。
+    """
+    if dt is None:
+        return "（なし）"
+    if not isinstance(dt, datetime):
+        return str(dt)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=timezone.utc)
+    return dt.astimezone(_JST).strftime("%Y-%m-%d %H:%M:%S") + " (JST)"
 
 
 def smtp_configured() -> bool:
@@ -84,12 +102,15 @@ def send_inquiry_notification(inquiry) -> None:
         "-" * 40,
         f"問い合わせID: {getattr(inquiry, 'id', None)}",
         f"ユーザーID　: {getattr(inquiry, 'user_id', None)}",
-        f"受信日時　　: {getattr(inquiry, 'created_at', None)}",
+        f"受信日時　　: {_fmt_jst(getattr(inquiry, 'created_at', None))}",
     ])
 
     try:
         _send(subject, body)
-        logger.info("問い合わせ通知メールを送信しました: id=%s", getattr(inquiry, "id", None))
+        logger.info(
+            "問い合わせ通知メールを送信しました: id=%s to=%s",
+            getattr(inquiry, "id", None), _env("NOTIFY_EMAIL"),
+        )
     except Exception as e:
         # ここで落とすとフォーム送信がユーザー側でエラーになるため、ログのみ。
         logger.error("問い合わせ通知メールの送信に失敗しました: %s", e, exc_info=True)
@@ -137,11 +158,14 @@ def send_feedback_notification(feedback) -> None:
         f"ID　　　　: {getattr(feedback, 'id', None)}",
         f"ユーザーID: {getattr(feedback, 'user_id', None)}",
         f"ブラウザ　: {v('user_agent')}",
-        f"受信日時　: {getattr(feedback, 'created_at', None)}",
+        f"受信日時　: {_fmt_jst(getattr(feedback, 'created_at', None))}",
     ])
 
     try:
         _send(subject, body)
-        logger.info("フィードバック通知メールを送信しました: id=%s", getattr(feedback, "id", None))
+        logger.info(
+            "フィードバック通知メールを送信しました: id=%s to=%s",
+            getattr(feedback, "id", None), _env("NOTIFY_EMAIL"),
+        )
     except Exception as e:
         logger.error("フィードバック通知メールの送信に失敗しました: %s", e, exc_info=True)
