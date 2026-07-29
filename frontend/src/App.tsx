@@ -17,9 +17,6 @@ import RppAnalysis from './pages/RppAnalysis'
 import Reports from './pages/Reports'
 import AccountSettings from './pages/AccountSettings'
 import ResetPassword from './pages/ResetPassword'
-import Tokushoho from './pages/legal/Tokushoho'
-import Privacy from './pages/legal/Privacy'
-import Terms from './pages/legal/Terms'
 import { supabase, authEnabled } from './lib/supabase'
 
 /**
@@ -27,6 +24,10 @@ import { supabase, authEnabled } from './lib/supabase'
  * 白くなるのを防ぐ。key に経路を渡すことで、ページを移動するとエラー状態が
  * 自動的にリセットされる（useLocation は BrowserRouter の内側でのみ使えるため
  * App 本体ではなくこの子コンポーネントに置いている）。
+ *
+ * 法的ページ（特商法・プライバシーポリシー・利用規約）はこのアプリ内には持たない。
+ * Stripeに登録しているビジネスウェブサイト（LP）側が正で、フッター等から
+ * 外部リンクで飛ばす（lib/links.ts 参照）。
  */
 function AppRoutes({ userEmail }: { userEmail: string | null }) {
   const location = useLocation()
@@ -49,75 +50,6 @@ function AppRoutes({ userEmail }: { userEmail: string | null }) {
 }
 
 const ONBOARDING_KEY = 'rakuten-kpi-onboarding-v1'
-
-interface ShellProps {
-  authReady: boolean
-  recovering: boolean
-  session: Session | null
-  showOnboarding: boolean
-  onCompleteOnboarding: () => void
-  onReopenOnboarding: () => void
-  onSignOut: () => void
-  onRecoveryDone: () => void
-}
-
-/**
- * 認証ゲート＋アプリ本体（サイドバー・各画面・フッター）。
- *
- * 法的ページ（/legal/*）はこのゲートの外側でルーティングしているため、
- * 未ログインでも閲覧できる（特商法は購入前の表示を求めており、Stripeの審査でも
- * 購入手続き前に到達できるURLであることが確認される）。
- */
-function Shell({
-  authReady,
-  recovering,
-  session,
-  showOnboarding,
-  onCompleteOnboarding,
-  onReopenOnboarding,
-  onSignOut,
-  onRecoveryDone,
-}: ShellProps) {
-  // 認証セッション確認中はローディング表示
-  if (!authReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50 text-sm text-gray-400">
-        読み込み中...
-      </div>
-    )
-  }
-  // パスワード再設定メールのリンク経由なら再設定画面を最優先で表示
-  if (recovering) {
-    return <ResetPassword onDone={onRecoveryDone} />
-  }
-  // 認証有効かつ未ログインならログイン画面
-  if (authEnabled && !session) {
-    return <Login />
-  }
-
-  return (
-    <>
-      <div className="flex h-screen overflow-hidden bg-gray-50">
-        <Sidebar
-          onOpenHelp={onReopenOnboarding}
-          userEmail={session?.user?.email ?? null}
-          onSignOut={onSignOut}
-        />
-        {/* main 自体はスクロールさせず、内側のラッパーをスクロール領域にする。
-            こうするとフッター（法的ページへのリンク）が常に画面下に残る。
-            各ページの `h-full` は flex-1 + min-h-0 の親に対して解決される。 */}
-        <main className="flex-1 overflow-hidden flex flex-col">
-          <div className="flex-1 min-h-0 overflow-auto flex flex-col">
-            <AppRoutes userEmail={session?.user?.email ?? null} />
-          </div>
-          <Footer />
-        </main>
-      </div>
-
-      {showOnboarding && <OnboardingModal onComplete={onCompleteOnboarding} />}
-    </>
-  )
-}
 
 export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
@@ -156,30 +88,37 @@ export default function App() {
 
   const signOut = () => { supabase?.auth.signOut() }
 
+  // 認証セッション確認中はローディング表示
+  if (!authReady) {
+    return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-sm text-gray-400">読み込み中...</div>
+  }
+  // パスワード再設定メールのリンク経由なら再設定画面を最優先で表示
+  if (recovering) {
+    return <ResetPassword onDone={() => setRecovering(false)} />
+  }
+  // 認証有効かつ未ログインならログイン画面
+  if (authEnabled && !session) {
+    return <Login />
+  }
+
   return (
     <BrowserRouter>
-      <Routes>
-        {/* 法的ページ: 認証ゲートより前に置き、未ログインでも閲覧できるようにする */}
-        <Route path="/legal/tokushoho" element={<Tokushoho />} />
-        <Route path="/legal/privacy" element={<Privacy />} />
-        <Route path="/legal/terms" element={<Terms />} />
-        {/* それ以外はすべてアプリ本体（内部で認証ゲート） */}
-        <Route
-          path="*"
-          element={
-            <Shell
-              authReady={authReady}
-              recovering={recovering}
-              session={session}
-              showOnboarding={showOnboarding}
-              onCompleteOnboarding={completeOnboarding}
-              onReopenOnboarding={reopenOnboarding}
-              onSignOut={signOut}
-              onRecoveryDone={() => setRecovering(false)}
-            />
-          }
-        />
-      </Routes>
+      <div className="flex h-screen overflow-hidden bg-gray-50">
+        <Sidebar onOpenHelp={reopenOnboarding} userEmail={session?.user?.email ?? null} onSignOut={signOut} />
+        {/* main 自体はスクロールさせず、内側のラッパーをスクロール領域にする。
+            こうするとフッター（法的ページへのリンク）が常に画面下に残る。
+            各ページの `h-full` は flex-1 + min-h-0 の親に対して解決される。 */}
+        <main className="flex-1 overflow-hidden flex flex-col">
+          <div className="flex-1 min-h-0 overflow-auto flex flex-col">
+            <AppRoutes userEmail={session?.user?.email ?? null} />
+          </div>
+          <Footer />
+        </main>
+      </div>
+
+      {showOnboarding && (
+        <OnboardingModal onComplete={completeOnboarding} />
+      )}
     </BrowserRouter>
   )
 }

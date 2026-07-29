@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
 import { LogIn, Loader2, Send } from 'lucide-react'
 import { supabase, googleLoginEnabled } from '../lib/supabase'
+import { LEGAL_LINKS, LP_BASE_URL, EXTERNAL_LINK_PROPS } from '../lib/links'
 
 type Mode = 'signin' | 'signup' | 'forgot'
 
@@ -205,12 +205,14 @@ export default function Login() {
         </div>
       </div>
 
-      {/* 法的ページへのリンク。登録前（購入前）に到達できる必要があるため、
-          ログイン画面にも置いておく。 */}
+      {/* サービス紹介と法的ページはLP側が正。ログイン画面しか見えない状態だと
+          サービス内容が分からないので、LPへの導線もここに置いておく
+          （Stripeの審査担当者がアプリURLから来た場合にも辿れるようにする）。 */}
       <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center mt-5 text-[11px] text-gray-400">
-        <Link to="/legal/tokushoho" className="hover:text-gray-600 hover:underline">特定商取引法に基づく表記</Link>
-        <Link to="/legal/privacy" className="hover:text-gray-600 hover:underline">プライバシーポリシー</Link>
-        <Link to="/legal/terms" className="hover:text-gray-600 hover:underline">利用規約</Link>
+        <a href={LP_BASE_URL} {...EXTERNAL_LINK_PROPS} className="hover:text-gray-600 hover:underline">サービス紹介</a>
+        <a href={LEGAL_LINKS.tokushoho} {...EXTERNAL_LINK_PROPS} className="hover:text-gray-600 hover:underline">特定商取引法に基づく表記</a>
+        <a href={LEGAL_LINKS.privacy} {...EXTERNAL_LINK_PROPS} className="hover:text-gray-600 hover:underline">プライバシーポリシー</a>
+        <a href={LEGAL_LINKS.terms} {...EXTERNAL_LINK_PROPS} className="hover:text-gray-600 hover:underline">利用規約</a>
       </div>
     </div>
   )

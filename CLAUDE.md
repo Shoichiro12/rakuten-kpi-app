@@ -136,8 +136,14 @@ CSVパースは `backend/routers/import_csv.py`。エンコーディング/ス�
 ### フロントエンド（`frontend/`）
 
 - `src/App.tsx` がルーティング（`/`=Dashboard, `/gap`=GapAnalysis, `/products`=ProductKPI, `/import`=DataImport, `/targets`=TargetSetting, `/rpp`=RppAnalysis）。
-- **法的ページ（`/legal/tokushoho`, `/legal/privacy`, `/legal/terms`）は認証ゲートの外側にルーティングしている。** `App.tsx` では `<Route path="*">` の中に認証チェック＋アプリ本体（`Shell`）を置き、`/legal/*` はその手前で解決する構造。特定商取引法は「購入前」の表示を求めており、Stripeの審査でも購入手続きに入る前から到達できるURLであることが確認されるため、**ログイン必須の場所に移さないこと。** 文面のプレースホルダーと公開前チェックは `docs/本番デプロイ_チェックリスト.md` を参照。
-- 価格（月額 ¥20,000税抜 / ¥22,000税込）の表示箇所は `backend/billing.py` の `PLAN_AMOUNT_LABEL`（＋診断が突き合わせる `PLAN_AMOUNT_JPY`＝税込22000 / `PLAN_AMOUNT_EXCL_TAX_JPY`＝税抜20000）・特商法ページ・利用規約 第3条の3箇所。改定時はStripeのpriceと合わせて全部直す。**総額表示義務があるので税込金額を主表記から外さない**（税抜のみの表示にしない。税抜・税込は同じ視認性で並列表示）。
+- **法的文書（特商法・プライバシーポリシー・利用規約）はこのアプリ内に持たない。** 正はLP（`https://ureshiru.vercel.app` = Stripeに「ビジネスウェブサイト」として登録しているサイト）側にあり、アプリからは `src/lib/links.ts` の `LEGAL_LINKS` を使って外部リンクで飛ばす（フッター・ログイン画面・`/billing` の申込ボタン付近）。
+  - **アプリ内に法的ページを作り直さないこと。** 一度アプリ側にも同じページを作ってしまい、価格改定でLP側と食い違う状態を招いた（LP: ¥19,800 / アプリ: ¥22,000）。文書が2箇所にあると必ずズレる。
+  - Stripeの審査担当者が見るのは**LP側**。特商法は「購入前」の表示を求めているが、購入導線（`/billing`）から外部リンクで到達できれば要件を満たせる。
+  - 独自ドメインへ移行する場合は `lib/links.ts` の `LP_BASE_URL` の1行を直す。
+- 価格（月額 ¥20,000税抜 / ¥22,000税込）の表示箇所は**アプリとLPにまたがる**。改定時は下記すべてとStripeのpriceを同時に直す。
+  - アプリ: `backend/billing.py` の `PLAN_AMOUNT_LABEL`（＋診断が突き合わせる `PLAN_AMOUNT_JPY`＝税込22000 / `PLAN_AMOUNT_EXCL_TAX_JPY`＝税抜20000 / `TAX_RATE`）
+  - **LP（別リポジトリ）**: 料金セクション、特商法の販売価格、利用規約の利用料金
+  - Stripe: price の `unit_amount`**総額表示義務があるので税込金額を主表記から外さない**（税抜のみの表示にしない。税抜・税込は同じ視認性で並列表示）。
 - **消費税は Stripe Tax（自動税計算）を使わない**（2026-07 に方針変更）。取引ごと0.5%の手数料がかかるため。代わりに次の2つを組み合わせる。
   - Price は【税込 ¥22,000】(`unit_amount=22000`・内税)で登録する。
   - **無料の「税率」(Tax rates)を手動で1つ作り**（10%・`inclusive=true`・日本）、Checkout の `subscription_data.default_tax_rates` に渡す（env `STRIPE_TAX_RATE_ID`）。これで請求書に「消費税 10% ¥2,000（内税）」の内訳が出る（総額は¥22,000のまま）。**適格請求書発行事業者として登録済みなので、顧客の仕入税額控除のために内訳が必要。** 登録番号(T+13桁)はStripeの請求書テンプレート側に設定する（コードでは扱わない）。

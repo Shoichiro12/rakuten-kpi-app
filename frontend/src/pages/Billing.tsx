@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
 import { CreditCard, Check, ExternalLink, Sparkles, AlertTriangle } from 'lucide-react'
+import { LEGAL_LINKS, EXTERNAL_LINK_PROPS } from '../lib/links'
 import Header from '../components/layout/Header'
 import ConsultingInquiryForm from '../components/ConsultingInquiryForm'
 import { api } from '../lib/api'
@@ -218,12 +218,13 @@ export default function Billing() {
                 {busy === 'checkout' ? '準備中…' : `${trialDays}日間の無料トライアルを始める`}
               </button>
               {/* 購入手続きに入る前に、価格・支払条件・解約条件へ到達できるようにする
-                  （特定商取引法の要請。Stripeの審査でも確認される） */}
+                  （特定商取引法の要請。Stripeの審査でも確認される）。
+                  リンク先はLP側。アプリ内に法的ページは持たない（lib/links.ts 参照） */}
               <p className="text-xs text-gray-500 mt-3">
                 お申し込みの前に{' '}
-                <Link to="/legal/tokushoho" className="text-blue-600 hover:underline">特定商取引法に基づく表記</Link>
+                <a href={LEGAL_LINKS.tokushoho} {...EXTERNAL_LINK_PROPS} className="text-blue-600 hover:underline">特定商取引法に基づく表記</a>
                 {' '}と{' '}
-                <Link to="/legal/terms" className="text-blue-600 hover:underline">利用規約</Link>
+                <a href={LEGAL_LINKS.terms} {...EXTERNAL_LINK_PROPS} className="text-blue-600 hover:underline">利用規約</a>
                 {' '}をご確認ください。
               </p>
               <p className="text-xs text-gray-400 mt-2">
