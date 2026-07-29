@@ -29,10 +29,9 @@
   "operatingSystem": "Web",
   "description": "楽天市場の売上・RPP広告KPIを管理・分析するWebアプリ。RMSのCSVを取り込むだけでROI・CPO・ROASを週次で自動監視します。",
   "offers": [
-    { "@type": "Offer", "name": "スタンダード", "price": "19800", "priceCurrency": "JPY" },
-    { "@type": "Offer", "name": "コンサルティング", "price": "100000", "priceCurrency": "JPY" }
+    { "@type": "Offer", "name": "ウレシル 月額プラン", "price": "22000", "priceCurrency": "JPY" }
   ],
-  "provider": { "@type": "Organization", "name": "JuneOne" }
+  "provider": { "@type": "Person", "name": "中村祥一郎" }
 }
 </script>
 
@@ -276,11 +275,14 @@
   <div class="wrap">
     <h2>料金プラン</h2>
     <p class="lead">初期費用なし。月単位で解約できます。</p>
+    <!-- 価格を変えるときは tokushoho.html・terms.html 第3条・下のJSON-LD・
+         アプリ側 backend/billing.py も合わせて直すこと（lp/README.md 参照）。
+         総額表示義務があるため税込金額を必ず併記する（税抜のみの表示にしない） -->
     <div class="plans">
-      <div class="plan hot">
-        <span class="badge">おすすめ</span>
-        <h3>スタンダード</h3>
-        <div class="price">¥19,800<small> /月（税込）</small></div>
+      <div class="plan hot" style="max-width:520px;margin:0 auto;">
+        <span class="badge">14日間無料トライアル</span>
+        <h3>ウレシル 月額プラン</h3>
+        <div class="price">¥20,000<small>（税抜）</small> / ¥22,000<small>（税込）/月</small></div>
         <ul>
           <li>ダッシュボード・GAP分析・全機能</li>
           <li>データ保存期間の上限なし</li>
@@ -290,20 +292,14 @@
         </ul>
         <a class="btn-primary js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">無料デモを予約</a>
       </div>
-      <div class="plan">
-        <h3>コンサルティング</h3>
-        <div class="price">¥100,000<small> /月（税込）</small></div>
-        <ul>
-          <li>スタンダードの全機能</li>
-          <li>月2回のKPIレビュー会（60分）</li>
-          <li>RPP入札・予算配分の改善提案</li>
-          <li>商品ページ改善のアドバイス</li>
-          <li>チャットで随時相談（優先対応）</li>
-        </ul>
-        <a class="btn-navy-outline js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">相談する</a>
-      </div>
     </div>
-    <p class="trial-note">どちらのプランも14日間の無料トライアル付き。いつでも解約できます。</p>
+    <p class="trial-note">14日間の無料トライアル付き。トライアル中の解約で料金はかかりません。</p>
+
+    <div style="max-width:640px;margin:40px auto 0;padding:24px 28px;background:#fff;border:1px solid #e2e8f0;border-radius:12px;text-align:center;">
+      <h3 style="margin:0 0 8px;">運用まで一緒にやってほしい方へ</h3>
+      <p style="margin:0 0 16px;color:#475569;font-size:14px;">ECコンサルティングは、店舗の規模・課題をお聞きしたうえで個別にお見積りします（¥150,000〜）。KPIレビュー会、RPP入札・予算配分の改善提案、商品ページ改善のアドバイスなど。</p>
+      <a class="btn-navy-outline" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%20EC%E3%82%B3%E3%83%B3%E3%82%B5%E3%83%AB%E3%81%AE%E3%81%94%E7%9B%B8%E8%AB%87">コンサルの相談をする</a>
+    </div>
   </div>
 </section>
 
@@ -351,7 +347,7 @@
     </div>
     <div class="footer-brand">
       <span class="logo-badge-invert">ウレシル<span class="dot">.</span></span>
-      <span>© 2026 JuneOne</span>
+      <span>© 2026 ウレシル</span>
     </div>
   </div>
 </footer>
