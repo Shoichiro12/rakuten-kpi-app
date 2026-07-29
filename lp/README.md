@@ -1,6 +1,6 @@
 # ウレシル LP（ランディングページ）
 
-`https://ureshiru.vercel.app` として公開している静的サイトのソース。
+`https://ureshiru.com`（Cloudflare Pages）として公開している静的サイトのソース。
 
 ## なぜここにあるか
 
@@ -60,16 +60,13 @@ lp/
 
 片方だけ直すと食い違う。改定時は必ず2ファイルとも直す。
 
-## デプロイ
+## デプロイ（2026-07-29 に Cloudflare Pages へ移行済み）
 
-**現在: Git連携なしの手動アップロード**（これが上記の事故の原因）。
+**`git push` するだけで自動デプロイされる。** 手動アップロードは不要。
 
-GitHub連携へ切り替える手順:
-
-1. Vercel → プロジェクト `ureshiru` → Settings → Git
-2. `Shoichiro12/rakuten-kpi-app` を接続
-3. **Root Directory を `lp` に設定**（リポジトリ直下ではなくこのフォルダを公開する）
-4. Framework Preset は "Other"（ビルド不要の静的サイト）
-5. 以降は `git push` で自動デプロイされる
-
-切り替えるまでは、このフォルダの中身をVercelにドラッグ＆ドロップして手動デプロイする。
+- ホスティング: Cloudflare Pages（プロジェクト名 `ureshiru-lp`、Root Directory=`lp`、ビルドなし）
+- 本番ドメイン: `https://ureshiru.com`（Cloudflare DNS・SSL自動）
+- プレビュー: `https://ureshiru-lp.pages.dev`
+- 拡張子なしURL（`/tokushoho` 等）はPagesが標準で解決する（vercel.json は不要になったため削除済み）
+- Vercel の旧プロジェクト（ureshiru.vercel.app）は Stripe審査完了までは残す。
+  審査完了後に Stripe の「ビジネスウェブサイト」を ureshiru.com へ変更し、Vercel側を削除する

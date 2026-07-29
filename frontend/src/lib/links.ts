@@ -13,9 +13,9 @@
  * 外部リンクで要件を満たせる（/billing の申込ボタン付近にリンクを置いている）。
  *
  * 独自ドメインへ移行したら LP_BASE_URL の1行だけ直せばよい。
- * LPは静的HTMLサイトで、Vercelが拡張子なしのパスも解決する。
+ * LPは静的HTMLサイト（Cloudflare Pages）で、拡張子なしのパスも解決される。
  */
-export const LP_BASE_URL = 'https://ureshiru.vercel.app'
+export const LP_BASE_URL = 'https://ureshiru.com'
 
 export const LEGAL_LINKS = {
   tokushoho: `${LP_BASE_URL}/tokushoho`,
