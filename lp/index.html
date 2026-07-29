@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ウレシル | 楽天市場の売上・RPP広告KPI管理ツール</title>
+<meta name="description" content="楽天RMSのCSVを貼り付けるだけ。売上をアクセス×転換率×客単価に分解し、RPP広告のROI・CPO・ROASを自動で監視。利益を削っている商品を自動アラートするKPI管理ツール。">
+<link rel="canonical" href="./">
+
+<!-- OGP（ドメイン確定後、https://ureshiru.com を実URLに置換してください） -->
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="ウレシル">
+<meta property="og:title" content="ウレシル | 楽天市場の売上・RPP広告KPI管理ツール">
+<meta property="og:description" content="RMSのCSVを貼り付けるだけ。ROI・CPO・ROASを毎週監視し、利益を削っている商品を自動でアラートします。">
+<meta property="og:url" content="https://ureshiru.vercel.app/">
+<meta property="og:image" content="https://ureshiru.vercel.app/screenshot-1784278207302-65ff3047.jpg">
+<meta property="og:locale" content="ja_JP">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=&#39;http://www.w3.org/2000/svg&#39; viewBox=&#39;0 0 64 64&#39;%3E%3Crect width=&#39;64&#39; height=&#39;64&#39; rx=&#39;14&#39; fill=&#39;%2316324f&#39;/%3E%3Ctext x=&#39;30&#39; y=&#39;44&#39; font-size=&#39;32&#39; font-family=&#39;sans-serif&#39; font-weight=&#39;bold&#39; fill=&#39;%23ffffff&#39; text-anchor=&#39;middle&#39;%3E%E3%82%A6%3C/text%3E%3Ccircle cx=&#39;53&#39; cy=&#39;47&#39; r=&#39;5&#39; fill=&#39;%23e8443a&#39;/%3E%3C/svg%3E">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  "name": "ウレシル",
+  "applicationCategory": "BusinessApplication",
+  "operatingSystem": "Web",
+  "description": "楽天市場の売上・RPP広告KPIを管理・分析するWebアプリ。RMSのCSVを取り込むだけでROI・CPO・ROASを週次で自動監視します。",
+  "offers": [
+    { "@type": "Offer", "name": "スタンダード", "price": "19800", "priceCurrency": "JPY" },
+    { "@type": "Offer", "name": "コンサルティング", "price": "100000", "priceCurrency": "JPY" }
+  ],
+  "provider": { "@type": "Organization", "name": "JuneOne" }
+}
+</script>
+
+<style>
+  :root {
+    --navy: #16324f;
+    --navy-dark: #0e2136;
+    --accent: #e8443a;
+    --accent-soft: #fdecea;
+    --gold: #ffd166;
+    --green: #1e9e6a;
+    --bg-alt: #f5f7fa;
+    --text: #22303e;
+    --text-strong: #475569;
+    --muted: #64748b;
+    --border: #e2e8f0;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif; color: var(--text); background: #fff; line-height: 1.75; }
+  a { color: var(--navy); }
+  a:hover { color: var(--accent); }
+  img { max-width: 100%; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  h2 { font-size: clamp(26px, 3vw, 36px); text-align: center; margin: 0 0 14px; color: var(--navy); font-weight: 800; letter-spacing: -0.01em; }
+  .lead { text-align: center; color: var(--muted); margin: 0 0 56px; font-size: 16px; }
+  section { padding: 110px 0; }
+  .skip { position: absolute; left: -9999px; }
+  .skip:focus { left: 12px; top: 12px; background: #fff; padding: 10px 16px; border-radius: 8px; z-index: 100; }
+
+  .btn-primary { display: inline-block; background: var(--accent); color: #fff; text-decoration: none; font-weight: 700; border-radius: 12px; box-shadow: 0 4px 14px rgba(232,68,58,.35); }
+  .btn-primary:hover { opacity: .88; color: #fff; }
+
+  header { position: sticky; top: 0; background: rgba(255,255,255,.92); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border); z-index: 10; }
+  .nav { display: flex; align-items: center; justify-content: space-between; height: 72px; }
+  .logo-badge { background: var(--navy); color: #fff; font-weight: 900; font-size: 18px; padding: 7px 16px; border-radius: 10px; letter-spacing: -0.01em; text-decoration: none; }
+  .logo-badge .dot { color: var(--accent); }
+  .nav nav { display: flex; align-items: center; gap: 28px; }
+  .nav a.menu { color: var(--text); text-decoration: none; font-size: 14px; }
+  .nav a.menu:hover { color: var(--accent); }
+  .nav .btn-primary { font-size: 14px; padding: 10px 24px; border-radius: 10px; box-shadow: 0 4px 14px rgba(232,68,58,.3); }
+
+  .hero { background: linear-gradient(160deg, var(--navy) 0%, var(--navy-dark) 100%); color: #fff; padding: 120px 0 128px; }
+  .hero .wrap { display: flex; gap: 64px; align-items: center; flex-wrap: wrap; }
+  .hero-copy { flex: 1 1 460px; }
+  .hero h1 { font-size: clamp(32px, 4.2vw, 52px); line-height: 1.35; margin: 0 0 24px; font-weight: 800; letter-spacing: -0.01em; }
+  .hero h1 em { font-style: normal; color: var(--gold); }
+  .hero-copy > p { color: #cbd5e1; margin: 0 0 36px; font-size: 17px; max-width: 34em; }
+  .hero-cta { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
+  .hero .btn-primary { font-size: 17px; padding: 16px 40px; box-shadow: 0 6px 20px rgba(232,68,58,.4); }
+  .btn-outline { border: 2px solid #fff; color: #fff; text-decoration: none; font-weight: 700; font-size: 16px; padding: 14px 34px; border-radius: 12px; }
+  .btn-outline:hover { background: rgba(255,255,255,.1); color: #fff; }
+  .hero-note { font-size: 13px; color: #94a3b8; margin: 16px 0 0; }
+  .hero-visual { flex: 1 1 400px; }
+
+  .mock { background: #fff; border-radius: 16px; padding: 22px; box-shadow: 0 24px 70px rgba(0,0,0,.4); color: var(--text); }
+  .mock-title { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 12px; }
+  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+  .kpi { background: var(--bg-alt); border-radius: 10px; padding: 12px; }
+  .kpi .k { font-size: 11px; color: var(--muted); }
+  .kpi .v { font-size: 20px; font-weight: 800; }
+  .kpi .up { color: var(--green); font-size: 11px; }
+  .kpi .down { color: var(--accent); font-size: 11px; }
+  .bars { display: flex; align-items: flex-end; gap: 7px; height: 100px; padding: 10px; background: var(--bg-alt); border-radius: 10px; }
+  .bars div { flex: 1; background: var(--navy); border-radius: 3px 3px 0 0; }
+  .bars div.hot { background: var(--accent); }
+  .alert { margin-top: 14px; background: var(--accent-soft); border-left: 4px solid var(--accent); font-size: 12px; padding: 10px 12px; border-radius: 6px; }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 28px; }
+  .card { background: #fff; border: 1px solid var(--border); border-radius: 14px; padding: 36px 32px; }
+  .card h3 { font-size: 19px; margin: 0 0 12px; color: var(--navy); }
+  .card p { font-size: 14px; color: var(--muted); margin: 0; text-wrap: pretty; }
+  .num { display: inline-flex; width: 38px; height: 38px; border-radius: 50%; background: var(--navy); color: #fff; align-items: center; justify-content: center; font-weight: 700; margin-bottom: 16px; }
+  .bg-alt { background: var(--bg-alt); }
+
+  #features .lead { margin-bottom: 72px; }
+  .feature { display: flex; gap: 56px; align-items: center; margin-bottom: 88px; flex-wrap: wrap; }
+  .feature.reverse { flex-direction: row-reverse; }
+  .feature:last-child { margin-bottom: 0; }
+  .feature > div { flex: 1 1 400px; }
+  .tag { display: inline-block; background: var(--accent-soft); color: var(--accent); font-size: 12px; font-weight: 700; padding: 5px 14px; border-radius: 999px; margin-bottom: 14px; }
+  .feature h3 { font-size: 26px; color: var(--navy); margin: 0 0 14px; font-weight: 800; line-height: 1.4; }
+  .feature p { margin: 0; color: var(--text-strong); font-size: 15px; text-wrap: pretty; }
+  .shot img { width: 100%; height: auto; display: block; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 12px 32px rgba(22,50,79,.12); }
+
+  .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 28px; max-width: 760px; margin: 0 auto; }
+  .plan { background: #fff; border: 1px solid var(--border); border-radius: 16px; padding: 44px 32px; text-align: center; position: relative; }
+  .plan.hot { border: 2px solid var(--accent); }
+  .plan .badge { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: var(--accent); color: #fff; font-size: 12px; font-weight: 700; padding: 5px 18px; border-radius: 999px; }
+  .plan h3 { color: var(--navy); margin: 0 0 10px; font-size: 20px; }
+  .price { font-size: 44px; font-weight: 800; color: var(--navy); }
+  .price small { font-size: 14px; font-weight: 400; color: var(--muted); }
+  .plan ul { list-style: none; text-align: left; margin: 24px 0 32px; padding: 0; font-size: 14px; display: grid; gap: 4px; }
+  .plan li { padding: 4px 0 4px 26px; position: relative; }
+  .plan li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: 700; }
+  .plan .btn-primary { font-size: 16px; padding: 14px 36px; }
+  .btn-navy-outline { display: inline-block; border: 2px solid var(--navy); color: var(--navy); text-decoration: none; font-weight: 700; font-size: 16px; padding: 12px 34px; border-radius: 12px; }
+  .btn-navy-outline:hover { background: var(--navy); color: #fff; }
+  .trial-note { text-align: center; margin: 28px 0 0; color: var(--muted); font-size: 14px; }
+
+  .faq-list { display: grid; gap: 14px; max-width: 780px; margin: 0 auto; }
+  details { background: #fff; border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; }
+  summary { font-weight: 700; cursor: pointer; color: var(--navy); }
+  details p { margin: 12px 0 0; font-size: 14px; color: var(--muted); }
+
+  .cta { background: var(--navy); color: #fff; text-align: center; }
+  .cta h2 { color: #fff; font-size: clamp(26px, 3vw, 38px); margin: 0 0 16px; }
+  .cta p { color: #cbd5e1; margin: 0 0 36px; font-size: 16px; }
+  .cta .btn-primary { font-size: 17px; padding: 16px 44px; box-shadow: 0 6px 20px rgba(232,68,58,.4); }
+  footer { background: var(--navy-dark); color: #94a3b8; font-size: 13px; padding: 44px 0; }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; align-items: center; }
+  footer .links { display: flex; gap: 24px; flex-wrap: wrap; }
+  footer a { color: #cbd5e1; text-decoration: none; }
+  footer a:hover { color: #fff; }
+  .footer-brand { display: flex; align-items: center; gap: 12px; }
+  .logo-badge-invert { background: #fff; color: var(--navy); font-weight: 900; font-size: 13px; padding: 4px 12px; border-radius: 8px; }
+  .logo-badge-invert .dot { color: var(--accent); }
+
+  @media (max-width: 640px) {
+    section { padding: 64px 0; }
+    .hero { padding: 80px 0 88px; }
+    .nav a.menu { display: none; }
+    .feature { gap: 32px; margin-bottom: 56px; }
+  }
+</style>
+</head>
+<body>
+
+<a class="skip" href="#main">本文へスキップ</a>
+
+<header>
+  <div class="wrap nav">
+    <a class="logo-badge" href="./">ウレシル<span class="dot">.</span></a>
+    <nav>
+      <a class="menu" href="#features">機能</a>
+      <a class="menu" href="#pricing">料金</a>
+      <a class="menu" href="#faq">FAQ</a>
+      <a class="btn-primary js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">無料デモを予約</a>
+    </nav>
+  </div>
+</header>
+
+<main id="main">
+
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-copy">
+      <h1>楽天の売上とRPP広告、<br>その分析<em>まだExcelでやりますか？</em></h1>
+      <p>RMSのCSVを貼り付けるだけ。売上を「アクセス × 転換率 × 客単価」に自動分解し、ROI・CPO・ROASを毎週監視。利益を削っている商品を自動でアラートします。</p>
+      <div class="hero-cta">
+        <a class="btn-primary js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">無料デモを予約する</a>
+        <a class="btn-outline" href="#pricing">料金を見る</a>
+      </div>
+      <p class="hero-note">クレジットカード不要・14日間無料トライアルあり</p>
+    </div>
+    <div class="hero-visual">
+      <div class="mock">
+        <div class="mock-title">ダッシュボード | 2026年7月 第2週</div>
+        <div class="kpis">
+          <div class="kpi"><div class="k">売上（KGI達成率）</div><div class="v">82%</div><div class="up">▲ 前週比 +6pt</div></div>
+          <div class="kpi"><div class="k">ROI</div><div class="v">124%</div><div class="up">▲ +11pt</div></div>
+          <div class="kpi"><div class="k">CPO</div><div class="v">¥812</div><div class="down">▼ Limit CPO超過 2商品</div></div>
+        </div>
+        <div class="bars">
+          <div style="height:45%"></div><div style="height:60%"></div><div style="height:52%"></div>
+          <div style="height:70%"></div><div class="hot" style="height:38%"></div><div style="height:78%"></div>
+          <div style="height:88%"></div>
+        </div>
+        <div class="alert js-hero-alert">⚠ 「商品A-102」CTR 0.8%（1%未満）。サムネイル改善を推奨</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>こんな運用、していませんか？</h2>
+    <p class="lead">RPPを回している店舗ほど、数字の管理が追いつかなくなります。</p>
+    <div class="cards">
+      <div class="card">
+        <h3>毎週のCSV集計に2時間</h3>
+        <p>RPPレポートと商品分析CSVをExcelに貼り付けて関数を直して…。集計するだけで施策を考える時間がなくなっていませんか。</p>
+      </div>
+      <div class="card">
+        <h3>ROASは見てるが利益は不明</h3>
+        <p>ROASが良くても、原価と経費を引いたら赤字の商品は珍しくありません。広告費がLimit CPOを超えた瞬間に気づけていますか。</p>
+      </div>
+      <div class="card">
+        <h3>どの商品から直すべきか勘頼み</h3>
+        <p>売上が落ちた原因はアクセスか、転換率か、客単価か。ショップ全体→ジャンル→商品と順に絞り込まないと、打ち手を外します。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="bg-alt" id="features">
+  <div class="wrap">
+    <h2>ウレシルができること</h2>
+    <p class="lead">広告運用コンサルのKPI管理手法を、そのままツールにしました。</p>
+
+    <div class="feature">
+      <div>
+        <span class="tag">ダッシュボード</span>
+        <h3>ROI・CPO・ROASを週次で自動監視</h3>
+        <p>売上目標に対する達成率、前週比・前月比・前年同月比をひと目で確認。CPOがLimit CPO（限界注文獲得単価）を超えたら自動で警告するので、「気づいたら広告で利益が溶けていた」を防ぎます。</p>
+      </div>
+      <div class="shot"><img src="screenshot-1784278207302-65ff3047.jpg" alt="ウレシルのダッシュボード画面。KGI達成率と主要KPIを週次で表示" loading="lazy" decoding="async"></div>
+    </div>
+
+    <div class="feature reverse">
+      <div>
+        <span class="tag">GAP分析</span>
+        <h3>売上ダウンの原因を3クリックで特定</h3>
+        <p>売上を「アクセス × 転換率 × 客単価」に分解し、ショップ全体→ジャンル→商品の3階層でドリルダウン。課題のある階層を自動でハイライトするので、直すべき商品がすぐ分かります。</p>
+      </div>
+      <div class="shot"><img src="screenshot-1784278186077-f60ca64b.jpg" alt="ウレシルのGAP分析画面。KGIとKPIを比較するロジックツリー" loading="lazy" decoding="async"></div>
+    </div>
+
+    <div class="feature">
+      <div>
+        <span class="tag">かんたん導入</span>
+        <h3>RMSのCSVを貼り付けるだけ</h3>
+        <p>RPP週次レポートと月次商品分析データをコピペするだけで取り込み完了。API連携の申請も、面倒な初期設定も不要。今日から使えます。</p>
+      </div>
+      <div class="shot"><img src="screenshot-1784278093156-e5f46359.jpg" alt="ウレシルのデータ取込み画面。CSVをドラッグ＆ドロップで取り込む" loading="lazy" decoding="async"></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2 style="margin-bottom:56px;">導入はかんたん3ステップ</h2>
+    <div class="cards">
+      <div class="card"><span class="num">1</span><h3>無料デモ（30分）</h3><p>あなたの店舗の実データを使って、画面を見ながらご説明します。</p></div>
+      <div class="card"><span class="num">2</span><h3>14日間無料トライアル</h3><p>CSVを取り込んで実際に運用。クレジットカード登録は不要です。</p></div>
+      <div class="card"><span class="num">3</span><h3>有料プランへ移行</h3><p>継続する場合のみお支払い。月単位でいつでも解約できます。</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="bg-alt" id="pricing">
+  <div class="wrap">
+    <h2>料金プラン</h2>
+    <p class="lead">初期費用なし。月単位で解約できます。</p>
+    <div class="plans">
+      <div class="plan hot">
+        <span class="badge">おすすめ</span>
+        <h3>スタンダード</h3>
+        <div class="price">¥19,800<small> /月（税込）</small></div>
+        <ul>
+          <li>ダッシュボード・GAP分析・全機能</li>
+          <li>データ保存期間の上限なし</li>
+          <li>1店舗・ユーザー数無制限</li>
+          <li>週次アラート通知</li>
+          <li>メール・チャットサポート</li>
+        </ul>
+        <a class="btn-primary js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">無料デモを予約</a>
+      </div>
+      <div class="plan">
+        <h3>コンサルティング</h3>
+        <div class="price">¥100,000<small> /月（税込）</small></div>
+        <ul>
+          <li>スタンダードの全機能</li>
+          <li>月2回のKPIレビュー会（60分）</li>
+          <li>RPP入札・予算配分の改善提案</li>
+          <li>商品ページ改善のアドバイス</li>
+          <li>チャットで随時相談（優先対応）</li>
+        </ul>
+        <a class="btn-navy-outline js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">相談する</a>
+      </div>
+    </div>
+    <p class="trial-note">どちらのプランも14日間の無料トライアル付き。いつでも解約できます。</p>
+  </div>
+</section>
+
+<section id="faq">
+  <div class="wrap">
+    <h2 style="margin-bottom:48px;">よくある質問</h2>
+    <div class="faq-list">
+      <details>
+        <summary>楽天RMSとのAPI連携は必要ですか？</summary>
+        <p>不要です。RMSからダウンロードできるRPP週次レポートと商品分析CSVを貼り付けるだけで利用できます。</p>
+      </details>
+      <details>
+        <summary>複数店舗を運営していますが使えますか？</summary>
+        <p>現在は1契約1店舗です。複数店舗をご希望の場合はお問い合わせください。</p>
+      </details>
+      <details>
+        <summary>解約はいつでもできますか？</summary>
+        <p>はい、月単位でいつでも解約できます。最低契約期間はありません。</p>
+      </details>
+      <details>
+        <summary>データの安全性は？</summary>
+        <p>お預かりしたデータは暗号化して保管し、第三者に提供することはありません。詳細は<a href="privacy.html">プライバシーポリシー</a>をご覧ください。</p>
+      </details>
+    </div>
+  </div>
+</section>
+
+<section class="cta" id="cta">
+  <div class="wrap">
+    <h2>まずは30分の無料デモから</h2>
+    <p>あなたの店舗のCSVを使って、その場でKPIを可視化してお見せします。</p>
+    <a class="btn-primary js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">無料デモを予約する</a>
+  </div>
+</section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="links">
+      <a href="tokushoho.html">特定商取引法に基づく表記</a>
+      <a href="privacy.html">プライバシーポリシー</a>
+      <a href="terms.html">利用規約</a>
+      <a href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E3%81%AB%E3%81%A4%E3%81%84%E3%81%A6%E3%81%AE%E3%81%8A%E5%95%8F%E3%81%84%E5%90%88%E3%82%8F%E3%81%9B">お問い合わせ</a>
+    </div>
+    <div class="footer-brand">
+      <span class="logo-badge-invert">ウレシル<span class="dot">.</span></span>
+      <span>© 2026 JuneOne</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // ===== CONFIG =====
+  // デモ予約ページ（Googleカレンダー予約ページ等）のURLを入れると全CTAが差し替わります。
+  // 空のままならメール（mailto）にフォールバックします。
+  const CONFIG = {
+    bookingUrl: "",
+    showHeroAlert: true
+  };
+
+  const ctaHref = CONFIG.bookingUrl || "mailto:shoichiro.nakamura.0601@gmail.com?subject=ウレシル無料デモ希望";
+  document.querySelectorAll('.js-booking').forEach(function (a) {
+    a.href = ctaHref;
+    if (CONFIG.bookingUrl) { a.target = '_blank'; a.rel = 'noopener'; }
+  });
+  if (!CONFIG.showHeroAlert) {
+    var el = document.querySelector('.js-hero-alert');
+    if (el) el.style.display = 'none';
+  }
+</script>
+
+
+
+</body></html>
