@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { maskEmail } from '../../lib/utils'
+import { HELP_URL, EXTERNAL_LINK_PROPS } from '../../lib/links'
 import {
   LayoutDashboard,
   TrendingUp,
@@ -7,6 +8,7 @@ import {
   Upload,
   Target,
   HelpCircle,
+  BookOpen,
   Megaphone,
   MessageSquarePlus,
   FileDown,
@@ -14,6 +16,7 @@ import {
   CreditCard,
   LogOut,
   UserCircle,
+  ExternalLink,
 } from 'lucide-react'
 
 const nav = [
@@ -83,6 +86,16 @@ export default function Sidebar({ onOpenHelp, onOpenFeedback, userEmail, onSignO
           <HelpCircle size={16} />
           使い方ガイド
         </button>
+        {/* 詳細マニュアルはLP側のヘルプページが正（lib/links.ts 参照） */}
+        <a
+          href={HELP_URL}
+          {...EXTERNAL_LINK_PROPS}
+          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+        >
+          <BookOpen size={16} />
+          <span className="flex-1">ヘルプページ</span>
+          <ExternalLink size={12} className="text-gray-600" />
+        </a>
         <button
           onClick={onOpenFeedback}
           className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"

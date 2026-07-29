@@ -23,6 +23,12 @@ export const LEGAL_LINKS = {
   terms: `${LP_BASE_URL}/terms`,
 } as const
 
+/**
+ * ヘルプ・使い方ガイド。法的文書と同じ理由でLP側に正を置き、
+ * アプリからは外部リンクで飛ばす（アプリ内に複製ページを作らないこと）。
+ */
+export const HELP_URL = `${LP_BASE_URL}/help`
+
 /** 外部リンクを開くときの共通属性（タブ乗っ取り対策込み）。 */
 export const EXTERNAL_LINK_PROPS = {
   target: '_blank',

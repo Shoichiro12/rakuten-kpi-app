@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ヘルプ・使い方ガイド | ウレシル</title>
+<meta name="description" content="楽天市場向け売上・広告KPI管理サービス「ウレシル」の使い方ガイド。初期セットアップ、楽天RMSからのCSV入手方法、各画面の使い方、KPI用語集、よくある質問。">
+<link rel="stylesheet" href="style.css">
+<style>
+  /* このページ専用の軽い追加スタイル（style.css を上書きしない） */
+  .toc { background: var(--bg-alt); border: 1px solid var(--border); border-radius: 12px; padding: 20px 24px; margin: 0 0 8px; }
+  .toc p { margin: 0 0 8px; font-weight: 700; color: var(--navy); }
+  .toc ol { margin: 0; padding-left: 20px; }
+  .toc li { margin: 2px 0; }
+  .steps { counter-reset: step; list-style: none; padding: 0; margin: 16px 0; }
+  .steps li { position: relative; padding: 14px 16px 14px 52px; border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px; }
+  .steps li::before { counter-increment: step; content: counter(step); position: absolute; left: 14px; top: 14px; width: 26px; height: 26px; border-radius: 50%; background: var(--navy); color: #fff; font-weight: 800; font-size: 13px; display: flex; align-items: center; justify-content: center; }
+  .steps b { color: var(--navy); }
+  .note { background: #fff8e6; border: 1px solid #f2dfa8; color: #8a6100; border-radius: 10px; padding: 12px 16px; font-size: 13.5px; margin: 12px 0; }
+  .formula { background: var(--bg-alt); border-radius: 10px; padding: 14px 18px; font-weight: 700; color: var(--navy); text-align: center; margin: 12px 0; }
+  th.narrow { width: 18%; }
+  details { border: 1px solid var(--border); border-radius: 10px; padding: 12px 16px; margin-bottom: 10px; }
+  details summary { cursor: pointer; font-weight: 700; color: var(--navy); font-size: 14.5px; }
+  details p { margin: 10px 0 2px; }
+  .table-scroll { overflow-x: auto; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="nav">
+    <a class="logo-badge" href="./">ウレシル<span class="dot">.</span></a>
+    <a class="back" href="./">← トップに戻る</a>
+  </div>
+</header>
+
+<main>
+  <div class="wrap">
+    <h1>ヘルプ・使い方ガイド</h1>
+    <p class="updated">最終更新：2026年7月29日</p>
+
+    <div class="toc">
+      <p>目次</p>
+      <ol>
+        <li><a href="#quickstart">まず3分で試す（サンプルデータ）</a></li>
+        <li><a href="#concept">基本の考え方（KGIとKPI）</a></li>
+        <li><a href="#setup">実データでの初期セットアップ</a></li>
+        <li><a href="#csv">楽天RMSからのCSV入手方法</a></li>
+        <li><a href="#screens">画面ガイド</a></li>
+        <li><a href="#glossary">KPI用語集</a></li>
+        <li><a href="#alerts">⚠️改善アラートの見方</a></li>
+        <li><a href="#faq">よくある質問</a></li>
+        <li><a href="#contact">お問い合わせ</a></li>
+      </ol>
+    </div>
+
+    <h2 id="quickstart">1. まず3分で試す（サンプルデータ）</h2>
+    <p>実データがなくても、サンプルデータで全機能を体験できます。あとから実データに差し替え可能です。</p>
+    <ol class="steps">
+      <li><b>「データ取込み」画面を開く</b><br>左サイドバーの「データ取込み」から「サンプルを生成」ボタンを押します。スポーツ用品ショップを想定した10商品×8週間分のデータが作成されます。</li>
+      <li><b>ダッシュボードを見る</b><br>KPIサマリ・目標達成率・⚠️アラート・「今日やるべきこと」が表示されます。右上で週次/月次を切り替えられます。</li>
+      <li><b>GAP分析を試す</b><br>ショップ全体 → ジャンル → 商品の3ステップで、どこに課題があるかを絞り込めます。</li>
+    </ol>
+
+    <h2 id="concept">2. 基本の考え方（KGIとKPI）</h2>
+    <p>ウレシルは「数字を眺める」ためではなく「次に何をすべきか決める」ためのツールです。売上目標（KGI）を3つのKPIに分解して考えます。</p>
+    <div class="formula">売上（KGI）＝ アクセス × 転換率（CVR） × 客単価</div>
+    <p>売上が目標に届かないとき、この3要素のどれが弱いのかを特定すれば、打ち手が決まります。</p>
+    <ul>
+      <li><b>アクセスが弱い</b> → 広告強化・検索対策・商品露出の改善</li>
+      <li><b>転換率が弱い</b> → 商品ページの訴求力・価格・レビューの改善</li>
+      <li><b>客単価が弱い</b> → セット販売・アップセル・価格構成の見直し</li>
+    </ul>
+    <p>分析は「ショップ全体 → ジャンル別 → 商品別」の順に大きい単位から絞り込みます。GAP分析画面はこの順序に沿って作られています。</p>
+
+    <h2 id="setup">3. 実データでの初期セットアップ</h2>
+    <ol class="steps">
+      <li><b>楽天RMSからCSVを2種類ダウンロード</b><br>「RPP広告レポート（週次）」と「商品分析レポート（月次）」。入手方法は<a href="#csv">次のセクション</a>を参照。</li>
+      <li><b>「データ取込み」画面でドラッグ&ドロップ</b><br>RMSのCSVはそのままでOK。列名の変更・ヘッダー削除は不要で、文字コードも自動判別されます。</li>
+      <li><b>「商品マスタ・原価」で原価を入力</b><br>商品ごとの売上原価を入れると、利益（Rev）・ROI・Limit CPOが正しく計算されます。未入力でも売上系KPIは見られます。</li>
+      <li><b>「目標設定」でKGIと目標値を設定</b><br>月次売上目標・アクセス/CVR/客単価の目標・経費率（既定15%）を設定すると、達成率とGAPが表示されます。</li>
+    </ol>
+    <div class="note">週次データは毎週、月次データは毎月取り込むと、トレンドや前週比・前月比が自動で更新されます。</div>
+
+    <h2 id="csv">4. 楽天RMSからのCSV入手方法</h2>
+
+    <h3>① RPP広告レポート（週次）</h3>
+    <p>広告費・ROAS・CPOなど広告KPIの元データです。</p>
+    <ol>
+      <li>RMS →「広告・アフィリエイト」→ RPP を開く</li>
+      <li>レポートダウンロードを選択</li>
+      <li>対象期間（週／月）を指定してCSVを書き出す</li>
+      <li>ウレシルの「データ取込み」画面の枠にドラッグ&ドロップ</li>
+    </ol>
+
+    <h3>② 商品分析レポート（月次）</h3>
+    <p>アクセス・CVR・在庫など商品別実績の元データです。</p>
+    <ol>
+      <li>RMS →「データ分析」→ 商品分析 を開く</li>
+      <li>対象月を指定してCSVダウンロード</li>
+      <li>ファイルはそのままでOK（先頭のヘッダー行は自動スキップ）</li>
+      <li>「データ取込み」画面の枠にドラッグ&ドロップ</li>
+    </ol>
+
+    <div class="note">CSVは編集せず、RMSからダウンロードしたままのファイルを取り込んでください。手を加えると列の判別に失敗することがあります。取込みに失敗した場合のエラーメッセージには原因（対象ファイルの種類・行数など）が表示されます。</div>
+
+    <h2 id="screens">5. 画面ガイド</h2>
+    <div class="table-scroll">
+      <table>
+        <tr><th class="narrow">画面</th><td>できること</td></tr>
+        <tr><th>ダッシュボード</th><td>週次・月次のKPIサマリ、目標達成率、前週比・前月比、⚠️改善アラート、「今日やるべきこと」の提案を確認する起点画面。</td></tr>
+        <tr><th>GAP分析</th><td>ショップ全体 → ジャンル別 → 商品別の3ステップで課題を絞り込み、KGIロジックツリーと改善アクションにつなげる。</td></tr>
+        <tr><th>商品別KPI</th><td>商品ごとの売上・広告費・CV・CVR・ROAS・利益の一覧。CPOがLimit CPOを超えた商品には警告が表示される。</td></tr>
+        <tr><th>RPP広告実績</th><td>取り込んだRPP広告データを週次・月次で閲覧。広告の診断パネルつき。</td></tr>
+        <tr><th>データ取込み</th><td>RMSのCSVをドラッグ&ドロップで取込み。サンプルデータ生成、取込み済み期間の確認・削除もここから。</td></tr>
+        <tr><th>商品マスタ・原価</th><td>商品ごとの売上原価・カテゴリを管理。利益系KPI（Rev・ROI・Limit CPO）の計算に使われる。</td></tr>
+        <tr><th>目標設定</th><td>KGI（月次売上目標）、KPI目標値（アクセス・CVR・客単価）、経費率を月別に設定。</td></tr>
+        <tr><th>レポート出力</th><td>集計済みKPIをCSVでダウンロード。経営者・マネージャーへの共有用。</td></tr>
+        <tr><th>請求・プラン</th><td>ご契約状況の確認、お支払い方法の変更、解約手続き。</td></tr>
+        <tr><th>アカウント設定</th><td>メールアドレス・パスワードの変更、退会。</td></tr>
+      </table>
+    </div>
+
+    <h2 id="glossary">6. KPI用語集</h2>
+    <p>アプリ内の各指標の横にある「?」アイコンからも同じ説明を確認できます。</p>
+    <div class="table-scroll">
+      <table>
+        <tr><th class="narrow">指標</th><td><b>計算式</b>／意味・目安</td></tr>
+        <tr><th>Rev（利益残）</th><td><b>GP −（広告費 + 店舗運営経費）</b>／実際の営業利益。マイナスは赤字。目標：プラス維持。</td></tr>
+        <tr><th>GP（売上総利益）</th><td><b>RPP売上 − 売上原価</b>／売上から原価を引いた粗利益。広告費・経費の原資。</td></tr>
+        <tr><th>GPR（粗利率）</th><td><b>GP ÷ RPP売上 × 100</b>／売上に占める粗利の割合。目標：40%以上。</td></tr>
+        <tr><th>ROI</th><td><b>GP ÷ 広告費 × 100</b>／広告費に対する利益の比率。100%以上で広告投資が黒字。目標：200%以上。</td></tr>
+        <tr><th>ROAS</th><td><b>RPP売上 ÷ 広告費 × 100</b>／広告費1円あたり何円の売上を生んだか。目標：300%以上。</td></tr>
+        <tr><th>CPO</th><td><b>広告費 ÷ 注文件数</b>／1注文の獲得にかかった広告費。低いほど効率的。Limit CPO以下を維持。</td></tr>
+        <tr><th>Limit CPO</th><td><b>GP ÷ 注文件数</b>／CPOがこの値を超えると利益が出ない上限値。</td></tr>
+        <tr><th>CVR（転換率）</th><td><b>注文件数 ÷ クリック数 × 100</b>／クリックした人が購入に至った割合。商品ページの訴求力を示す。目標：1〜3%。</td></tr>
+        <tr><th>CTR</th><td><b>クリック数 ÷ 広告表示回数 × 100</b>／広告が表示された中でクリックされた割合。タイトル・画像の魅力を示す。目標：1%以上。</td></tr>
+        <tr><th>CPC</th><td><b>広告費 ÷ クリック数</b>／1クリックあたりのコスト。上昇トレンドは競合増加のサイン。</td></tr>
+        <tr><th>Av（客単価）</th><td><b>RPP売上 ÷ 注文件数</b>／1注文あたりの平均購入金額。セット販売・アップセルで改善。</td></tr>
+        <tr><th>Gross（RPP売上）</th><td>集計期間内のRPP広告経由の売上合計。広告外の自然検索売上は含まない。</td></tr>
+      </table>
+    </div>
+    <div class="note">CVRについて：RPP広告の「クリック → 注文」のCVRと、商品分析の「訪問者（UU）→ 注文」のCVRは母数が異なるため、同じ商品でも数値が一致しないことがあります。ウレシルでは画面ごとにどちらの軸かを明示しています。</div>
+
+    <h2 id="alerts">7. ⚠️改善アラートの見方</h2>
+    <p>次の条件に当てはまると、ダッシュボードや商品一覧に⚠️が自動表示されます。</p>
+    <div class="table-scroll">
+      <table>
+        <tr><th class="narrow">条件</th><td>意味と主な打ち手</td></tr>
+        <tr><th>ROIが100%未満</th><td>広告費が粗利を上回っている＝広告が赤字。入札単価の見直しや対象商品の絞り込みを検討。</td></tr>
+        <tr><th>CPOがLimit CPO超過</th><td>1注文の獲得コストが利益の上限を超えている。その商品の広告費配分を見直す。</td></tr>
+        <tr><th>CTRが1%未満</th><td>広告が表示されてもクリックされていない。商品画像・タイトルの改善を検討。</td></tr>
+        <tr><th>CVRが低下傾向</th><td>クリック後に買われていない。商品ページ・価格・レビューを確認。</td></tr>
+        <tr><th>CPCが上昇トレンド</th><td>クリック単価が上がっている。競合の入札強化のサイン。費用対効果を再確認。</td></tr>
+      </table>
+    </div>
+
+    <h2 id="faq">8. よくある質問</h2>
+
+    <details>
+      <summary>データを取り込んだのに数字が表示されません</summary>
+      <p>画面右上の期間切替（週次/月次）と対象期間が、取り込んだデータの期間と合っているか確認してください。取込み済みの期間は「データ取込み」画面の下部で一覧できます。RPP広告データと商品分析データは対象範囲が異なるため、片方だけ取り込んだ場合は一部の指標のみ表示されます。</p>
+    </details>
+    <details>
+      <summary>CSVの取込みでエラーになります</summary>
+      <p>RMSからダウンロードしたままのファイルを、編集せずにそのまま取り込んでください。列名の変更・ヘッダー行の削除・Excelでの保存し直しは列の判別に失敗する原因になります。文字コードは自動判別されるので変換は不要です。</p>
+    </details>
+    <details>
+      <summary>週次と月次で数字が少し違います</summary>
+      <p>週をまたぐ期間（月末月初）の週次データは開始日の月に集計されるため、月次の正確な値とはわずかな差が出ることがあります。正確な月次値は商品分析レポート（月次）の取込みで確認してください。</p>
+    </details>
+    <details>
+      <summary>利益（Rev）やROIが表示されません</summary>
+      <p>利益系の指標は売上原価の入力が必要です。「商品マスタ・原価」画面で商品ごとの原価を設定してください。</p>
+    </details>
+    <details>
+      <summary>サンプルデータを消して実データに切り替えたい</summary>
+      <p>「データ取込み」画面の取込み済みデータ一覧から、期間単位で削除できます。削除後に実データのCSVを取り込んでください。</p>
+    </details>
+    <details>
+      <summary>間違ったファイルを取り込んでしまいました</summary>
+      <p>「データ取込み」画面の取込み済み一覧で、該当する週・月の「×」を押すとその期間だけ削除できます。同じ期間を再取込みする際は「上書き」も選べます。</p>
+    </details>
+    <details>
+      <summary>最初のガイド（オンボーディング）をもう一度見たい</summary>
+      <p>左サイドバー下部の「使い方ガイド」からいつでも再表示できます。</p>
+    </details>
+    <details>
+      <summary>解約したい</summary>
+      <p>「請求・プラン」画面からいつでも解約できます。解約後もその請求期間の終了までは利用できます。詳細は<a href="terms.html">利用規約</a>をご確認ください。</p>
+    </details>
+
+    <h2 id="contact">9. お問い合わせ</h2>
+    <p>不具合の報告・機能のご要望は、アプリ内の左サイドバー「不具合・要望を送る」からお送りいただけます。その他のお問い合わせは下記までご連絡ください。</p>
+    <p>メールアドレス：<a href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E3%81%AB%E3%81%A4%E3%81%84%E3%81%A6%E3%81%AE%E3%81%8A%E5%95%8F%E3%81%84%E5%90%88%E3%82%8F%E3%81%9B">shoichiro.nakamura.0601@gmail.com</a></p>
+  </div>
+</main>
+
+<footer>
+  <div class="inner">
+    <div class="links">
+      <a href="help.html">ヘルプ・使い方ガイド</a>
+      <a href="tokushoho.html">特定商取引法に基づく表記</a>
+      <a href="privacy.html">プライバシーポリシー</a>
+      <a href="terms.html">利用規約</a>
+    </div>
+    <div><span class="logo-badge-invert">ウレシル<span class="dot">.</span></span> © 2026 ウレシル</div>
+  </div>
+</footer>
+
+</body></html>

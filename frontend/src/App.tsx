@@ -50,7 +50,8 @@ function AppRoutes({ userEmail }: { userEmail: string | null }) {
   )
 }
 
-const ONBOARDING_KEY = 'rakuten-kpi-onboarding-v1'
+// オンボーディングの内容を大きく変えたらバージョンを上げる（既存ユーザーにも一度だけ再表示される）
+const ONBOARDING_KEY = 'rakuten-kpi-onboarding-v2'
 
 export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)

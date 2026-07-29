@@ -2,20 +2,29 @@ import { useState } from 'react'
 import {
   LayoutDashboard, TrendingUp, Package, Upload, Target,
   ChevronRight, ChevronLeft, CheckCircle, Sparkles, X,
-  BarChart3, ArrowRight,
+  BarChart3, ArrowRight, Megaphone, Boxes, FileDown, BookOpen,
+  ExternalLink,
 } from 'lucide-react'
 import { api } from '../lib/api'
+import { HELP_URL, EXTERNAL_LINK_PROPS } from '../lib/links'
 
 interface OnboardingModalProps {
   onComplete: () => void
 }
 
-const SCREENS = [
-  { icon: LayoutDashboard, label: 'ダッシュボード', desc: '週次・月次のKPIサマリと⚠️アラートを確認' },
+/** サイドバーの並び順に合わせた画面一覧（「毎日見る」と「設定・取込み」に分類）。 */
+const SCREENS_DAILY = [
+  { icon: LayoutDashboard, label: 'ダッシュボード', desc: 'KPIサマリ・達成率・⚠️アラート・今日やるべきこと' },
   { icon: TrendingUp, label: 'GAP分析', desc: 'ショップ→ジャンル→商品の3段階で課題を特定' },
   { icon: Package, label: '商品別KPI', desc: '商品ごとのKPI一覧・LimitCPO超過を警告' },
+  { icon: Megaphone, label: 'RPP広告実績', desc: '取込み済み広告データの週次・月次閲覧と診断' },
+]
+
+const SCREENS_SETUP = [
   { icon: Upload, label: 'データ取込み', desc: '楽天RMSのCSVをドラッグ&ドロップするだけ' },
+  { icon: Boxes, label: '商品マスタ・原価', desc: '原価を入れると利益（Rev・ROI）が計算される' },
   { icon: Target, label: '目標設定', desc: 'KGI売上目標・KPI目標・経費率を月別管理' },
+  { icon: FileDown, label: 'レポート出力', desc: '集計KPIをCSVで書き出して共有' },
 ]
 
 const KPI_CHAIN = [
@@ -251,25 +260,44 @@ function StepSampleData({
 
 function StepScreens() {
   return (
-    <div className="flex flex-col flex-1 gap-4">
+    <div className="flex flex-col flex-1 gap-3">
       <div className="text-center">
-        <h2 className="text-xl font-bold text-gray-900">5つの画面の使い方</h2>
+        <h2 className="text-xl font-bold text-gray-900">画面の使い方</h2>
         <p className="mt-1 text-sm text-gray-500">左のサイドバーから各画面に移動できます</p>
       </div>
 
-      <div className="space-y-2">
-        {SCREENS.map(({ icon: Icon, label, desc }, i) => (
-          <div key={label} className="flex items-center gap-3 p-3 rounded-xl hover:bg-gray-50 transition-colors">
-            <div className="w-9 h-9 rounded-xl bg-gray-900 flex items-center justify-center shrink-0">
-              <Icon size={16} className="text-white" />
+      <div>
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-1 mb-1">毎日見る画面</p>
+        <div className="space-y-0.5">
+          {SCREENS_DAILY.map(({ icon: Icon, label, desc }) => (
+            <div key={label} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-gray-900 flex items-center justify-center shrink-0">
+                <Icon size={13} className="text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-gray-900">{label}</p>
+                <p className="text-[11px] text-gray-500">{desc}</p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-gray-900">{label}</p>
-              <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-1 mb-1">設定・取込み</p>
+        <div className="space-y-0.5">
+          {SCREENS_SETUP.map(({ icon: Icon, label, desc }) => (
+            <div key={label} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+              <div className="w-7 h-7 rounded-lg bg-gray-600 flex items-center justify-center shrink-0">
+                <Icon size={13} className="text-white" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-gray-900">{label}</p>
+                <p className="text-[11px] text-gray-500">{desc}</p>
+              </div>
             </div>
-            <span className="text-xs text-gray-300 font-mono shrink-0">{i + 1}</span>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -279,16 +307,16 @@ function StepCSV() {
   return (
     <div className="flex flex-col flex-1 gap-4">
       <div className="text-center">
-        <h2 className="text-xl font-bold text-gray-900">実データのインポート方法</h2>
-        <p className="mt-1 text-sm text-gray-500">楽天RMSのCSVをドラッグ&ドロップするだけ</p>
+        <h2 className="text-xl font-bold text-gray-900">実データ運用の流れ</h2>
+        <p className="mt-1 text-sm text-gray-500">この4ステップで利益まで見える状態になります</p>
       </div>
 
       <div className="space-y-3">
         {[
-          { step: '①', title: '楽天RMSにログイン', desc: 'RMS（ショップ管理画面）にアクセス' },
-          { step: '②', title: '2種類のCSVを書き出す', desc: '広告レポート（RPP）と商品分析（月次）' },
-          { step: '③', title: '「データ取込み」を開く', desc: '左メニューから取込み画面へ移動' },
-          { step: '④', title: 'ファイルをドラッグ&ドロップ', desc: '枠に置くだけ。文字コードは自動判別' },
+          { step: '①', title: '楽天RMSからCSVを2種類書き出す', desc: 'RPP広告レポート（週次）と商品分析（月次）。入手手順は取込み画面にも記載' },
+          { step: '②', title: '「データ取込み」にドラッグ&ドロップ', desc: 'RMSのCSVはそのままでOK。列名変更・ヘッダー削除は不要' },
+          { step: '③', title: '「商品マスタ・原価」で原価を入力', desc: '利益（Rev）・ROI・Limit CPOが計算できるようになる' },
+          { step: '④', title: '「目標設定」でKGI・KPI目標を設定', desc: '達成率とGAPがダッシュボードに表示される' },
         ].map(({ step, title, desc }) => (
           <div key={step} className="flex items-start gap-3 p-3 bg-gray-50 rounded-xl">
             <span className="text-lg font-bold text-blue-600 w-7 shrink-0">{step}</span>
@@ -300,10 +328,18 @@ function StepCSV() {
         ))}
       </div>
 
-      <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
-        <p className="font-semibold">RMSのCSVはそのままでOK</p>
-        <p className="mt-1">列名の変更・ヘッダー削除は不要。取込み画面に各レポートの入手手順も載っています。</p>
-      </div>
+      <a
+        href={HELP_URL}
+        {...EXTERNAL_LINK_PROPS}
+        className="flex items-center gap-2.5 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-xl p-3 text-xs text-blue-700 transition-colors"
+      >
+        <BookOpen size={16} className="shrink-0" />
+        <span className="flex-1">
+          <span className="font-semibold">詳しくはヘルプページへ</span>
+          <span className="block text-blue-600 mt-0.5">CSV入手方法・KPI用語集・よくある質問をまとめています。サイドバー下部からいつでも開けます。</span>
+        </span>
+        <ExternalLink size={13} className="shrink-0 text-blue-400" />
+      </a>
     </div>
   )
 }
