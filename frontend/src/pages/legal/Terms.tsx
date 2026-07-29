@@ -1,20 +1,19 @@
-import { LegalLayout, Section, Bullets, PH } from '../../components/legal/LegalLayout'
+import { LegalLayout, Section, Bullets, BUSINESS, REFUND_POLICY_TEXT } from '../../components/legal/LegalLayout'
 
 /**
  * 利用規約（/legal/terms）。簡易版。
  *
- * ⚠️ 雛形です。特商法表記・プライバシーポリシーより緊急性は低いものの、
  * 月額課金サービスとして最低限の項目（サブスク契約・自動更新・トライアル条件・
- * 禁止事項・免責）を含めています。公開前に PH の置き換えと内容の確認を。
+ * 禁止事項・免責）を含む。事業者情報は BUSINESS から参照する。
  *
- * 「第5条 解約」は特商法表記の返金・解約条件と必ず整合させること
- * （2箇所に書くと片方だけ古くなる。方針決定時は両方直す）。
+ * 第5条（解約）は特商法表記の「返品・キャンセルについて」と同じ文言でなければならないので、
+ * REFUND_POLICY_TEXT を共有している。書き写さないこと。
  */
 export default function Terms() {
   return (
-    <LegalLayout title="利用規約" updatedAt="2026年7月27日">
+    <LegalLayout title="利用規約" updatedAt="2026年7月28日">
       <p className="text-sm text-gray-700 leading-relaxed">
-        本規約は、<PH>事業者名</PH>（以下「当方」）が提供するウレシル（以下「本サービス」）の
+        本規約は、{BUSINESS.name}（以下「当方」）が提供するウレシル（以下「本サービス」）の
         利用条件を定めるものです。本サービスをご利用いただく場合、本規約に同意したものとみなします。
       </p>
 
@@ -63,11 +62,11 @@ export default function Terms() {
       </Section>
 
       <Section title="第5条（解約）">
+        {/* 特商法表記の「返品・キャンセルについて」と同じ定数を参照している */}
+        <p>{REFUND_POLICY_TEXT}</p>
         <p>
-          <PH>解約手続きの方法・解約後の利用可能期間・返金の有無を記載（方針決定後に追記が必要）</PH>
-        </p>
-        <p className="text-xs text-gray-500">
-          ※ 特定商取引法に基づく表記の「返品・キャンセルについて」と同じ内容にすること。
+          解約手続きは、本サービス内の「請求・プラン」画面から Stripe のカスタマーポータルを開き、
+          いつでも行うことができます。
         </p>
       </Section>
 
@@ -130,15 +129,13 @@ export default function Terms() {
 
       <Section title="第12条（準拠法・管轄）">
         <p>
-          本規約は日本法に準拠します。本サービスに関する紛争については、
-          <PH>管轄裁判所（例: 東京地方裁判所）</PH>を第一審の専属的合意管轄裁判所とします。
+          本規約は日本法に準拠します。本サービスに関して紛争が生じた場合には、
+          {BUSINESS.court}を第一審の専属的合意管轄裁判所とします。
         </p>
       </Section>
 
       <Section title="お問い合わせ">
-        <p>
-          本規約に関するお問い合わせ先: <PH>メールアドレス</PH>
-        </p>
+        <p>本規約に関するお問い合わせ先: {BUSINESS.email}</p>
       </Section>
     </LegalLayout>
   )

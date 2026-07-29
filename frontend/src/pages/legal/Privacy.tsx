@@ -1,15 +1,17 @@
-import { LegalLayout, Section, Bullets, PH } from '../../components/legal/LegalLayout'
+import { LegalLayout, Section, Bullets, BUSINESS } from '../../components/legal/LegalLayout'
 
 /**
  * プライバシーポリシー（/legal/privacy）。
  *
- * ⚠️ 雛形です。公開前に PH（黄色ハイライト）を実データに置き換え、
- * 記載内容が実際のデータの扱いと一致しているか確認してください。
- * 新しく個人情報を扱う機能を追加したときは「2. 取得する情報」の更新も必要です。
+ * 事業者情報は `LegalLayout.tsx` の BUSINESS から参照する。
+ * 新しく個人情報を扱う機能を追加したときは「2. 取得する情報」の更新が必要。
+ * 「5. データの保存期間・退会時の取り扱い」で問い合わせ記録を退会後も保持すると
+ * 明記しており、退会処理（routers/account.py の _ALL_MODELS）で
+ * ConsultingInquiry を削除対象にしていないのはこの記載に合わせている。
  */
 export default function Privacy() {
   return (
-    <LegalLayout title="プライバシーポリシー" updatedAt="2026年7月27日">
+    <LegalLayout title="プライバシーポリシー" updatedAt="2026年7月28日">
       <p className="text-sm text-gray-700 leading-relaxed">
         ウレシル（以下「本サービス」）における個人情報およびお客様データの取り扱いについて、
         以下のとおり定めます。
@@ -17,7 +19,7 @@ export default function Privacy() {
 
       <Section title="1. 事業者情報">
         <p>
-          <PH>事業者名</PH> / 連絡先: <PH>問い合わせ用メールアドレス</PH>
+          {BUSINESS.name}（連絡先: {BUSINESS.email}）
         </p>
       </Section>
 
@@ -75,8 +77,7 @@ export default function Privacy() {
 
       <Section title="7. お問い合わせ窓口">
         <p>
-          本ポリシーおよび個人情報の取り扱いに関するお問い合わせ先:{' '}
-          <PH>メールアドレス</PH>
+          本ポリシーおよび個人情報の取り扱いに関するお問い合わせ先: {BUSINESS.email}
         </p>
       </Section>
 
