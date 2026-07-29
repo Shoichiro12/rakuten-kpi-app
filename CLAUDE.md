@@ -19,7 +19,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 退会時にコンサル問い合わせ・フィードバック記録は削除しない（営業記録として保持。プライバシーポリシー第5条と整合） | 2026-07-28 | 実装済み（削除対象に含めない、が実装） |
 | Stripe顧客の重複防止（メールで既存顧客を検索して再利用） | 2026-07-28 | **未実装**（公開後でよい、と決定済み。実装時はcheckout作成前にemail検索） |
 | 専門家確認（法務文面・インボイス様式） | 2026-07-29 | **未実施**（審査完了と機能ロック実装後にまとめて手配、と決定） |
-| Supabase Redirect URLs に `https://app.ureshiru.com/**` を追加（旧URLと併存） | 2026-07-29 | 実装済み（Total URLs: 2 確認済み。Site URL は app.ureshiru.com 有効化後に切替） |
+| Supabase Redirect URLs に `https://app.ureshiru.com/**` を追加（旧URLと併存） | 2026-07-29 | 実装済み（Total URLs: 2。Site URL も https://app.ureshiru.com に切替済み） |
+| Render カスタムドメイン app.ureshiru.com 有効化＋Stripe Webhook URL を https://app.ureshiru.com/api/stripe/webhook に変更（whsec不変） | 2026-07-29 | 実装済み（Verified/Certificate Issued、/api/health 200確認） |
 | 旧Render(Oregon)・旧Vercelプロジェクトの削除 | 2026-07-29 | **未実施**（新環境の安定運用を数日確認してから） |
 | 4万SKU CSV取込のメモリ実測 → Render Starter で不足なら Standard へ | 2026-07-29 | **未実施** |
 
