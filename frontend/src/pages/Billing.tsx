@@ -144,6 +144,31 @@ export default function Billing() {
             </div>
           )}
 
+          {/* 支払い失敗（past_due/unpaid）: 「未契約」と見せない。
+              何が起きたか分からないままプラン選択カードが出るのが最悪のUXなので、
+              専用の案内＋カスタマーポータルへの導線を最上部に出す。
+              Stripeのスマートリトライが自動で再試行するため、利用者にやってもらうのは
+              カード情報の確認・更新だけ。 */}
+          {status && (status.status === 'past_due' || status.status === 'unpaid') && (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+              <div className="flex items-center gap-2 mb-2">
+                <AlertTriangle size={18} className="text-red-600" />
+                <h3 className="text-sm font-semibold text-red-800">お支払いの確認が取れていません</h3>
+              </div>
+              <p className="text-sm text-red-700 mb-4">
+                ご登録のカードでの決済に失敗しました。ご契約は解約されていません。
+                お支払い方法をご確認・更新いただくと、自動的に再決済されます。
+              </p>
+              <button
+                onClick={openPortal}
+                disabled={busy === 'portal'}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <ExternalLink size={15} /> お支払い方法を確認・更新する
+              </button>
+            </div>
+          )}
+
           {/* 契約中: 現在の状態＋ポータル */}
           {active && status && (
             <div className="bg-white rounded-xl border shadow-sm p-6">
@@ -192,8 +217,11 @@ export default function Billing() {
             </div>
           )}
 
-          {/* 未契約: プランカード（プランは1つだけ） */}
-          {!active && status?.enabled && (
+          {/* 未契約: プランカード（プランは1つだけ）。
+              past_due/unpaid は「未契約」ではなく支払いトラブルなので、
+              新規登録カードは出さない（上の専用案内だけにする） */}
+          {!active && status?.enabled &&
+            status.status !== 'past_due' && status.status !== 'unpaid' && (
             <div className="bg-white rounded-xl border shadow-sm p-6">
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="text-base font-bold text-gray-900">{plan?.label ?? 'ウレシル 月額プラン'}</h3>

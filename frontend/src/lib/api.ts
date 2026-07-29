@@ -69,6 +69,13 @@ async function parseJson(
   if (!res.ok) {
     const d = parsed as Record<string, string> | null
     const msg = d?.detail || d?.message || res.statusText || 'APIエラーが発生しました'
+    // 402 = 有効な契約がない（機能ロック。backend/subscription_guard.py）。
+    // どの画面で起きても /billing に誘導する。/billing 系のAPIは 402 を返さないので
+    // リダイレクトループにはならない。
+    if (res.status === 402 && !window.location.pathname.startsWith('/billing')) {
+      console.warn('[API] 402 未契約のため /billing へ誘導:', msg)
+      window.location.href = '/billing'
+    }
     console.error(`[API] HTTPエラー ${res.status} ${res.url}:`, msg)
     throw new Error(msg)
   }

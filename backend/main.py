@@ -23,6 +23,7 @@ from models import RppWeekly, MonthlyItemSales, MonthlyAnalysis, Target, RppSale
 from sample_data import generate_sample_data
 from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account, rpp_diagnosis, recommendations, costs, masters, inventory, billing, consulting, feedback
 from auth import get_current_user, AuthUser, UserContextMiddleware
+from subscription_guard import require_active_subscription
 from migrations import run_migrations
 
 models.Base.metadata.create_all(bind=engine)
@@ -91,24 +92,29 @@ app.add_middleware(UserContextMiddleware)
 
 # 全 /api ルーターをログイン必須にする（SUPABASE_JWT_SECRET 未設定時は素通り＝ローカル開発）
 _auth = [Depends(get_current_user)]
-app.include_router(dashboard.router, dependencies=_auth)
-app.include_router(import_csv.router, dependencies=_auth)
-app.include_router(targets.router, dependencies=_auth)
-app.include_router(gap_analysis.router, dependencies=_auth)
-app.include_router(products.router, dependencies=_auth)
-app.include_router(actions.router, dependencies=_auth)
-app.include_router(rpp_diagnosis.router, dependencies=_auth)
-app.include_router(evaluation.router, dependencies=_auth)
-app.include_router(recommendations.router, dependencies=_auth)
-app.include_router(export.router, dependencies=_auth)
-app.include_router(account.router, dependencies=_auth)
-app.include_router(costs.router, dependencies=_auth)
-app.include_router(masters.router, dependencies=_auth)
-app.include_router(masters.shops_router, dependencies=_auth)
-app.include_router(inventory.router, dependencies=_auth)
-app.include_router(billing.router, dependencies=_auth)
-app.include_router(consulting.router, dependencies=_auth)
-app.include_router(feedback.router, dependencies=_auth)
+# 機能ロック: 有効な契約（trialing/active）が無ければ 402（subscription_guard.py 参照）。
+# ⚠️ 新しいルーターを足すときは、契約なしで使えるべき例外（billing/account/
+#    consulting/feedback）でない限り、必ず _paid を付けること。_auth だけだと
+#    未契約者に機能を無料開放してしまう。
+_paid = _auth + [Depends(require_active_subscription)]
+app.include_router(dashboard.router, dependencies=_paid)
+app.include_router(import_csv.router, dependencies=_paid)
+app.include_router(targets.router, dependencies=_paid)
+app.include_router(gap_analysis.router, dependencies=_paid)
+app.include_router(products.router, dependencies=_paid)
+app.include_router(actions.router, dependencies=_paid)
+app.include_router(rpp_diagnosis.router, dependencies=_paid)
+app.include_router(evaluation.router, dependencies=_paid)
+app.include_router(recommendations.router, dependencies=_paid)
+app.include_router(export.router, dependencies=_paid)
+app.include_router(account.router, dependencies=_auth)      # 退会は契約なしでも可能に
+app.include_router(costs.router, dependencies=_paid)
+app.include_router(masters.router, dependencies=_paid)
+app.include_router(masters.shops_router, dependencies=_paid)
+app.include_router(inventory.router, dependencies=_paid)
+app.include_router(billing.router, dependencies=_auth)      # 契約するための画面なのでロック外
+app.include_router(consulting.router, dependencies=_auth)   # 問い合わせは未契約でも可能に
+app.include_router(feedback.router, dependencies=_auth)     # フィードバックも同様
 # Stripe Webhook は Stripe サーバーが叩くため認証を付けない（署名検証で正当性を担保）
 app.include_router(billing.webhook_router)
 
@@ -130,7 +136,8 @@ def api_root():
 
 
 @app.post("/api/sample-data")
-def create_sample_data(db: Session = Depends(get_db), _user: AuthUser = Depends(get_current_user)):
+def create_sample_data(db: Session = Depends(get_db), _user: AuthUser = Depends(get_current_user),
+        _sub: None = Depends(require_active_subscription)):
     generate_sample_data(db)
     return {"message": "サンプルデータを生成しました（10商品 × 8週間、RPP診断デモ付き）"}
 
@@ -165,7 +172,8 @@ def security_status(db: Session = Depends(get_db), _user: AuthUser = Depends(get
 
 
 @app.get("/api/data-status")
-def data_status(db: Session = Depends(get_db), _user: AuthUser = Depends(get_current_user)):
+def data_status(db: Session = Depends(get_db), _user: AuthUser = Depends(get_current_user),
+        _sub: None = Depends(require_active_subscription)):
     """セットアップ進捗の判定に使うデータ登録状況。フロントのガイド表示に利用。"""
     rpp_rows = db.query(func.count(RppWeekly.id)).scalar() or 0
     rpp_weeks = db.query(func.count(func.distinct(RppWeekly.week_start))).scalar() or 0
@@ -212,7 +220,8 @@ def data_status(db: Session = Depends(get_db), _user: AuthUser = Depends(get_cur
 
 
 @app.post("/api/reset-data")
-def reset_data(db: Session = Depends(get_db), _user: AuthUser = Depends(get_current_user)):
+def reset_data(db: Session = Depends(get_db), _user: AuthUser = Depends(get_current_user),
+        _sub: None = Depends(require_active_subscription)):
     """登録済みデータを削除してまっさらな状態に戻す（サンプル→実データ切替などで使用）。
 
     目標（Target）はユーザー設定のため保持する。
