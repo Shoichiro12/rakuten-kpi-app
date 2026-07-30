@@ -19,7 +19,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | 退会時にコンサル問い合わせ・フィードバック記録は削除しない（営業記録として保持。プライバシーポリシー第5条と整合） | 2026-07-28 | 実装済み（削除対象に含めない、が実装） |
 | Stripe顧客の重複防止（メールで既存顧客を検索して再利用） | 2026-07-28 | **未実装**（公開後でよい、と決定済み。実装時はcheckout作成前にemail検索） |
 | 専門家確認（法務文面・インボイス様式） | 2026-07-29 | **未実施**（審査完了と機能ロック実装後にまとめて手配、と決定）。**優先確認事項に「特商法第26条（営業目的取引の適用除外）への依拠」を追加（2026-07-30）**: 解約を問い合わせ経由（2〜3営業日以内に手続き完了）に変更した設計は、顧客全員が「営業のために」契約する前提で26条の適用除外に依拠している。この依拠の妥当性を最優先で確認してもらうこと |
-| 解約はポータル自己完結ではなく問い合わせ経由（受付後2〜3営業日以内に手続き完了）。**Stripeカスタマーポータルの「顧客によるサブスクリプションのキャンセル」は意図的に無効化**しており、「解約ボタンがない」は不具合ではない（直さないこと）。アプリ内はフィードバック category="cancel"（解約について）で受付、通知メール件名は【解約リクエスト】で始まる | 2026-07-30 | 実装済み（feedback.py / notifications.py / Billing.tsx / FeedbackModal.tsx / lp/tokushoho.html / lp/terms.html）。**ポータル側のキャンセル無効化はStripeダッシュボードでの手作業＝オーナー実施要**（設定→カスタマーポータル→サブスクリプション） |
+| 解約はポータル自己完結ではなく問い合わせ経由（受付後2〜3営業日以内に手続き完了）。**Stripeカスタマーポータルの「顧客によるサブスクリプションのキャンセル」は意図的に無効化**しており、「解約ボタンがない」は不具合ではない（直さないこと）。アプリ内はフィードバック category="cancel"（解約について）で受付、通知メール件名は【解約リクエスト】で始まる | 2026-07-30 | 実装済み（feedback.py / notifications.py / Billing.tsx / FeedbackModal.tsx / lp/tokushoho.html / lp/terms.html）。ポータル側のキャンセル無効化も**実施済み（2026-07-30、Stripeダッシュボードで本番・テスト両環境とも設定・保存を確認）** |
+| 退会（アカウント削除）は契約中（trialing/active/past_due/unpaid）はブロックし、先に解約（問い合わせ経由）を完了してもらう。退会APIはStripe契約に触れないため、契約中に退会を通すと「ログイン不可なのに課金継続」事故になる | 2026-07-30 | 実装済み（routers/account.py が409を返す＋AccountSettings.tsx が案内表示・ボタン無効化） |
 | Supabase Redirect URLs に `https://app.ureshiru.com/**` を追加（旧URLと併存） | 2026-07-29 | 実装済み（Total URLs: 2。Site URL も https://app.ureshiru.com に切替済み） |
 | Render カスタムドメイン app.ureshiru.com 有効化＋Stripe Webhook URL を https://app.ureshiru.com/api/stripe/webhook に変更（whsec不変） | 2026-07-29 | 実装済み（Verified/Certificate Issued、/api/health 200確認） |
 | 旧Render(Oregon)・旧Vercelプロジェクトの削除 | 2026-07-29 | **未実施**（新環境の安定運用を数日確認してから） |

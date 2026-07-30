@@ -9,6 +9,8 @@ interface AccountInfo {
   user_id: string | null
   total_rows: number
   can_delete: boolean
+  /** 契約が解約前の状態（trialing/active/past_due/unpaid）。trueなら退会前に解約が必要 */
+  has_active_subscription?: boolean
 }
 
 interface Props {
@@ -226,6 +228,15 @@ export default function AccountSettings({ userEmail }: Props) {
             サーバーに SUPABASE_SERVICE_ROLE_KEY が設定されていないため、現在この機能は利用できません。
           </p>
         )}
+        {/* 契約中は退会不可（先に解約=問い合わせ経由が必要）。バックエンドでも409でブロックされる */}
+        {info?.has_active_subscription && (
+          <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-3">
+            現在ご契約中のため、アカウント削除の前に解約のお手続きが必要です。
+            <a href="/billing" className="underline font-medium mx-1">請求・プラン</a>
+            画面の「解約について問い合わせる」からご連絡ください（ご連絡から2〜3営業日以内に解約手続きが完了します）。
+            解約完了後に、この画面から退会いただけます。
+          </p>
+        )}
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -242,7 +253,12 @@ export default function AccountSettings({ userEmail }: Props) {
           <Notice {...deleteMsg} />
           <button
             onClick={deleteAccount}
-            disabled={deleteBusy || confirmText !== '削除' || (info ? !info.can_delete : false)}
+            disabled={
+              deleteBusy
+              || confirmText !== '削除'
+              || (info ? !info.can_delete : false)
+              || Boolean(info?.has_active_subscription)
+            }
             className="inline-flex items-center gap-2 px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors"
           >
             {deleteBusy ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
