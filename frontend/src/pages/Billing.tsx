@@ -3,6 +3,7 @@ import { CreditCard, Check, ExternalLink, Sparkles, AlertTriangle } from 'lucide
 import { LEGAL_LINKS, EXTERNAL_LINK_PROPS } from '../lib/links'
 import Header from '../components/layout/Header'
 import ConsultingInquiryForm from '../components/ConsultingInquiryForm'
+import { requestOpenFeedback } from '../components/FeedbackModal'
 import { api } from '../lib/api'
 import type { BillingStatus, BillingPlan, BillingDiagnosis } from '../types'
 
@@ -197,7 +198,7 @@ export default function Billing() {
                   disabled={busy === 'portal'}
                   className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
                 >
-                  <ExternalLink size={15} /> プラン・支払い方法を管理する
+                  <ExternalLink size={15} /> お支払い方法の変更
                 </button>
                 <button
                   onClick={async () => {
@@ -213,7 +214,28 @@ export default function Billing() {
                   {busy === 'refresh' ? '更新中…' : '最新の状態に更新'}
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-2">Stripeのカスタマーポータルで支払い方法の変更・プラン変更・解約ができます。</p>
+              {/* ポータルの自己解約は意図的に無効化している（Stripeダッシュボード側の設定）。
+                  解約は下の「解約をご希望の場合」セクション＝問い合わせ経由で受け付ける。
+                  「解約ボタンがない」は不具合ではない（CLAUDE.md 申し送り参照）。 */}
+              <p className="text-xs text-gray-400 mt-2">Stripeのカスタマーポータルでお支払い方法の変更・ご契約内容の確認ができます。</p>
+            </div>
+          )}
+
+          {/* 解約の導線: ポータルではなく問い合わせ経由（受付後2〜3営業日以内に手続き完了）。
+              特商法ページ・利用規約第5条の記載と文言を整合させること。 */}
+          {active && status && (
+            <div className="bg-white rounded-xl border shadow-sm p-6">
+              <h3 className="text-sm font-semibold text-gray-800 mb-2">解約をご希望の場合</h3>
+              <p className="text-xs text-gray-500 mb-4">
+                解約のお手続きは、下記フォームよりご連絡いただいてから2〜3営業日以内に完了します。
+                手続き完了まで、現在の請求期間内は引き続きサービスをご利用いただけます。
+              </p>
+              <button
+                onClick={() => requestOpenFeedback('cancel')}
+                className="px-4 py-2 border border-gray-300 text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors"
+              >
+                解約について問い合わせる
+              </button>
             </div>
           )}
 

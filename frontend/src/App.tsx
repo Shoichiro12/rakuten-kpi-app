@@ -5,7 +5,7 @@ import Sidebar from './components/layout/Sidebar'
 import Footer from './components/layout/Footer'
 import ErrorBoundary from './components/ErrorBoundary'
 import OnboardingModal from './components/OnboardingModal'
-import FeedbackModal from './components/FeedbackModal'
+import FeedbackModal, { OPEN_FEEDBACK_EVENT, type FeedbackCategory } from './components/FeedbackModal'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import GapAnalysis from './pages/GapAnalysis'
@@ -55,9 +55,22 @@ const ONBOARDING_KEY = 'rakuten-kpi-onboarding-v2'
 
 export default function App() {
   const [showOnboarding, setShowOnboarding] = useState(false)
-  // フィードバック窓口（不具合報告・要望）。BrowserRouter内でuseLocationを使うため
+  // フィードバック窓口（不具合報告・要望・解約について）。BrowserRouter内でuseLocationを使うため
   // モーダル自体はルーター配下で描画する
   const [showFeedback, setShowFeedback] = useState(false)
+  const [feedbackCategory, setFeedbackCategory] = useState<FeedbackCategory>('bug')
+
+  // 深い階層のページ（Billingの「解約について問い合わせる」等）からも
+  // 種別を指定してフィードバック窓口を開けるようにする
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ category?: FeedbackCategory }>).detail
+      setFeedbackCategory(detail?.category ?? 'bug')
+      setShowFeedback(true)
+    }
+    window.addEventListener(OPEN_FEEDBACK_EVENT, handler)
+    return () => window.removeEventListener(OPEN_FEEDBACK_EVENT, handler)
+  }, [])
   // 認証: 無効(ローカル)なら常に通す。有効なら Supabase セッションの有無でゲート。
   const [session, setSession] = useState<Session | null>(null)
   const [authReady, setAuthReady] = useState(!authEnabled)
@@ -111,7 +124,7 @@ export default function App() {
       <div className="flex h-screen overflow-hidden bg-gray-50">
         <Sidebar
           onOpenHelp={reopenOnboarding}
-          onOpenFeedback={() => setShowFeedback(true)}
+          onOpenFeedback={() => { setFeedbackCategory('bug'); setShowFeedback(true) }}
           userEmail={session?.user?.email ?? null}
           onSignOut={signOut}
         />
@@ -130,7 +143,7 @@ export default function App() {
         <OnboardingModal onComplete={completeOnboarding} />
       )}
       {showFeedback && (
-        <FeedbackModal onClose={() => setShowFeedback(false)} />
+        <FeedbackModal initialCategory={feedbackCategory} onClose={() => setShowFeedback(false)} />
       )}
     </BrowserRouter>
   )

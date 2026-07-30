@@ -27,7 +27,11 @@ function GoogleIcon() {
  * Supabase側でGoogleプロバイダが未設定の場合はエラーメッセージで気づけるようにする。
  */
 export default function Login() {
-  const [mode, setMode] = useState<Mode>('signin')
+  // LPの「無料で試す」CTAから ?signup=1 付きで来た訪問者には、
+  // ログインではなくアカウント作成フォームを最初から表示する（登録導線の途切れ防止）
+  const [mode, setMode] = useState<Mode>(() =>
+    new URLSearchParams(window.location.search).get('signup') ? 'signup' : 'signin',
+  )
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)

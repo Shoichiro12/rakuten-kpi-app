@@ -275,9 +275,9 @@ export interface BillingDiagnosis {
   livemode_mismatch?: boolean
 }
 
-/** フィードバック（不具合報告・要望）の送信内容 */
+/** フィードバック（不具合報告・要望・解約について）の送信内容 */
 export interface FeedbackPayload {
-  category: 'bug' | 'request' | 'other'
+  category: 'bug' | 'request' | 'other' | 'cancel'
   message: string
   /** 送信時に開いていた画面のパス（自動添付） */
   page?: string | null

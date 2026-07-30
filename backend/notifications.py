@@ -120,6 +120,7 @@ _FEEDBACK_CATEGORY_LABELS = {
     "bug": "不具合の報告",
     "request": "改善の要望",
     "other": "その他",
+    "cancel": "解約について",
 }
 
 
@@ -143,7 +144,12 @@ def send_feedback_notification(feedback) -> None:
 
     category = _FEEDBACK_CATEGORY_LABELS.get(
         getattr(feedback, "category", ""), getattr(feedback, "category", "不明"))
-    subject = f"【ウレシル フィードバック】{category}"
+    # 解約リクエストは2〜3営業日以内の手続き完了を約束している運用のため、
+    # 他のフィードバックに埋もれないよう件名を必ず【解約リクエスト】で始める
+    if getattr(feedback, "category", "") == "cancel":
+        subject = f"【解約リクエスト】ウレシル: {v('user_email')}"
+    else:
+        subject = f"【ウレシル フィードバック】{category}"
     body = "\n".join([
         "アプリ内からフィードバックが届きました。",
         "",

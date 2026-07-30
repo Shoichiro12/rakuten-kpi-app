@@ -27,7 +27,9 @@ _MAX_MESSAGE_LEN = 5000
 
 
 class FeedbackPayload(BaseModel):
-    category: Literal["bug", "request", "other"] = "bug"
+    # "cancel"（解約について）: 解約はポータルの自己完結ボタンではなく
+    # 問い合わせ経由で受け付ける方針（CLAUDE.md 申し送り参照）。
+    category: Literal["bug", "request", "other", "cancel"] = "bug"
     message: str
     page: Optional[str] = None
 

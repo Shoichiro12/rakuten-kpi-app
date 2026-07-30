@@ -1,14 +1,30 @@
 import { useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import { Bug, Check, Lightbulb, MessageSquare, Send, X } from 'lucide-react'
+import { Bug, Check, Lightbulb, LogOut, MessageSquare, Send, X } from 'lucide-react'
 import { api } from '../lib/api'
 
-type Category = 'bug' | 'request' | 'other'
+export type FeedbackCategory = 'bug' | 'request' | 'other' | 'cancel'
+type Category = FeedbackCategory
+
+/**
+ * ルーター配下のどの画面からでもフィードバック窓口を開くためのイベント。
+ * モーダルの表示状態は App.tsx が持っているため、深い階層のページ（Billing等）からは
+ * props のバケツリレーではなくこのイベントで依頼する。
+ */
+export const OPEN_FEEDBACK_EVENT = 'ureshiru:open-feedback'
+
+/** フィードバック窓口を開く（category を指定するとその種別が選択済みで開く） */
+export function requestOpenFeedback(category: FeedbackCategory = 'bug') {
+  window.dispatchEvent(new CustomEvent(OPEN_FEEDBACK_EVENT, { detail: { category } }))
+}
 
 const CATEGORIES: { value: Category; label: string; icon: typeof Bug; hint: string }[] = [
   { value: 'bug', label: '不具合の報告', icon: Bug, hint: '動かない・表示がおかしい・数値が合わない など' },
   { value: 'request', label: '改善の要望', icon: Lightbulb, hint: 'こういう機能がほしい・ここが使いにくい など' },
   { value: 'other', label: 'その他', icon: MessageSquare, hint: '質問・感想など何でも' },
+  // 解約はポータルの自己完結ボタンではなく問い合わせ経由で受け付ける方針
+  // （受付から2〜3営業日以内に手続き完了。CLAUDE.md 申し送り参照）
+  { value: 'cancel', label: '解約について', icon: LogOut, hint: '解約のご依頼・解約に関するご相談' },
 ]
 
 /**
@@ -19,9 +35,16 @@ const CATEGORIES: { value: Category; label: string; icon: typeof Bug; hint: stri
  * 利用者に環境を書かせる必要はない（書く手間があると報告されなくなる）。
  * 通知は NOTIFY_EMAIL 宛のメール（backend/notifications.py）。
  */
-export default function FeedbackModal({ onClose }: { onClose: () => void }) {
+export default function FeedbackModal({
+  onClose,
+  initialCategory = 'bug',
+}: {
+  onClose: () => void
+  /** 開いた時点で選択しておく種別（Billingの「解約について問い合わせる」は 'cancel' で開く） */
+  initialCategory?: Category
+}) {
   const location = useLocation()
-  const [category, setCategory] = useState<Category>('bug')
+  const [category, setCategory] = useState<Category>(initialCategory)
   const [message, setMessage] = useState('')
   const [sending, setSending] = useState(false)
   const [done, setDone] = useState(false)
@@ -64,7 +87,11 @@ export default function FeedbackModal({ onClose }: { onClose: () => void }) {
               <Check size={20} />
             </div>
             <p className="text-sm font-semibold text-gray-900 mb-1">送信しました。ありがとうございます。</p>
-            <p className="text-xs text-gray-500">いただいた内容はサービス改善に活用します。</p>
+            <p className="text-xs text-gray-500">
+              {category === 'cancel'
+                ? '解約のご依頼を受け付けました。2〜3営業日以内に手続きを完了し、ご登録のメールアドレスへご連絡します。手続き完了まで、現在の請求期間内は引き続きサービスをご利用いただけます。'
+                : 'いただいた内容はサービス改善に活用します。'}
+            </p>
             <button
               onClick={onClose}
               className="mt-4 px-4 py-2 border text-sm text-gray-600 rounded-lg hover:bg-gray-50"
@@ -111,7 +138,9 @@ export default function FeedbackModal({ onClose }: { onClose: () => void }) {
               placeholder={
                 category === 'bug'
                   ? '例: RPPのCSVを取り込むと「◯◯」というエラーが出ます。ファイルは今週の週次レポートです。'
-                  : '内容をご記入ください'
+                  : category === 'cancel'
+                    ? '例: 解約を希望します。（差し支えなければ理由もお聞かせください）'
+                    : '内容をご記入ください'
               }
             />
 
