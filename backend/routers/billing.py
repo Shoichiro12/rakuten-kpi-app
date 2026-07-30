@@ -13,7 +13,7 @@
   DB操作の直前に current_user_id を明示セットしてテナントを固定する（tenancy.py 参照）。
   秘密鍵・Webhook署名シークレットはフロントへ渡さない。
 """
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -94,7 +94,33 @@ def create_checkout(
     """Checkout Session を作成し、その URL を返す（フロントはそこへ遷移）。
 
     プランは単一（standard）なので分岐しない。トライアルは B.trial_days() 日。
+
+    例外: EXEMPT_TEST_EMAILS（テスト・デモ用アカウント）は Stripe Checkout を
+    通さず trialing を直接作成する（下の分岐参照）。通常ユーザーの流れは変えない。
     """
+    # ── テスト・デモ用アカウントの除外分岐（2026-07-30） ──────────────
+    #   社内の検証・レビュー用アカウントはカード登録ができず、カード必須化以降
+    #   ログイン後の画面を確認できなくなったため、Checkout をスキップして
+    #   trialing のサブスクリプションをDBに直接作成する。
+    #   - 判定は【JWT検証済み】の user.email のみ（ボディ等の入力値は使わない）
+    #   - Stripe には顧客もサブスクリプションも作らない（DBレコードのみ）。
+    #     Webhook が来ないため、この契約は期限切れで自動停止しない点に注意
+    #     （テスト専用の想定。対象は env で自社管理のメールに限定すること）
+    #   - Stripe 未設定のローカル環境でも動くよう、get_stripe() より前に置く
+    if B.is_exempt_test_email(user.email):
+        s = db.query(Subscription).first()
+        if s is None:
+            s = Subscription()
+            db.add(s)
+        s.plan = B.STANDARD_PLAN
+        s.status = "trialing"
+        s.trial_end = datetime.utcnow() + timedelta(days=B.trial_days())
+        s.current_period_end = s.trial_end
+        db.commit()
+        # フロントは url に遷移するだけなので、Checkout 成功時と同じ戻り先を返す。
+        # session_id を付けない＝フロントの confirm 呼び出しは走らない（Billing.tsx 参照）。
+        return {"url": f"{B.app_base_url()}/billing?checkout=success"}
+
     stripe = B.get_stripe()
     if stripe is None:
         raise HTTPException(status_code=501, detail="Stripeが未設定です（STRIPE_SECRET_KEY）。")

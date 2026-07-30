@@ -81,6 +81,33 @@ def tax_rate_id() -> Optional[str]:
 
 BILLING_ENABLED = bool(_SECRET)
 
+# ── テスト・デモ用アカウントのカード登録除外（2026-07-30） ──────────
+# 社内の検証・レビュー用アカウントはカード登録（Stripe Checkout）を通さず、
+# trialing のサブスクリプションを直接作成できるようにする。
+#
+# 運用ルール:
+#   - 対象メールはカンマ区切りで env EXEMPT_TEST_EMAILS に設定する（大文字小文字は無視）。
+#   - env を「空文字」に設定すると除外は完全に無効になる（未設定なら既定値が生きる）。
+#   - 判定には必ず【JWT検証済みの認証ユーザーのメール】を使うこと。
+#     リクエストボディ等のユーザー入力値で判定すると、誰でも名乗るだけで
+#     課金をバイパスできてしまう。
+#
+# ⚠️ セキュリティ注意: ここに載せたメールアドレスの受信箱を持つ人は、
+#    そのメールでアカウント登録するだけで無料で全機能を使える。
+#    自社が所有・管理しているメールアドレスだけを載せること。
+_EXEMPT_TEST_EMAILS = frozenset(
+    e.strip().lower()
+    for e in os.environ.get("EXEMPT_TEST_EMAILS", "test@gmail.com").split(",")
+    if e.strip()
+)
+
+
+def is_exempt_test_email(email: Optional[str]) -> bool:
+    """認証ユーザーのメールがカード登録除外の対象か（テスト・デモ用アカウント判定）。"""
+    if not email:
+        return False
+    return email.strip().lower() in _EXEMPT_TEST_EMAILS
+
 
 def get_stripe():
     """api_key を設定した stripe SDK を返す（未設定/未導入なら None）。"""

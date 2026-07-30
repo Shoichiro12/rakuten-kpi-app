@@ -25,6 +25,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Render カスタムドメイン app.ureshiru.com 有効化＋Stripe Webhook URL を https://app.ureshiru.com/api/stripe/webhook に変更（whsec不変） | 2026-07-29 | 実装済み（Verified/Certificate Issued、/api/health 200確認） |
 | 旧Render(Oregon)・旧Vercelプロジェクトの削除 | 2026-07-29 | **未実施**（新環境の安定運用を数日確認してから） |
 | 4万SKU CSV取込のメモリ実測 → Render Starter で不足なら Standard へ | 2026-07-29 | **未実施** |
+| テスト・デモ用アカウントのカード登録除外: env `EXEMPT_TEST_EMAILS`（カンマ区切り・既定 `test@gmail.com`・空文字設定で無効化）に載ったメールは `/api/billing/checkout` で Stripe Checkout を通さず trialing をDBに直接作成する。判定はJWT検証済みメールのみ。**このメールの受信箱を持つ人は無料で全機能を使えるため、本番は自社管理のメールに差し替えること** | 2026-07-30 | 実装済み（backend/billing.py `is_exempt_test_email` / routers/billing.py `create_checkout`。本番envへの設定は手動・未実施） |
 
 ## ⚠️ セキュリティ最優先事項: 新しいテーブルには必ずRLSを（顧客データ漏洩の防止）
 
