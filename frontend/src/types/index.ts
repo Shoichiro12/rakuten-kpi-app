@@ -296,6 +296,8 @@ export interface ConsultingInquiryPayload {
 export interface BillingPlansResponse {
   enabled: boolean
   trial_days: number
+  /** Stripe鍵のモード（true=本番 / false=テスト / null=未設定）。テスト時だけ4242案内を出す */
+  livemode?: boolean | null
   plans: BillingPlan[]
 }
 

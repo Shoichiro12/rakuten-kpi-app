@@ -76,8 +76,14 @@ def refresh_status(db: Session = Depends(get_db), _u: AuthUser = Depends(get_cur
 
 @router.get("/plans")
 def billing_plans(_u: AuthUser = Depends(get_current_user)):
-    """設定済みプラン一覧（画面カード用）。トライアル日数も返す。"""
-    return {"enabled": B.BILLING_ENABLED, "trial_days": B.trial_days(), "plans": B.configured_plans()}
+    """設定済みプラン一覧（画面カード用）。トライアル日数も返す。
+
+    livemode: 設定中のStripe鍵が本番か（true=本番 / false=テスト / null=未設定）。
+    フロントは「テストモードでは4242…で登録できます」の案内をテスト時だけ表示する。
+    本番でこの文言が出ると、実カードを求められた顧客を混乱させるため。
+    """
+    return {"enabled": B.BILLING_ENABLED, "trial_days": B.trial_days(),
+            "livemode": B.key_is_live(), "plans": B.configured_plans()}
 
 
 class CheckoutPayload(BaseModel):

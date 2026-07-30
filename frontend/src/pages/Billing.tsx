@@ -25,6 +25,10 @@ export default function Billing() {
   const [status, setStatus] = useState<BillingStatus | null>(null)
   const [plans, setPlans] = useState<BillingPlan[]>([])
   const [trialDays, setTrialDays] = useState(14)
+  // Stripe鍵のモード（false=テストのときだけ「4242…で登録できます」を表示する。
+  // true=本番 / null・undefined=未設定や取得前は出さない。本番でテスト用文言を
+  // 見せると実カードを求められた顧客が混乱するため）
+  const [livemode, setLivemode] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
@@ -42,6 +46,7 @@ export default function Billing() {
       setStatus(st)
       setPlans(pl.plans)
       setTrialDays(pl.trial_days)
+      setLivemode(pl.livemode ?? null)
     } catch (e) {
       console.error('[Billing] 取得エラー:', e)
     } finally {
@@ -278,7 +283,8 @@ export default function Billing() {
                 {' '}をご確認ください。
               </p>
               <p className="text-xs text-gray-400 mt-2">
-                決済は Stripe の安全な画面で行われます。テストモードでは番号 4242 4242 4242 4242（有効期限は未来・任意のCVV）で登録できます。
+                決済は Stripe の安全な画面で行われます。
+                {livemode === false && ' テストモードでは番号 4242 4242 4242 4242（有効期限は未来・任意のCVV）で登録できます。'}
               </p>
             </div>
           )}
