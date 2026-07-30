@@ -71,6 +71,8 @@
   a { color: var(--ink); }
   a:hover { color: var(--sage-deep); }
   a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+  /* 暗色地（CTAバンド・フッター）では墨色リングが背景に同化するため紙色に反転（3:1以上を確保） */
+  .cta a:focus-visible, footer a:focus-visible { outline-color: var(--paper); }
   img { max-width: 100%; }
   .nw { white-space: nowrap; }
   .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
