@@ -7,7 +7,7 @@ from sqlalchemy import func
 from database import get_db
 from models import RppWeekly, Target
 from calculations import calc_kpis, calc_change_rate
-from access_definitions import MIN_ACCESS_SAMPLE, is_reliable
+from access_definitions import MIN_ACCESS_SAMPLE, is_reliable, min_access_for
 from shop_metrics import get_shop_monthly
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -250,13 +250,14 @@ def get_alerts(
 
     # 100UUルール（要件No.6）: アクセス母数が閾値未満の期間は、CVR・客単価の
     # 評価・アラートを保留する（母数不足で統計的に信用できないため）。
-    low_sample = not is_reliable(kpis["ct"])
+    min_access = min_access_for(period)
+    low_sample = not is_reliable(kpis["ct"], min_access)
     if low_sample:
         alerts.append({
             "type": "warning",
             "metric": "アクセス母数不足",
             "message": (
-                f"アクセス（クリック数）が{MIN_ACCESS_SAMPLE}未満です"
+                f"アクセス（クリック数）が{min_access}未満です"
                 f"（現在: {kpis['ct']:,}）。母数不足のためCVR・客単価の評価を保留しています。"
                 "まずアクセス対策で母数を確保しましょう。"
             ),

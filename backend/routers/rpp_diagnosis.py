@@ -8,24 +8,29 @@ RppSales（実CSV由来の商品単位データ）のみを入力にした課題
 このモジュールはデータの取り出し・ベンチマーク算出・アクション定義の付与を担う。
 """
 
+from datetime import date
 from typing import Literal, Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import RppActionCheck, RppSales
+from models import InventoryStatus, MonthlyItemSales, Product, RppActionCheck, RppSales
 from calculations import (
     RPP_CPC_SPIKE_RATE,
     RPP_CTR_RATIO,
     RPP_CVR_RATIO,
     RPP_MIN_CT_FOR_DIAGNOSIS,
+    RPP_MIN_CT_NEW_PRODUCT,
     RPP_ROAS_LINE,
     calc_change_rate,
     detect_rpp_issues,
     safe_div,
 )
+from gates import check_gates, min_ct_for_phase, needs_intent_check, resolve_phase
+from benchmarks import resolve_benchmark
 
 router = APIRouter(prefix="/api/rpp", tags=["rpp"])
 
@@ -82,6 +87,64 @@ ISSUE_LABELS: dict[str, str] = {
     "cvr_low": "CVR低迷（LP/商品ページ課題）",
     "cpc_spike": "CPC急騰（入札競争激化の可能性）",
 }
+
+
+def _product_gate_context(db: Session, current_ym: str) -> dict:
+    """ゲート判定に必要な商品状態をまとめて取得する（1商品ずつクエリしない）。
+
+    Returns:
+        {management_no: {"stock_count", "stock_ym", "has_inventory",
+                         "phase": resolve_phase()の結果, "page_ready",
+                         "investment_intent"}}
+    """
+    # 商品マスタ（ゲート用状態）
+    products = {p.management_no: p for p in db.query(Product).all() if p.management_no}
+
+    # 手動の在庫フラグ（product_url キー → management_no へ引き当て）
+    inv_by_url = {r.product_url: r.has_inventory for r in db.query(InventoryStatus).all()}
+
+    # 最新月の商品分析データ（在庫スナップショット）
+    latest_ym = db.query(func.max(MonthlyItemSales.year_month)).scalar()
+    stock_by_mno: dict[str, dict] = {}
+    if latest_ym:
+        for r in db.query(MonthlyItemSales).filter(MonthlyItemSales.year_month == latest_ym).all():
+            if r.management_no:
+                stock_by_mno[r.management_no] = {
+                    "stock_count": r.stock_count,
+                    "zero_stock_days": r.zero_stock_days or 0,
+                    "ym": latest_ym,
+                    "product_url": r.product_url,
+                }
+
+    # 発売月の自動推定（launch_month 未設定の商品用）: 実績データの初出月
+    first_seen: dict[str, str] = {}
+    for mno, ym in db.query(
+        MonthlyItemSales.management_no, func.min(MonthlyItemSales.year_month)
+    ).group_by(MonthlyItemSales.management_no).all():
+        if mno and ym:
+            first_seen[mno] = ym
+    for mno, ym in db.query(
+        RppSales.item_code, func.min(RppSales.year_month)
+    ).group_by(RppSales.item_code).all():
+        if mno and ym and (mno not in first_seen or ym < first_seen[mno]):
+            first_seen[mno] = ym
+
+    ctx: dict[str, dict] = {}
+    mnos = set(products) | set(stock_by_mno) | set(first_seen)
+    for mno in mnos:
+        p = products.get(mno)
+        stock = stock_by_mno.get(mno)
+        product_url = (p.product_url if p else None) or (stock or {}).get("product_url")
+        launch = (p.launch_month if p else None) or first_seen.get(mno)
+        ctx[mno] = {
+            "stock_count": stock["stock_count"] if stock else None,
+            "stock_ym": stock["ym"] if stock else None,
+            "has_inventory": inv_by_url.get(product_url) if product_url else None,
+            "page_ready": p.page_ready if p else None,
+            "investment_intent": p.investment_intent if p else None,
+            "phase": resolve_phase(launch, p.phase_override if p else None, current_ym),
+        }
+    return ctx
 
 
 class RppActionTogglePayload(BaseModel):
@@ -214,6 +277,8 @@ def get_rpp_diagnosis(
         "cpo_evaluable": False,
         "cpo_skip_reason": "原価データ未取込のためLimit CPO判定はスキップし、ROAS100%ラインを代替基準にしています",
         "min_ct": RPP_MIN_CT_FOR_DIAGNOSIS,
+        # 新商品フェーズの商品はクリック母数の基準を50に引き上げる（2-B パターン1'）
+        "min_ct_new": RPP_MIN_CT_NEW_PRODUCT,
         "issue_labels": ISSUE_LABELS,
         "actions": RPP_ACTIONS,
     }
@@ -231,6 +296,11 @@ def get_rpp_diagnosis(
     avg_ctr = round(sum(ctr_vals) / len(ctr_vals), 2) if ctr_vals else 0.0
     avg_cvr = round(safe_div(total_cv, total_ct) * 100, 2)
 
+    # ベースライン（3段フォールバック。この画面は店舗横断のため店舗平均→デフォルトの解決。
+    # ジャンル別の解決は商品別の診断分類（第2段階）で行う）
+    baseline_ad_cvr = resolve_benchmark(db, "ad_cvr", shop_avg=avg_cvr)
+    baseline_ctr = resolve_benchmark(db, "ctr", shop_avg=avg_ctr)
+
     benchmarks = {
         "avg_ctr": avg_ctr,
         "avg_cvr": avg_cvr,
@@ -238,7 +308,14 @@ def get_rpp_diagnosis(
         "ctr_ratio": RPP_CTR_RATIO,
         "cvr_ratio": RPP_CVR_RATIO,
         "cpc_spike_rate": RPP_CPC_SPIKE_RATE,
+        # どの段のベンチマークを使ったかの根拠情報（フロントの注記表示用）
+        "baseline_ad_cvr": baseline_ad_cvr,
+        "baseline_ctr": baseline_ctr,
     }
+
+    # ── ゲート判定用の商品状態（在庫・ページ品質・フェーズ・意図確認）────────
+    current_ym = (date_from[:7] if date_from else None) or year_month or date.today().strftime("%Y-%m")
+    gate_ctx = _product_gate_context(db, current_ym)
 
     # ── 前期CPC（同商品の前週/前月比較用） ─────────────────────────────
     prev_rows = _prev_period_rows(db, period_type, year_month, date_from)
@@ -263,6 +340,46 @@ def get_rpp_diagnosis(
     for code, grp in sorted(groups.items()):
         m = _aggregate_item(grp)
         prev_cpc = prev_cpc_by_item.get(code)
+        ctx = gate_ctx.get(code, {})
+        phase = ctx.get("phase") or resolve_phase(None, None, current_ym)
+
+        # ── ゲート判定（2-A）: 在庫→ページ品質。引っかかったら診断分類に回さない ──
+        gate = check_gates(
+            has_inventory=ctx.get("has_inventory"),
+            stock_count=ctx.get("stock_count"),
+            stock_source=f"{ctx.get('stock_ym')} 商品分析データ" if ctx.get("stock_ym") else None,
+            page_ready=ctx.get("page_ready"),
+        )
+        if gate is not None:
+            items.append({
+                "management_no": code,
+                "product_name": m["product_name"],
+                "item_url": m["item_url"],
+                "status": "gated",
+                "gate": gate,
+                "phase": phase,
+                "intent_check": None,
+                "issues": [],
+                "metrics": {
+                    "ct": m["ct"],
+                    "ctr": m["ctr"],
+                    "cvr_720": m["cvr_720"],
+                    "roas_720": m["roas_720"],
+                    "cpo_720": m["cpo_720"],
+                    "cpc": m["cpc"],
+                    "prev_cpc": prev_cpc,
+                    "cpc_change_rate": calc_change_rate(m["cpc"], prev_cpc) if prev_cpc else None,
+                    "ad_cost": m["ad_cost"],
+                    "gross_720": m["gross_720"],
+                    "cv_720": m["cv_720"],
+                    "bid_price": m["bid_price"],
+                },
+            })
+            continue
+
+        # 母数ゲート: 新商品フェーズは最低クリック数を50に引き上げる（パターン1'）
+        min_ct = min_ct_for_phase(phase["phase"])
+
         result = detect_rpp_issues(
             ct=m["ct"],
             ctr=m["ctr"],
@@ -275,6 +392,7 @@ def get_rpp_diagnosis(
             # 原価データが無いため CPO 判定はスキップ（上記 docstring 参照）
             cpo=None,
             limit_cpo=None,
+            min_ct=min_ct,
         )
         issues = [
             {
@@ -284,12 +402,22 @@ def get_rpp_diagnosis(
             }
             for i in result["issues"]
         ]
+        # 意図確認（ゲート4・フラグ型）: 新商品の損益分岐点割れには確認/注記を添える
+        intent = needs_intent_check(
+            phase=phase["phase"],
+            roas=m["roas_720"],
+            investment_intent=ctx.get("investment_intent"),
+        )
         items.append({
             "management_no": code,
             "product_name": m["product_name"],
             "item_url": m["item_url"],
             "status": result["status"],
+            "gate": None,
+            "phase": phase,
+            "intent_check": intent,
             "issues": issues,
+            "min_ct": min_ct,
             "metrics": {
                 "ct": m["ct"],
                 "ctr": m["ctr"],

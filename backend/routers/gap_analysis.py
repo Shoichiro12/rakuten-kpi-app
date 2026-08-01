@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import RppWeekly, Target, MonthlyItemSales
 from calculations import calc_kpis, calc_change_rate
-from access_definitions import is_reliable
+from access_definitions import MIN_ACCESS_SAMPLE_MONTHLY, is_reliable, min_access_for
 from shop_metrics import get_shop_monthly
 
 router = APIRouter(prefix="/api/gap", tags=["gap"])
@@ -186,7 +186,7 @@ def _build_shop_products(items, prev_items, genre: Optional[str]) -> dict:
             "limit_cpo_exceeded": False,
             # site_uu 軸。母数（訪問UU）が閾値未満ならCVR・客単価は参考値（要件No.5/No.6）。
             "access_axis": "site_uu",
-            "reliable": is_reliable(kpis.get("access")),
+            "reliable": is_reliable(kpis.get("access"), MIN_ACCESS_SAMPLE_MONTHLY),
         })
 
     result.sort(key=lambda x: x["current"]["gross"], reverse=True)
@@ -395,7 +395,7 @@ def gap_genre(
                 "changes": changes,
                 # site_uu 軸。母数（訪問UU）が閾値未満ならCVR・客単価は参考値（要件No.5/No.6）。
                 "access_axis": "site_uu",
-                "reliable": is_reliable(kpis.get("access")),
+                "reliable": is_reliable(kpis.get("access"), MIN_ACCESS_SAMPLE_MONTHLY),
                 **_genre_path_parts(genre_key, level),
             })
         shop_result.sort(key=lambda x: x["current"]["gross"], reverse=True)
@@ -450,7 +450,7 @@ def gap_genre(
             "changes": changes,
             # rpp_click 軸。母数（クリック数）が閾値未満ならCVR・客単価は参考値（要件No.5/No.6）。
             "access_axis": "rpp_click",
-            "reliable": is_reliable(kpis.get("ct")),
+            "reliable": is_reliable(kpis.get("ct"), min_access_for(period)),
             # --- 追加キー（階層情報） ---
             **path_info,
         })
@@ -583,7 +583,7 @@ def gap_product(
             "limit_cpo_exceeded": kpis["cpo"] > kpis["limit_cpo"] if kpis["limit_cpo"] > 0 else False,
             # rpp_click 軸。母数（クリック数）が閾値未満ならCVR・客単価は参考値（要件No.5/No.6）。
             "access_axis": "rpp_click",
-            "reliable": is_reliable(kpis.get("ct")),
+            "reliable": is_reliable(kpis.get("ct"), min_access_for(period)),
         })
 
     result.sort(key=lambda x: x["current"]["gross"], reverse=True)
@@ -682,7 +682,7 @@ def get_kpi_tree(
         "axis": "shop" if shop else "rpp",
         "access_axis": access_axis,
         # アクセス母数が信用に足るか（要件No.6）。false ならCVR・客単価は参考値。
-        "reliable": is_reliable(actual_access),
+        "reliable": is_reliable(actual_access, min_access_for(period)),
         "kgi": node("売上目標", "kgi", actual_gross, t_sales, "currency"),
         "access": node(access_label, "access", actual_access, t_access, "number"),
         "cvr": node("転換率（CVR）", "cvr", actual_cvr, t_cvr, "percent"),

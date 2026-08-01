@@ -43,6 +43,8 @@ _USER_SCOPED_TABLES = {
     "consulting_inquiries": [],
     # フィードバック（不具合報告・要望。同上）
     "feedbacks": [],
+    # ジャンル別ベンチマーク手入力値（アクション提案ロジック 3-B/3-B'）
+    "genre_benchmarks": [("uq_genre_benchmark", ("genre_u1", "genre_u2", "genre_u3", "metric"))],
 }
 
 
@@ -50,6 +52,13 @@ _USER_SCOPED_TABLES = {
 # {テーブル名: [(列名, 型DDL), ...]}
 _EXTRA_COLUMNS = {
     "shops": [("restock_lead_days", "INTEGER DEFAULT 14")],
+    # アクション提案ロジックのゲート用状態（設計ドキュメント2026-08-01 2-A / 3-A）
+    "products": [
+        ("launch_month", "VARCHAR"),
+        ("phase_override", "VARCHAR"),
+        ("page_ready", "BOOLEAN"),
+        ("investment_intent", "BOOLEAN"),
+    ],
 }
 
 

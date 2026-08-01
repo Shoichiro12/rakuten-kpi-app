@@ -215,9 +215,17 @@ export const api = {
       return request<import('../types').MasterProductsResponse>(`/master/products${qs ? `?${qs}` : ''}`)
         .then((d) => d ?? { count: 0, items: [] })
     },
-    /** product_name / category_id / is_active の編集 */
-    updateProduct: (managementNo: string, data: Partial<Pick<import('../types').MasterProduct, 'product_name' | 'category_id' | 'is_active'>>) =>
+    /** product_name / category_id / is_active ＋ゲート用状態（フェーズ・ページ品質等）の編集 */
+    updateProduct: (managementNo: string, data: Partial<Pick<import('../types').MasterProduct, 'product_name' | 'category_id' | 'is_active' | 'launch_month' | 'phase_override' | 'page_ready' | 'investment_intent'>>) =>
       request(`/master/products/${encodeURIComponent(managementNo)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    /* ─── ジャンル別ベンチマーク手入力（アクション提案ロジック 3-B / 3-B'）─── */
+    benchmarks: () =>
+      request<{ count: number; items: import('../types').GenreBenchmarkItem[] }>('/master/benchmarks')
+        .then((d) => d ?? { count: 0, items: [] }),
+    upsertBenchmark: (data: { genre_u1: string; genre_u2?: string | null; genre_u3?: string | null; metric: 'page_cvr' | 'ad_cvr' | 'ctr'; value: number; memo?: string | null }) =>
+      request<import('../types').GenreBenchmarkItem>('/master/benchmarks', { method: 'POST', body: JSON.stringify(data) }),
+    deleteBenchmark: (id: number) =>
+      request<{ deleted: number }>(`/master/benchmarks/${id}`, { method: 'DELETE' }),
     /** カテゴリ・原価率が未確定の商品の提案キュー（廃盤は除外） */
     suggestions: () =>
       request<import('../types').SuggestionsResponse>('/master/suggestions').then((d) => d ?? { count: 0, items: [] }),

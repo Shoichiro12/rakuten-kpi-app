@@ -1,7 +1,7 @@
 import random
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
-from models import RppWeekly, MonthlyAnalysis, Target, RppSales, MonthlyItemSales, Product, ProductCategory, ProductCost
+from models import RppWeekly, MonthlyAnalysis, Target, RppSales, MonthlyItemSales, Product, ProductCategory, ProductCost, GenreBenchmark
 from masters import get_or_create_default_shop, get_or_create_category, upsert_product, recalc_rpp_cost_of_sales
 
 
@@ -93,6 +93,15 @@ MONTHLY_ITEM_CONFIG = {
 # 取扱停止アクションを検証するため、特別パターン（低母数/欠品/僅少）と重複しない商品を選ぶ。
 DISCONTINUED_MANAGEMENT_NO = "SPW-002"
 
+# ─── ゲート判定（gates.py / 設計ドキュメント2-A）のデモ配置 ─────────────────
+# RPP診断のゲート・フェーズ・意図確認が一通り確認できるよう、商品ごとに状態を仕込む。
+#   BAG-002 … 在庫0（MONTHLY_ITEM_CONFIG）→ 在庫ゲートで診断から除外・入荷提案
+#   BAG-001 … page_ready=False → ページ品質ゲートで「まずページ完成」提案
+#   SPW-003 … 発売月=当月（新商品フェーズ）＋ roas_low → 意図確認（投資ラインの問いかけ）
+#   それ以外 … 発売から1年経過の稼働済み商品として扱う
+NEW_PRODUCT_MANAGEMENT_NO = "SPW-003"
+PAGE_NOT_READY_MANAGEMENT_NO = "BAG-001"
+
 
 def get_week_start(d: date) -> date:
     return d - timedelta(days=d.weekday() + 1) if d.weekday() != 6 else d
@@ -159,6 +168,7 @@ def generate_sample_data(db: Session):
     db.query(ProductCost).delete()
     db.query(Product).delete()
     db.query(ProductCategory).delete()
+    db.query(GenreBenchmark).delete()
 
     today = date.today()
     current_week_start = get_week_start(today)
@@ -395,6 +405,17 @@ def generate_sample_data(db: Session):
         # 1件だけ廃盤にして廃盤機能（除外トグル・バッジ・取扱停止）を検証（旧モデル想定）。
         if mno == DISCONTINUED_MANAGEMENT_NO:
             prod.is_active = False
+        # ── ゲート判定デモ（gates.py）: フェーズ・ページ品質の状態を仕込む ──
+        if mno == NEW_PRODUCT_MANAGEMENT_NO:
+            # 発売月=当月 → 新商品フェーズ（3ヶ月様子見）。roas_low と組み合わせて
+            # 意図確認（「投資ラインとして許容範囲か」）の表示を検証する。
+            prod.launch_month = today.strftime("%Y-%m")
+        else:
+            # それ以外は1年前発売の稼働済み商品（自動推定に依存しない決定的なデモ）
+            prod.launch_month = f"{today.year - 1}-{today.month:02d}"
+        if mno == PAGE_NOT_READY_MANAGEMENT_NO:
+            # ページ未完成 → ページ品質ゲートで広告提案を止め「まずページ完成」を提示
+            prod.page_ready = False
         # 原価率（個別）: 提案キューのデモ対象以外に設定する（PRICE_RANGES の原価率を流用）。
         if mno not in COST_UNSET:
             rate = PRICE_RANGES[mno][1]
@@ -416,6 +437,14 @@ def generate_sample_data(db: Session):
                 gp[1] if len(gp) > 1 else None,
                 MONTHLY_ITEM_CONFIG.get(mno, {}).get("genre_u3"),
             )
+
+    # ── ジャンル別ベンチマーク手入力のデモ（benchmarks.py の①を検証）──
+    # RMS画面で見た値を入力した想定。RPP診断のベースライン解決が
+    # manual_genre → shop_avg → default とフォールバックする様子を確認できる。
+    db.add(GenreBenchmark(
+        genre_u1="スポーツ", genre_u2="シューズ", genre_u3=None,
+        metric="ctr", value=1.8, memo="RMS表示値（デモデータ）",
+    ))
 
     db.flush()
     recalc_rpp_cost_of_sales(db)  # 個別原価率を RppWeekly に反映

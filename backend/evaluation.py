@@ -106,6 +106,7 @@ def evaluate_matrix(
     av: dict,
     low_sample: bool = False,
     access_axis: Optional[AccessAxis] = None,
+    min_access: int = MIN_ACCESS_SAMPLE,
 ) -> dict:
     """judge_metric の結果4つから評価マトリクスを構築する。
 
@@ -115,6 +116,8 @@ def evaluate_matrix(
                      フォーカスを固定する。
         access_axis : アクセス指標の軸（"rpp_click" | "site_uu"）。どちらの母数で
                      判定したかをレスポンスに明示する（要件No.5）。
+        min_access : 母数判定に使った閾値。週次=100 / 月次=430
+                     （access_definitions.min_access_for() で期間に応じて渡す）。
 
     Returns:
         pattern_no : 1〜16（判定可能時）/ 17（判定不可）
@@ -153,7 +156,7 @@ def evaluate_matrix(
             "metrics": metrics,
             "undetermined": undetermined,
             "low_sample": low_sample,
-            "min_access": MIN_ACCESS_SAMPLE,
+            "min_access": min_access,
             "access_axis": access_axis,
         }
 
@@ -167,7 +170,7 @@ def evaluate_matrix(
         else:
             rank, priority = "△", "高"
         comment = (
-            f"アクセス母数が{MIN_ACCESS_SAMPLE}未満のため、CVR・客単価は評価していません"
+            f"アクセス母数が{min_access}未満のため、CVR・客単価は評価していません"
             "（統計的に信用できないため）。まずアクセス対策で母数を確保しましょう。"
         )
         return {
@@ -179,7 +182,7 @@ def evaluate_matrix(
             "metrics": metrics,
             "undetermined": undetermined,
             "low_sample": True,
-            "min_access": MIN_ACCESS_SAMPLE,
+            "min_access": min_access,
             "access_axis": access_axis,
         }
 
@@ -224,5 +227,5 @@ def evaluate_matrix(
         "metrics": metrics,
         "undetermined": undetermined,
         "low_sample": False,
-        "min_access": MIN_ACCESS_SAMPLE,
+        "min_access": min_access,
     }

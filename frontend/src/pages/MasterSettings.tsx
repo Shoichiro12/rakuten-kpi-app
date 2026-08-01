@@ -3,7 +3,7 @@ import { Save, CheckCircle, RefreshCw, Plus, Trash2, Pencil, Check, X, Download,
 import Header from '../components/layout/Header'
 import GenrePicker from '../components/GenrePicker'
 import { api } from '../lib/api'
-import type { MasterProduct, CostItem, Category, SuggestionItem, GenreTree, GenreValue } from '../types'
+import type { MasterProduct, CostItem, Category, SuggestionItem, GenreTree, GenreValue, GenreBenchmarkItem } from '../types'
 
 /** 管理番号ごとに商品マスタ情報＋適用中の原価率をまとめた1行。 */
 interface Row extends MasterProduct {
@@ -42,6 +42,12 @@ export default function MasterSettings() {
   const [editingCatId, setEditingCatId] = useState<number | null>(null)
   const [editCat, setEditCat] = useState({ genre_u1: '', genre_u2: '', genre_u3: '' })
 
+  // ジャンル別ベンチマーク手入力（RMS表示値。診断の基準①として最優先で使われる）
+  const [benchmarks, setBenchmarks] = useState<GenreBenchmarkItem[]>([])
+  const [newBench, setNewBench] = useState<{ genre: GenreValue; metric: 'page_cvr' | 'ad_cvr' | 'ctr'; value: string; memo: string }>({
+    genre: { genre_u1: '', genre_u2: '', genre_u3: '' }, metric: 'page_cvr', value: '', memo: '',
+  })
+
   const flash = (msg: string) => {
     setSavedMsg(msg)
     setTimeout(() => setSavedMsg(null), 2000)
@@ -50,13 +56,14 @@ export default function MasterSettings() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const [prodRes, costRes, shopRes, catRes, sugRes, treeRes] = await Promise.all([
+      const [prodRes, costRes, shopRes, catRes, sugRes, treeRes, benchRes] = await Promise.all([
         api.master.products(),
         api.costs.list(),
         api.shops.me(),
         api.master.categories(),
         api.master.suggestions(),
         api.master.genreTree(),
+        api.master.benchmarks(),
       ])
       const costMap = new Map<string, CostItem>()
       for (const c of costRes.items) costMap.set(c.management_no, c)
@@ -73,6 +80,7 @@ export default function MasterSettings() {
       setCategories(catRes.items)
       setSuggestions(sugRes.items)
       setGenreTree(treeRes)
+      setBenchmarks(benchRes.items)
       setShopName(shopRes.name)
       setCostPct(Math.round((shopRes.default_cost_rate ?? 0.6) * 100))
       setExpensePct(Math.round((shopRes.default_expense_rate ?? 0.15) * 100))
@@ -152,6 +160,55 @@ export default function MasterSettings() {
       flash(`${r.management_no} の原価率を更新（再計算済み）`)
     } catch (e) {
       console.error('[MasterSettings] 原価率更新エラー:', e)
+    }
+  }
+
+  /** ゲート用状態（フェーズ・ページ品質・投資許容・発売月）の更新 */
+  const saveGateState = async (
+    r: Row,
+    data: Partial<Pick<MasterProduct, 'launch_month' | 'phase_override' | 'page_ready' | 'investment_intent'>>,
+  ) => {
+    try {
+      await api.master.updateProduct(r.management_no, data)
+      setRows((prev) => prev.map((x) => x.management_no === r.management_no ? { ...x, ...data } : x))
+      flash(`${r.management_no} の提案設定を更新しました`)
+    } catch (e) {
+      console.error('[MasterSettings] 提案設定更新エラー:', e)
+    }
+  }
+
+  // ベンチマーク手入力 ─────────────────────────
+  const addBenchmark = async () => {
+    const v = Number(newBench.value)
+    if (!newBench.genre.genre_u1.trim() || !Number.isFinite(v) || v <= 0) {
+      flash('大分類と0より大きい%値を入力してください')
+      return
+    }
+    try {
+      await api.master.upsertBenchmark({
+        genre_u1: newBench.genre.genre_u1.trim(),
+        genre_u2: newBench.genre.genre_u2.trim() || null,
+        genre_u3: newBench.genre.genre_u3.trim() || null,
+        metric: newBench.metric,
+        value: v,
+        memo: newBench.memo.trim() || null,
+      })
+      setNewBench({ genre: { genre_u1: '', genre_u2: '', genre_u3: '' }, metric: 'page_cvr', value: '', memo: '' })
+      await load()
+      flash('ベンチマークを保存しました')
+    } catch (e) {
+      console.error('[MasterSettings] ベンチマーク保存エラー:', e)
+      flash('保存に失敗しました')
+    }
+  }
+
+  const removeBenchmark = async (b: GenreBenchmarkItem) => {
+    try {
+      await api.master.deleteBenchmark(b.id)
+      setBenchmarks((prev) => prev.filter((x) => x.id !== b.id))
+      flash('ベンチマークを削除しました（自店集計→既定値へフォールバックします）')
+    } catch (e) {
+      console.error('[MasterSettings] ベンチマーク削除エラー:', e)
     }
   }
 
@@ -521,6 +578,7 @@ export default function MasterSettings() {
                       <th className="px-3 py-2.5 text-left">商品名</th>
                       <th className="px-3 py-2.5 text-left">ジャンル</th>
                       <th className="px-3 py-2.5 text-right">原価率</th>
+                      <th className="px-3 py-2.5 text-left">広告提案の状態</th>
                       <th className="px-3 py-2.5 text-center">状態</th>
                     </tr>
                   </thead>
@@ -556,6 +614,62 @@ export default function MasterSettings() {
                               {r.cost_source === 'product' ? '個別' : '既定'}
                             </span>
                           </span>
+                        </td>
+                        <td className="px-3 py-2">
+                          {/* ゲート用状態（診断・提案の前提。設計ドキュメント2-A / 3-A） */}
+                          <div className="flex flex-col gap-1 min-w-[180px]">
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="text-[10px] text-gray-400 w-14 shrink-0">フェーズ</span>
+                              <select
+                                value={r.phase_override ?? 'auto'}
+                                onChange={(e) => {
+                                  const v = e.target.value
+                                  saveGateState(r, { phase_override: v === 'auto' ? null : (v as 'new' | 'established') })
+                                }}
+                                className="text-xs border border-gray-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                title="新商品は最初の3ヶ月を様子見期間とし、RPP診断の母数基準を50クリックに引き上げます。自動=発売月から判定"
+                              >
+                                <option value="auto">自動（発売+3ヶ月）</option>
+                                <option value="new">新商品</option>
+                                <option value="established">稼働済み</option>
+                              </select>
+                              <input
+                                type="month"
+                                value={r.launch_month ?? ''}
+                                onChange={(e) => saveGateState(r, { launch_month: e.target.value || null })}
+                                className="text-xs border border-gray-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                title="発売月。未入力は実績データの初出月から自動推定"
+                              />
+                            </span>
+                            <span className="inline-flex items-center gap-1.5">
+                              <span className="text-[10px] text-gray-400 w-14 shrink-0">ページ</span>
+                              <select
+                                value={r.page_ready === null ? 'unknown' : r.page_ready ? 'ready' : 'not_ready'}
+                                onChange={(e) => {
+                                  const v = e.target.value
+                                  saveGateState(r, { page_ready: v === 'unknown' ? null : v === 'ready' })
+                                }}
+                                className="text-xs border border-gray-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                title="「未完成」にすると、ページが完成するまで広告関連の提案を保留し「まずページ完成」を提案します"
+                              >
+                                <option value="unknown">未回答</option>
+                                <option value="ready">完成</option>
+                                <option value="not_ready">未完成</option>
+                              </select>
+                              <label
+                                className="inline-flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer select-none"
+                                title="新商品の低ROASを意図的な投資として許容する場合にチェック。診断の数値は変わらず、表示が注記付きになります"
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={r.investment_intent === true}
+                                  onChange={(e) => saveGateState(r, { investment_intent: e.target.checked ? true : null })}
+                                  className="rounded border-gray-300"
+                                />
+                                投資許容
+                              </label>
+                            </span>
+                          </div>
                         </td>
                         <td className="px-3 py-2 text-center">
                           <button
@@ -627,6 +741,82 @@ export default function MasterSettings() {
                         </div>
                       </>
                     )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {/* ジャンル別ベンチマーク手入力（アクション提案ロジック 3-B / 3-B'） */}
+          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b">
+              <h3 className="text-sm font-semibold text-gray-700">ジャンル別ベンチマーク（RMS表示値の手入力）</h3>
+              <p className="text-xs text-gray-400 mt-0.5">
+                楽天RMSに表示される「同ジャンル・同規模店舗のベンチマーク値」を入力すると、診断の比較基準として最優先で使われます。
+                未入力のジャンルは「自店の同ジャンル集計 → 汎用ベースライン（ページCVR 7% / 広告CVR 3〜5% / CTR 2%）」の順で自動的に代用されます。
+              </p>
+            </div>
+
+            {/* 入力フォーム */}
+            <div className="px-4 py-3 border-b bg-gray-50 flex flex-wrap items-center gap-2">
+              <GenrePicker
+                tree={genreTree}
+                value={newBench.genre}
+                onChange={(g) => setNewBench((p) => ({ ...p, genre: g }))}
+                compact
+              />
+              <select
+                value={newBench.metric}
+                onChange={(e) => setNewBench((p) => ({ ...p, metric: e.target.value as 'page_cvr' | 'ad_cvr' | 'ctr' }))}
+                className="text-xs border border-gray-200 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="page_cvr">ページ全体CVR</option>
+                <option value="ad_cvr">RPP広告経由CVR</option>
+                <option value="ctr">CTR</option>
+              </select>
+              <span className="inline-flex items-center gap-1">
+                <input
+                  type="number" min={0} max={100} step={0.01}
+                  value={newBench.value}
+                  onChange={(e) => setNewBench((p) => ({ ...p, value: e.target.value }))}
+                  placeholder="7.52"
+                  className="w-20 text-right text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-gray-400 text-xs">%</span>
+              </span>
+              <input
+                value={newBench.memo}
+                onChange={(e) => setNewBench((p) => ({ ...p, memo: e.target.value }))}
+                placeholder="出典メモ（例: RMS 2026-07 表示値）"
+                className="w-52 text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              <button
+                onClick={addBenchmark}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                <Plus size={14} />保存
+              </button>
+            </div>
+
+            {benchmarks.length === 0 ? (
+              <div className="py-8 text-center text-sm text-gray-400">
+                手入力のベンチマークはまだありません（自店集計・汎用ベースラインで動作中）
+              </div>
+            ) : (
+              <ul className="divide-y divide-gray-100">
+                {benchmarks.map((b) => (
+                  <li key={b.id} className="px-4 py-2.5 flex items-center gap-3">
+                    <span className="text-sm text-gray-800">
+                      {[b.genre_u1, b.genre_u2, b.genre_u3].filter(Boolean).join(' > ')}
+                    </span>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">{b.metric_label}</span>
+                    <span className="text-sm font-semibold text-gray-900">{b.value}%</span>
+                    {b.memo && <span className="text-xs text-gray-400">{b.memo}</span>}
+                    <div className="ml-auto">
+                      <button onClick={() => removeBenchmark(b)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="削除">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </li>
                 ))}
               </ul>

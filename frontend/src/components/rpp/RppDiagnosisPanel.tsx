@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { X, AlertTriangle, Info, CheckSquare, Square, CheckCircle2 } from 'lucide-react'
+import { X, AlertTriangle, Info, CheckSquare, Square, CheckCircle2, PackageX, HelpCircle } from 'lucide-react'
 import { api } from '../../lib/api'
 import { formatCurrency, formatPercent } from '../../lib/utils'
 import type { RppConfidence, RppDiagnosisItem, RppDiagnosisResponse } from '../../types'
@@ -107,6 +107,14 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
             {item.product_name || item.management_no}
           </p>
           <p className="text-xs text-gray-400">{item.management_no}</p>
+          {item.phase?.phase === 'new' && (
+            <span
+              className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-100 text-sky-700"
+              title={`発売月 ${item.phase.launch_month ?? '不明'}。新商品は最初の3ヶ月を様子見期間とし、判定基準を緩めます（商品マスタで変更可）`}
+            >
+              {item.phase.label}
+            </span>
+          )}
         </div>
         <button onClick={onClose} className="p-1.5 hover:bg-gray-200 rounded-lg shrink-0">
           <X size={15} />
@@ -135,7 +143,33 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
           <p className="mt-2 text-[10px] text-gray-400">
             クリック数 {m.ct.toLocaleString()} ／ 広告費 {formatCurrency(m.ad_cost)} ／ 売上(720h) {formatCurrency(m.gross_720)}
           </p>
+          {(b.baseline_ad_cvr || b.baseline_ctr) && (
+            <p className="mt-1 text-[10px] text-gray-400 leading-snug">
+              基準値の根拠:{' '}
+              {b.baseline_ctr && `CTR ${formatPercent(b.baseline_ctr.value, 2)}（${b.baseline_ctr.source_label}）`}
+              {b.baseline_ctr && b.baseline_ad_cvr && ' ／ '}
+              {b.baseline_ad_cvr && `広告CVR ${formatPercent(b.baseline_ad_cvr.value, 2)}（${b.baseline_ad_cvr.source_label}）`}
+            </p>
+          )}
         </div>
+
+        {/* ゲート判定（在庫・ページ品質）: 診断分類の対象外。ゲートの提案を表示する */}
+        {item.status === 'gated' && item.gate && (
+          <div className="px-4 py-4">
+            <div className="rounded-xl border border-orange-200 bg-orange-50 p-3 flex items-start gap-2">
+              <PackageX size={14} className="text-orange-500 mt-0.5 shrink-0" />
+              <div>
+                <p className="text-xs font-bold text-orange-700">{item.gate.label}</p>
+                <p className="text-[11px] font-semibold text-gray-800 mt-1.5">
+                  {item.gate.proposal.title}
+                </p>
+                <p className="text-[11px] text-gray-600 leading-snug mt-1">
+                  {item.gate.proposal.reason}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* データ不足（判定スキップ・情報表示のみ。警告扱いにしない） */}
         {insufficient && (
@@ -145,11 +179,29 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
               <div>
                 <p className="text-xs font-bold text-gray-700">データ不足</p>
                 <p className="text-[11px] text-gray-500 leading-snug mt-1">
-                  クリック数が{diagnosis.min_ct}件未満のため判定をスキップしました。
+                  クリック数が{item.min_ct ?? diagnosis.min_ct}件未満のため判定をスキップしました。
+                  {item.phase?.phase === 'new' && ' 新商品フェーズのため、基準を通常の10件から50件に引き上げています。'}
                   母数が少ない状態では各指標がぶれやすく、誤った対策につながるため、
-                  もう少しデータが貯まってから確認してください。
+                  まず露出とデータ蓄積を優先してください。
                 </p>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* 意図確認（ゲート4・フラグ型）: 診断は数値どおり出した上で問いかけ/注記を添える */}
+        {item.intent_check && (
+          <div className="px-4 pt-3">
+            <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 flex items-start gap-2">
+              <HelpCircle size={14} className="text-sky-500 mt-0.5 shrink-0" />
+              <p className="text-[11px] text-sky-800 leading-snug">
+                {item.intent_check.ask ? item.intent_check.question : item.intent_check.note}
+                {item.intent_check.ask && (
+                  <span className="block mt-1 text-[10px] text-sky-600">
+                    回答は商品マスタ設定の「投資として許容」から登録できます。
+                  </span>
+                )}
+              </p>
             </div>
           </div>
         )}

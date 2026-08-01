@@ -101,10 +101,25 @@ function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
   if (!diag) {
     return <span className="text-gray-300">—</span>
   }
+  if (diag.status === 'gated') {
+    // ゲート判定（在庫・ページ品質）に該当 → 診断分類の対象外。バッジで理由を示す
+    const short = diag.gate?.gate === 'stock' ? '在庫なし' : 'ページ未完成'
+    return (
+      <span
+        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700"
+        title={diag.gate?.label}
+      >
+        {short}
+      </span>
+    )
+  }
   if (diag.status === 'insufficient_data') {
     return (
-      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500">
-        データ不足
+      <span
+        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500"
+        title={diag.phase?.phase === 'new' ? '新商品フェーズのため基準50クリックで判定' : undefined}
+      >
+        データ不足{diag.phase?.phase === 'new' ? '（新商品）' : ''}
       </span>
     )
   }

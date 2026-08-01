@@ -103,6 +103,14 @@ export interface MasterProduct {
   genre_u2: string | null
   genre_u3: string | null
   is_active: boolean
+  /** 発売月 YYYY-MM。null は実績データの初出月から自動推定 */
+  launch_month: string | null
+  /** 商品フェーズの上書き。null=自動判定（発売から3ヶ月は新商品） */
+  phase_override: 'new' | 'established' | null
+  /** ページ品質ゲート。null=未回答 / false=未完成（広告提案を保留） / true=完成 */
+  page_ready: boolean | null
+  /** 意図確認ゲートの回答。true=新商品への意図的出稿として許容中 */
+  investment_intent: boolean | null
   updated_at: string | null
 }
 
@@ -616,7 +624,61 @@ export interface InboxListResponse {
 
 /** 確信度。needs_check はキーワード別レポート取込後に confirmed へ昇格予定 */
 export type RppConfidence = 'confirmed' | 'needs_check' | 'info'
-export type RppDiagnosisStatus = 'insufficient_data' | 'issues' | 'good'
+/** gated = ゲート判定（在庫・ページ品質）に該当し、診断分類の対象外 */
+export type RppDiagnosisStatus = 'insufficient_data' | 'issues' | 'good' | 'gated'
+
+/* ─── ゲート判定（設計ドキュメント2026-08-01 2-A / gates.py） ────── */
+
+export type GateKind = 'stock' | 'page_quality' | 'sample_size'
+
+export interface GateResult {
+  gate: GateKind
+  label: string
+  proposal: {
+    title: string
+    reason: string
+    effort: string
+  }
+  context: Record<string, unknown>
+}
+
+/** 商品フェーズ（3-A）。新商品はデフォルト発売3ヶ月、担当者が上書き可能 */
+export interface PhaseInfo {
+  phase: 'new' | 'established'
+  basis: 'override' | 'launch_month' | 'unknown'
+  launch_month: string | null
+  label: string
+}
+
+/** 意図確認（ゲート4・フラグ型）。ask=true は確認の問いかけ、false は許容済みの注記 */
+export interface IntentCheck {
+  ask: boolean
+  question?: string
+  note?: string
+}
+
+/** ベンチマーク解決の結果（benchmarks.py の3段フォールバック） */
+export interface BenchmarkResolution {
+  metric: 'page_cvr' | 'ad_cvr' | 'ctr'
+  metric_label: string
+  value: number
+  source: 'manual_genre' | 'shop_genre' | 'shop_avg' | 'default'
+  source_label: string
+  detail: string
+}
+
+/** ジャンル別ベンチマーク手入力値（/api/master/benchmarks） */
+export interface GenreBenchmarkItem {
+  id: number
+  genre_u1: string
+  genre_u2: string | null
+  genre_u3: string | null
+  metric: 'page_cvr' | 'ad_cvr' | 'ctr'
+  metric_label: string
+  value: number
+  memo: string | null
+  updated_at: string | null
+}
 
 /** 既存ActionPanelのActionDefと同構造 + confidence（バックエンドRPP_ACTIONSと対応） */
 export interface RppActionDef {
@@ -655,6 +717,14 @@ export interface RppDiagnosisItem {
   product_name: string | null
   item_url: string | null
   status: RppDiagnosisStatus
+  /** ゲート判定に該当した場合のみ（status='gated'） */
+  gate?: GateResult | null
+  /** 商品フェーズ（新商品/稼働済み）。母数基準の切替根拠 */
+  phase?: PhaseInfo
+  /** 意図確認（新商品の損益分岐点割れ時のみ） */
+  intent_check?: IntentCheck | null
+  /** この商品に適用された最低クリック母数（新商品=50 / 稼働済み=10） */
+  min_ct?: number
   issues: RppDiagnosisIssue[]
   metrics: RppDiagnosisMetrics
 }
@@ -666,6 +736,9 @@ export interface RppDiagnosisBenchmarks {
   ctr_ratio?: number
   cvr_ratio?: number
   cpc_spike_rate?: number
+  /** ベースラインの解決結果（どの段のベンチマークを使ったかの根拠表示用） */
+  baseline_ad_cvr?: BenchmarkResolution
+  baseline_ctr?: BenchmarkResolution
 }
 
 export interface RppDiagnosisResponse {
@@ -679,6 +752,8 @@ export interface RppDiagnosisResponse {
   cpo_evaluable: boolean
   cpo_skip_reason: string
   min_ct: number
+  /** 新商品フェーズの最低クリック母数（パターン1'の商品粒度読み替え） */
+  min_ct_new?: number
   issue_labels: Record<string, string>
   actions: RppActionDef[]
   benchmarks: RppDiagnosisBenchmarks

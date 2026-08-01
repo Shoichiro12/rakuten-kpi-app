@@ -262,6 +262,18 @@ class Product(Base, UserScopedMixin):
     product_url = Column(String)
     category_id = Column(Integer, ForeignKey("product_categories.id"), nullable=True)
     is_active = Column(Boolean, default=True)   # 廃盤・取扱停止フラグ（手動管理・取込で上書きしない）
+    # ── アクション提案ロジックのゲート用状態（設計ドキュメント2026-08-01 2-A）──
+    # launch_month: 発売月 YYYY-MM。null なら実績データの初出月から自動推定する。
+    # phase_override: 'new' | 'established' | null(自動判定=発売から3ヶ月は新商品)。
+    #                 担当者が様子見期間を延長・短縮するための上書き（3-A）。
+    # page_ready: ページ品質ゲート。null=未回答（ゲートは通す）/ False=未完成
+    #             （広告強化を止め「まずページ完成」を提案）/ True=完成。
+    # investment_intent: 意図確認ゲート（2-A ゲート4）の回答保存。True=新商品への
+    #                    意図的出稿として許容中（診断は変えず、見せ方の注記だけ変える）。
+    launch_month = Column(String, nullable=True)
+    phase_override = Column(String, nullable=True)
+    page_ready = Column(Boolean, nullable=True)
+    investment_intent = Column(Boolean, nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -282,6 +294,37 @@ class ProductCost(Base, UserScopedMixin):
 
     __table_args__ = (
         UniqueConstraint("user_id", "management_no", name="uq_product_cost"),
+    )
+
+
+class GenreBenchmark(Base, UserScopedMixin):
+    """ジャンル別ベンチマークの手入力値（設計ドキュメント2026-08-01 3-B / 3-B'）。
+
+    RMS画面に表示される「同ジャンル・同規模店舗のベンチマーク値」は取込CSVに
+    含まれないため、利用者が見た値を任意で入力して保存する（オーナー確認済みの方針）。
+    ベンチマーク解決の優先順位（benchmarks.py）:
+      ①この手入力値 → ②自店ジャンル集計 → ③汎用デフォルト（7% / 3〜5% / 2%）
+
+    metric は指標の種類:
+      'page_cvr' … ページ全体CVR（site_uu軸、全流入経路）
+      'ad_cvr'   … RPP広告経由CVR（rpp_click軸）
+      'ctr'      … RPP広告CTR
+    genre_u2 / genre_u3 は null 可（大分類だけの入力も許す。詳細な階層が優先される）。
+    """
+    __tablename__ = "genre_benchmarks"
+
+    id = Column(Integer, primary_key=True, index=True)
+    genre_u1 = Column(String, nullable=False)
+    genre_u2 = Column(String, nullable=True)
+    genre_u3 = Column(String, nullable=True)
+    metric = Column(String, nullable=False)   # 'page_cvr' | 'ad_cvr' | 'ctr'
+    value = Column(Float, nullable=False)     # %値（例: 7.52）
+    memo = Column(String)                     # 出典メモ（例: RMS 2026-07 表示値）
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "genre_u1", "genre_u2", "genre_u3", "metric",
+                         name="uq_genre_benchmark"),
     )
 
 

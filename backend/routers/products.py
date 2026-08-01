@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import RppWeekly
 from calculations import calc_kpis
-from access_definitions import is_reliable
+from access_definitions import is_reliable, min_access_for
 from masters import inactive_management_nos
 
 router = APIRouter(prefix="/api/products", tags=["products"])
@@ -110,7 +110,7 @@ def list_products(
             # この一覧はRPP軸（RppWeekly.ct＝クリック数）。母数が閾値未満ならCVR・客単価は
             # 参考値（要件No.5/No.6）。reliable=false の商品はフロントで注記を出す。
             "access_axis": "rpp_click",
-            "reliable": is_reliable(kpis["ct"]),
+            "reliable": is_reliable(kpis["ct"], min_access_for(period)),
         })
 
     result.sort(key=lambda x: x["gross"], reverse=True)

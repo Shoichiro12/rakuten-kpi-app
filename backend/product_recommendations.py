@@ -17,7 +17,9 @@ docs/VISION.md が目指すのは AIストアマネージャーなので、
 
 from typing import Optional
 
-from access_definitions import MIN_ACCESS_SAMPLE, is_reliable  # noqa: F401
+# このモジュールの入力は月次データ（MonthlyItemSales）のみなので、母数判定は
+# 月次換算の閾値（430 = 週100件 × 30 ÷ 7）を使う（2026-08-01 オーナー承認済み）。
+from access_definitions import MIN_ACCESS_SAMPLE_MONTHLY, is_reliable  # noqa: F401
 
 # レビュー評価の警戒ライン（楽天の平均的な水準を踏まえた保守的な閾値）
 LOW_REVIEW_SCORE = 3.5
@@ -139,7 +141,7 @@ def _rule_low_cvr(row, shop, days_in_month: int) -> Optional[dict]:
     改善インパクトは「店舗平均CVRまで戻した場合の増加売上」で見積もる。
     """
     access = row.access_uu or 0
-    if not is_reliable(access):
+    if not is_reliable(access, MIN_ACCESS_SAMPLE_MONTHLY):
         return None
     shop_cvr = (shop or {}).get("cvr") or 0
     cvr = row.cvr or 0
@@ -175,7 +177,7 @@ def _rule_low_cvr(row, shop, days_in_month: int) -> Optional[dict]:
 def _rule_no_review(row, shop, days_in_month: int) -> Optional[dict]:
     """アクセスがあるのにレビューが無い商品。レビューはCVRの主要因。"""
     access = row.access_uu or 0
-    if not is_reliable(access) or (row.review_count or 0) > 0:
+    if not is_reliable(access, MIN_ACCESS_SAMPLE_MONTHLY) or (row.review_count or 0) > 0:
         return None
     sales = row.sales or 0
     if sales <= 0:
@@ -237,7 +239,7 @@ def _rule_high_potential(row, shop, days_in_month: int) -> Optional[dict]:
     if shop_cvr <= 0 or cvr <= 0:
         return None
     # 母数が極端に小さい商品はCVRが偶然高く出るため除外する
-    if not is_reliable(access):
+    if not is_reliable(access, MIN_ACCESS_SAMPLE_MONTHLY):
         return None
     if cvr < shop_cvr * CVR_HIGH_RATIO:
         return None
@@ -281,7 +283,7 @@ def _rule_low_sample_hold(row, shop, days_in_month: int) -> Optional[dict]:
     データが全く無い商品（アクセス0）には出さない（多少のアクセスがある低母数のみ）。
     """
     access = row.access_uu or 0
-    if access <= 0 or is_reliable(access):
+    if access <= 0 or is_reliable(access, MIN_ACCESS_SAMPLE_MONTHLY):
         return None
     sales = row.sales or 0
     return {
@@ -292,15 +294,15 @@ def _rule_low_sample_hold(row, shop, days_in_month: int) -> Optional[dict]:
         "management_no": row.management_no,
         "title": f"「{_name(row)}」は判定保留（データ蓄積待ち）",
         "reason": (
-            f"アクセス {access:,}人で母数が{MIN_ACCESS_SAMPLE}未満です。この人数ではCVR・客単価が"
-            "統計的に信用できません。今の数値で価格やページを判断せず、まずアクセスを積んで"
-            "母数を確保してから見直してください。"
+            f"アクセス {access:,}人で母数が月{MIN_ACCESS_SAMPLE_MONTHLY}未満（週100件相当）です。"
+            "この人数ではCVR・客単価が統計的に信用できません。今の数値で価格やページを判断せず、"
+            "まずアクセスを積んで母数を確保してから見直してください。"
         ),
         "impact": "誤った判断を避けるための保留です",
         # 並び順のためだけの極小値（保留は最下位に置く）
         "impact_value": sales * 0.001,
         "effort": "—",
-        "badges": [f"母数 {access:,}（<{MIN_ACCESS_SAMPLE}）", "参考値"],
+        "badges": [f"母数 {access:,}（<{MIN_ACCESS_SAMPLE_MONTHLY}）", "参考値"],
         "link": "/products",
     }
 

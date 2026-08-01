@@ -21,7 +21,19 @@ AccessAxis = Literal["rpp_click", "site_uu"]
 
 # アクセス母数の下限。これ未満は CVR・客単価を統計的に信用しない（要件No.6）。
 # 旧 evaluation.MIN_ACCESS_SAMPLE をここへ集約。全画面・全ルーターで共通利用する。
-MIN_ACCESS_SAMPLE = 100
+#
+# 基準は「週あたり100件」（NATIONS DAY3・オーナー確認済み）。この100は週次の値なので、
+# 月次データに対しては月換算（100 × 30 ÷ 7 ≒ 429 → 430）で判定する。
+# 従来は月次にも100を使っていたが、それでは月次でほぼ全商品が母数条件を満たしてしまい
+# ゲートとして機能しないため、2026-08-01 の設計整理で換算を導入した（オーナー承認済み）。
+# 週次の閾値・既定値は従来どおり100で変更なし。
+MIN_ACCESS_SAMPLE = 100            # 週次（週あたりアクセス）
+MIN_ACCESS_SAMPLE_MONTHLY = 430    # 月次（週100件の月換算）
+
+
+def min_access_for(period_type: Literal["weekly", "monthly"]) -> int:
+    """期間種別に応じたアクセス母数の下限を返す（weekly=100 / monthly=430）。"""
+    return MIN_ACCESS_SAMPLE_MONTHLY if period_type == "monthly" else MIN_ACCESS_SAMPLE
 
 
 def is_reliable(denominator, threshold: int = MIN_ACCESS_SAMPLE) -> bool:

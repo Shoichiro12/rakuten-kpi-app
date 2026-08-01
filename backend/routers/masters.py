@@ -16,7 +16,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import Product, ProductCategory, ProductCost, Shop
+from models import GenreBenchmark, Product, ProductCategory, ProductCost, Shop
 from masters import (
     DEFAULT_COST_RATE,
     get_or_create_category,
@@ -65,6 +65,11 @@ def list_master_products(
             "genre_u2": cat.genre_u2 if cat else None,
             "genre_u3": cat.genre_u3 if cat else None,
             "is_active": p.is_active,
+            # アクション提案ロジックのゲート用状態（2-A / 3-A）
+            "launch_month": p.launch_month,
+            "phase_override": p.phase_override,
+            "page_ready": p.page_ready,
+            "investment_intent": p.investment_intent,
             "updated_at": p.updated_at.isoformat() if p.updated_at else None,
         })
     return {"count": len(items), "items": items}
@@ -74,6 +79,12 @@ class ProductUpdatePayload(BaseModel):
     product_name: Optional[str] = None
     category_id: Optional[int] = None
     is_active: Optional[bool] = None
+    # ゲート用状態。exclude_unset で「送られたキーだけ」更新するため、
+    # None を明示的に送れば「未回答/自動判定に戻す」操作になる。
+    launch_month: Optional[str] = None
+    phase_override: Optional[str] = None      # 'new' | 'established' | None(自動判定)
+    page_ready: Optional[bool] = None         # True/False/None(未回答)
+    investment_intent: Optional[bool] = None  # True(投資として許容)/None
 
 
 @router.put("/products/{management_no}")
@@ -94,6 +105,13 @@ def update_master_product(
         exists = db.query(ProductCategory).filter(ProductCategory.id == data["category_id"]).first()
         if exists is None:
             raise HTTPException(status_code=400, detail="指定されたカテゴリが存在しません")
+    if "phase_override" in data and data["phase_override"] not in (None, "new", "established"):
+        raise HTTPException(status_code=400, detail="phase_override は new / established / null のみ指定できます")
+    if "launch_month" in data and data["launch_month"] is not None:
+        lm = str(data["launch_month"]).strip()
+        if len(lm) != 7 or lm[4] != "-" or not (lm[:4] + lm[5:]).isdigit():
+            raise HTTPException(status_code=400, detail="launch_month は YYYY-MM 形式で指定してください")
+        data["launch_month"] = lm
     for key, value in data.items():
         setattr(prod, key, value)
     db.commit()
@@ -102,6 +120,10 @@ def update_master_product(
         "product_name": prod.product_name,
         "category_id": prod.category_id,
         "is_active": prod.is_active,
+        "launch_month": prod.launch_month,
+        "phase_override": prod.phase_override,
+        "page_ready": prod.page_ready,
+        "investment_intent": prod.investment_intent,
     }
 
 
@@ -458,6 +480,94 @@ async def import_master_products(file: UploadFile = File(...), db: Session = Dep
         "recalculated_rows": recalculated,
         "processed": len(touched),
     }
+
+
+# ── ジャンル別ベンチマーク手入力（アクション提案ロジック 3-B / 3-B'）──────────
+# RMS画面に表示される「同ジャンル・同規模店舗のベンチマーク値」は取込CSVに含まれない
+# ため、利用者が見た値を任意で登録する。ベンチマーク解決（benchmarks.py）の①として
+# 最優先で使われ、無ければ自店集計→汎用デフォルトへフォールバックする。
+
+_BENCHMARK_METRICS = ("page_cvr", "ad_cvr", "ctr")
+
+_BENCHMARK_METRIC_LABELS = {
+    "page_cvr": "ページ全体CVR",
+    "ad_cvr": "RPP広告経由CVR",
+    "ctr": "CTR",
+}
+
+
+class BenchmarkPayload(BaseModel):
+    genre_u1: str
+    genre_u2: Optional[str] = None
+    genre_u3: Optional[str] = None
+    metric: str          # 'page_cvr' | 'ad_cvr' | 'ctr'
+    value: float         # %値（例: 7.52）
+    memo: Optional[str] = None
+
+
+def _benchmark_to_dict(b: GenreBenchmark) -> dict:
+    return {
+        "id": b.id,
+        "genre_u1": b.genre_u1,
+        "genre_u2": b.genre_u2,
+        "genre_u3": b.genre_u3,
+        "metric": b.metric,
+        "metric_label": _BENCHMARK_METRIC_LABELS.get(b.metric, b.metric),
+        "value": b.value,
+        "memo": b.memo,
+        "updated_at": b.updated_at.isoformat() if b.updated_at else None,
+    }
+
+
+@router.get("/benchmarks")
+def list_benchmarks(db: Session = Depends(get_db)):
+    """手入力ベンチマークの一覧。"""
+    rows = db.query(GenreBenchmark).order_by(
+        GenreBenchmark.genre_u1, GenreBenchmark.genre_u2, GenreBenchmark.genre_u3,
+        GenreBenchmark.metric,
+    ).all()
+    return {"count": len(rows), "items": [_benchmark_to_dict(b) for b in rows]}
+
+
+@router.post("/benchmarks")
+def upsert_benchmark(payload: BenchmarkPayload, db: Session = Depends(get_db)):
+    """手入力ベンチマークの登録・更新（ジャンル階層×指標で一意）。"""
+    if payload.metric not in _BENCHMARK_METRICS:
+        raise HTTPException(status_code=400, detail="metric は page_cvr / ad_cvr / ctr のみ指定できます")
+    u1 = (payload.genre_u1 or "").strip()
+    if not u1:
+        raise HTTPException(status_code=400, detail="genre_u1（大分類）は必須です")
+    if payload.value <= 0 or payload.value > 100:
+        raise HTTPException(status_code=400, detail="value は 0 より大きく 100 以下の%値で指定してください")
+    u2 = (payload.genre_u2 or "").strip() or None
+    u3 = (payload.genre_u3 or "").strip() or None
+    if u3 and not u2:
+        raise HTTPException(status_code=400, detail="小分類（u3）を指定する場合は中分類（u2）も指定してください")
+
+    row = db.query(GenreBenchmark).filter(
+        GenreBenchmark.genre_u1 == u1,
+        GenreBenchmark.genre_u2 == u2,
+        GenreBenchmark.genre_u3 == u3,
+        GenreBenchmark.metric == payload.metric,
+    ).first()
+    if row is None:
+        row = GenreBenchmark(genre_u1=u1, genre_u2=u2, genre_u3=u3, metric=payload.metric)
+        db.add(row)
+    row.value = payload.value
+    row.memo = payload.memo
+    db.commit()
+    return _benchmark_to_dict(row)
+
+
+@router.delete("/benchmarks/{benchmark_id}")
+def delete_benchmark(benchmark_id: int, db: Session = Depends(get_db)):
+    """手入力ベンチマークの削除（削除後は自店集計→デフォルトへフォールバック）。"""
+    row = db.query(GenreBenchmark).filter(GenreBenchmark.id == benchmark_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="ベンチマークが見つかりません")
+    db.delete(row)
+    db.commit()
+    return {"deleted": benchmark_id}
 
 
 # ── 店舗（単一店舗前提: id=1 相当を "me" として返す） ─────────────────────
