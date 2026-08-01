@@ -133,13 +133,23 @@ def _product_gate_context(db: Session, current_ym: str) -> dict:
         if mno and ym and (mno not in first_seen or ym < first_seen[mno]):
             first_seen[mno] = ym
 
+    # ⚠️ 初出月＝店舗のデータ開始月の商品は「発売月不明」として扱う（→稼働済みの通常基準）。
+    # データ取込を始めたばかりの店舗では全商品の初出月がデータ開始月に一致するため、
+    # そのまま発売月とみなすと全商品が新商品（育成型）扱いになってしまう
+    # （2026-08-01 本番で実際に発生した誤判定。データの途中の月から現れた商品だけを
+    # 新商品と推定し、最初からいる商品は launch_month の手動設定がある場合のみ従う）。
+    data_start_ym = min(first_seen.values()) if first_seen else None
+
     ctx: dict[str, dict] = {}
     mnos = set(products) | set(stock_by_mno) | set(first_seen)
     for mno in mnos:
         p = products.get(mno)
         stock = stock_by_mno.get(mno)
         product_url = (p.product_url if p else None) or (stock or {}).get("product_url")
-        launch = (p.launch_month if p else None) or first_seen.get(mno)
+        derived = first_seen.get(mno)
+        if derived is not None and derived == data_start_ym:
+            derived = None  # データ開始月からいる商品は発売月を推定しない（上記コメント参照）
+        launch = (p.launch_month if p else None) or derived
         ctx[mno] = {
             "stock_count": stock["stock_count"] if stock else None,
             "stock_ym": stock["ym"] if stock else None,
