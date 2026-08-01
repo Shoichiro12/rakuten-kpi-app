@@ -123,8 +123,25 @@ function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
       </span>
     )
   }
+  // 診断分類バッジ（8分類・第2段階）。良好型は従来の「良好」表示を使う
+  const cls = diag.classification
+  const TONE_BADGE: Record<string, string> = {
+    danger: 'bg-red-100 text-red-700',
+    warning: 'bg-amber-100 text-amber-700',
+    info: 'bg-sky-100 text-sky-700',
+    success: 'bg-green-100 text-green-700',
+  }
+  const clsBadge = cls && cls.type !== 'good' ? (
+    <span
+      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${TONE_BADGE[cls.tone] ?? 'bg-gray-100 text-gray-600'}`}
+      title={cls.summary}
+    >
+      {cls.label}
+    </span>
+  ) : null
+
   if (diag.status === 'good') {
-    return (
+    return clsBadge ?? (
       <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
         良好
       </span>
@@ -134,6 +151,7 @@ function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
   const rest = diag.issues.length - shown.length
   return (
     <span className="inline-flex items-center gap-1 flex-wrap">
+      {clsBadge}
       {shown.map((i) => (
         <span
           key={i.issue}

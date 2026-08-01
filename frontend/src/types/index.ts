@@ -667,6 +667,37 @@ export interface BenchmarkResolution {
   detail: string
 }
 
+/* ─── 診断分類（設計ドキュメント2026-08-01 2-B / diagnosis.py） ───── */
+
+export type DiagnosisType =
+  | 'nurture'       // 育成型
+  | 'bleeding'      // 出血型（停止候補）
+  | 'page_improve'  // 要ページ改善型
+  | 'watch'         // 要観察型
+  | 'high_cpc'      // 高CPC型
+  | 'low_exposure'  // 低露出型
+  | 'almost'        // 惜しい群
+  | 'good'          // 良好型
+
+/** 提案1件。kind: primary=第一候補 / second_best=代替案 / note=補足 */
+export interface ClassificationProposal {
+  title: string
+  detail: string
+  kind: 'primary' | 'second_best' | 'note'
+  estimate: string | null
+}
+
+export interface Classification {
+  type: DiagnosisType
+  label: string
+  /** バッジ色のトーン（danger/warning/info/success） */
+  tone: 'danger' | 'warning' | 'info' | 'success'
+  summary: string
+  proposals: ClassificationProposal[]
+  /** Limit CPO（複合条件）が判定できたか（原価率設定済み商品のみ true） */
+  limit_cpo_evaluable: boolean
+}
+
 /** ジャンル別ベンチマーク手入力値（/api/master/benchmarks） */
 export interface GenreBenchmarkItem {
   id: number
@@ -710,6 +741,8 @@ export interface RppDiagnosisMetrics {
   gross_720: number
   cv_720: number
   bid_price: number
+  /** 限界CPO（粗利÷CV）。原価率設定済み商品のみ。gated時は未設定 */
+  limit_cpo?: number | null
 }
 
 export interface RppDiagnosisItem {
@@ -723,6 +756,10 @@ export interface RppDiagnosisItem {
   phase?: PhaseInfo
   /** 意図確認（新商品の損益分岐点割れ時のみ） */
   intent_check?: IntentCheck | null
+  /** 診断分類（8分類）。gated / insufficient_data 時は null */
+  classification?: Classification | null
+  /** この商品のベンチマーク解決結果（どの段の基準を使ったか） */
+  benchmark_sources?: { ad_cvr: BenchmarkResolution; ctr: BenchmarkResolution }
   /** この商品に適用された最低クリック母数（新商品=50 / 稼働済み=10） */
   min_ct?: number
   issues: RppDiagnosisIssue[]
@@ -754,6 +791,10 @@ export interface RppDiagnosisResponse {
   min_ct: number
   /** 新商品フェーズの最低クリック母数（パターン1'の商品粒度読み替え） */
   min_ct_new?: number
+  /** ROAS合格ライン（300%）。roas_line（100%=損益分岐点）とは別の基準 */
+  roas_pass_line?: number
+  /** 診断分類キー→表示ラベル */
+  type_labels?: Record<string, string>
   issue_labels: Record<string, string>
   actions: RppActionDef[]
   benchmarks: RppDiagnosisBenchmarks

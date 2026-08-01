@@ -189,6 +189,61 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
           </div>
         )}
 
+        {/* 診断分類（8分類・第2段階）: 分類＋提案（試算＋セカンドベスト）を表示。
+            良好型で提案が無い場合は従来の「良好」カードに任せる */}
+        {item.classification && (item.classification.type !== 'good' || item.classification.proposals.length > 0) && (
+          (() => {
+            const cls = item.classification!
+            const tone = {
+              danger: { border: 'border-red-200', bg: 'bg-red-50', text: 'text-red-700' },
+              warning: { border: 'border-amber-200', bg: 'bg-amber-50', text: 'text-amber-700' },
+              info: { border: 'border-sky-200', bg: 'bg-sky-50', text: 'text-sky-700' },
+              success: { border: 'border-green-200', bg: 'bg-green-50', text: 'text-green-700' },
+            }[cls.tone] ?? { border: 'border-gray-200', bg: 'bg-gray-50', text: 'text-gray-700' }
+            const KIND_LABEL: Record<string, string> = {
+              primary: '第一候補',
+              second_best: '代替案',
+              note: '補足',
+            }
+            return (
+              <div className="px-4 pt-3">
+                <div className={`rounded-xl border overflow-hidden ${tone.border}`}>
+                  <div className={`px-3 py-2.5 ${tone.bg}`}>
+                    <p className={`text-xs font-bold ${tone.text}`}>診断分類: {cls.label}</p>
+                    <p className="text-[11px] text-gray-600 leading-snug mt-1">{cls.summary}</p>
+                  </div>
+                  {cls.proposals.map((p, i) => (
+                    <div key={i} className={`px-3 py-2.5 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
+                      <p className="text-xs text-gray-800">
+                        <span className={`inline-block mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          p.kind === 'primary' ? 'bg-gray-900 text-white'
+                            : p.kind === 'second_best' ? 'bg-gray-200 text-gray-700'
+                            : 'bg-gray-100 text-gray-500'
+                        }`}>
+                          {KIND_LABEL[p.kind] ?? p.kind}
+                        </span>
+                        <span className="font-semibold">{p.title}</span>
+                      </p>
+                      <p className="text-[11px] text-gray-500 leading-snug mt-1">{p.detail}</p>
+                      {p.estimate && (
+                        <p className="text-[11px] font-medium text-gray-700 mt-1 bg-gray-50 rounded px-2 py-1">
+                          試算: {p.estimate}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                  {/* 影響の大きい提案（停止候補）は実行を強制しない原則の明示（2-C / 3-F） */}
+                  {cls.type === 'bleeding' && (
+                    <p className="px-3 py-2 text-[10px] text-gray-400 border-t border-gray-100 leading-snug">
+                      どちらを実行するかは店舗責任者の判断に委ねられます。アプリが自動で配信を止めることはありません。
+                    </p>
+                  )}
+                </div>
+              </div>
+            )
+          })()
+        )}
+
         {/* 意図確認（ゲート4・フラグ型）: 診断は数値どおり出した上で問いかけ/注記を添える */}
         {item.intent_check && (
           <div className="px-4 pt-3">
@@ -206,8 +261,8 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
           </div>
         )}
 
-        {/* 良好 */}
-        {item.status === 'good' && (
+        {/* 良好（分類が良好型以外の場合は分類カードに任せる） */}
+        {item.status === 'good' && (!item.classification || item.classification.type === 'good') && (
           <div className="px-4 py-4">
             <div className="rounded-xl border border-green-200 bg-green-50 p-3 flex items-start gap-2">
               <CheckCircle2 size={14} className="text-green-600 mt-0.5 shrink-0" />
