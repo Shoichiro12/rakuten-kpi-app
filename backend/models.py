@@ -297,6 +297,43 @@ class ProductCost(Base, UserScopedMixin):
     )
 
 
+class ItemTarget(Base, UserScopedMixin):
+    """アイテム(商品)別の目標（設計ドキュメント2026-08-01 3-B''）。
+
+    利用者が手入力するのは target_sales（目標売上）のみ。目標CVR・目標客単価は
+    NATIONS資料の確定公式 MIN(現状値, 前年値) で自動算出し（保守的採用。売上成長は
+    アクセス増加だけで実現する設計思想）、必要アクセス数を逆算する:
+        目標注文件数 = 目標売上 ÷ 目標客単価
+        必要アクセス数 = 目標注文件数 ÷ 目標CVR
+    CVR・客単価は site_uu 軸（商品分析レポートのページ全体CVR・客単価）を使う。
+
+    calc_basis:
+      'rule'         … 確定公式で算出（実績データあり）
+      'estimated'    … 実績が無い新商品等。同ジャンル・自店平均からの参考値
+                       （estimated_approved=True になるまで診断・逆算には使わない）
+      'insufficient' … 推定材料も無く算出不能（データ取込後に自動再計算される）
+    算出値は「目標保存時」と「商品分析CSV取込時」に再計算する（target_calc.py）。
+    """
+    __tablename__ = "item_targets"
+
+    id = Column(Integer, primary_key=True, index=True)
+    management_no = Column(String, nullable=False)
+    year_month = Column(String, nullable=False)      # YYYY-MM
+    target_sales = Column(Float, nullable=False)     # 利用者が唯一手入力する値
+    target_cvr = Column(Float, nullable=True)        # 自動算出(%)
+    target_av = Column(Float, nullable=True)         # 自動算出(円)
+    required_access = Column(Float, nullable=True)   # 自動算出(UU)
+    calc_basis = Column(String, nullable=False, default="insufficient")
+    basis_detail = Column(String)                    # 採用値の内訳・推定元の説明
+    estimated_approved = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "management_no", "year_month", name="uq_item_target"),
+    )
+
+
 class GenreBenchmark(Base, UserScopedMixin):
     """ジャンル別ベンチマークの手入力値（設計ドキュメント2026-08-01 3-B / 3-B'）。
 

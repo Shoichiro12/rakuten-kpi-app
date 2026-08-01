@@ -1,7 +1,7 @@
 import random
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
-from models import RppWeekly, MonthlyAnalysis, Target, RppSales, MonthlyItemSales, Product, ProductCategory, ProductCost, GenreBenchmark
+from models import RppWeekly, MonthlyAnalysis, Target, RppSales, MonthlyItemSales, Product, ProductCategory, ProductCost, GenreBenchmark, ItemTarget
 from masters import get_or_create_default_shop, get_or_create_category, upsert_product, recalc_rpp_cost_of_sales
 
 
@@ -175,6 +175,7 @@ def generate_sample_data(db: Session):
     db.query(Product).delete()
     db.query(ProductCategory).delete()
     db.query(GenreBenchmark).delete()
+    db.query(ItemTarget).delete()
 
     today = date.today()
     current_week_start = get_week_start(today)
@@ -443,6 +444,23 @@ def generate_sample_data(db: Session):
                 gp[1] if len(gp) > 1 else None,
                 MONTHLY_ITEM_CONFIG.get(mno, {}).get("genre_u3"),
             )
+
+    # ── アイテム別目標（item_targets / 3-B''）のデモ ──
+    #   RUN-001 … 実績あり → 確定公式(rule)。前年実績は無いため「現状値のみ採用」の注記付き
+    #   NEW-001 … 実績データが無い新商品 → 自店平均からの推定(estimated)＋承認フローを検証
+    upsert_product(db, "NEW-001", shop_id=shop.id, product_name="新商品サンプル（実績データなし）")
+    prod_new = db.query(Product).filter(Product.management_no == "NEW-001").first()
+    if prod_new is not None:
+        prod_new.launch_month = today.strftime("%Y-%m")
+    db.flush()
+
+    from target_calc import calc_item_target
+    cur_ym = today.strftime("%Y-%m")
+    for mno, sales_target in (("RUN-001", 1_500_000), ("NEW-001", 300_000)):
+        calc = calc_item_target(db, mno, cur_ym, sales_target)
+        db.add(ItemTarget(
+            management_no=mno, year_month=cur_ym, target_sales=sales_target, **calc,
+        ))
 
     # ── ジャンル別ベンチマーク手入力のデモ（benchmarks.py の①を検証）──
     # RMS画面で見た値を入力した想定。RPP診断のベースライン解決が

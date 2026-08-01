@@ -45,6 +45,8 @@ _USER_SCOPED_TABLES = {
     "feedbacks": [],
     # ジャンル別ベンチマーク手入力値（アクション提案ロジック 3-B/3-B'）
     "genre_benchmarks": [("uq_genre_benchmark", ("genre_u1", "genre_u2", "genre_u3", "metric"))],
+    # アイテム別目標（アクション提案ロジック 3-B''。第3段階）
+    "item_targets": [("uq_item_target", ("management_no", "year_month"))],
 }
 
 

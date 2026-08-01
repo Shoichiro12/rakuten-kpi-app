@@ -31,7 +31,7 @@ from database import engine, get_db, SessionLocal
 import models
 from models import RppWeekly, MonthlyItemSales, MonthlyAnalysis, Target, RppSales, InventoryStatus, Shop
 from sample_data import generate_sample_data
-from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account, rpp_diagnosis, recommendations, costs, masters, inventory, billing, consulting, feedback
+from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account, rpp_diagnosis, recommendations, costs, masters, inventory, billing, consulting, feedback, item_targets
 from auth import get_current_user, AuthUser, UserContextMiddleware
 from subscription_guard import require_active_subscription
 from migrations import run_migrations
@@ -110,6 +110,7 @@ _paid = _auth + [Depends(require_active_subscription)]
 app.include_router(dashboard.router, dependencies=_paid)
 app.include_router(import_csv.router, dependencies=_paid)
 app.include_router(targets.router, dependencies=_paid)
+app.include_router(item_targets.router, dependencies=_paid)
 app.include_router(gap_analysis.router, dependencies=_paid)
 app.include_router(products.router, dependencies=_paid)
 app.include_router(actions.router, dependencies=_paid)

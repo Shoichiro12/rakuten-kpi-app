@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react'
-import { Save, CheckCircle } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Save, CheckCircle, Check, RefreshCw } from 'lucide-react'
 import Header from '../components/layout/Header'
 import { api } from '../lib/api'
 import { getCurrentYearMonth } from '../lib/utils'
-import type { Target } from '../types'
+import type { Target, ItemTargetListEntry } from '../types'
 
 function Field({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
   return (
@@ -30,6 +30,59 @@ export default function TargetSetting() {
   const [costRate, setCostRate] = useState(0.6)   // 店舗デフォルト原価率（/api/shops/me から取得）
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  // アイテム別目標（3-B''・第3段階）
+  const [itemRows, setItemRows] = useState<ItemTargetListEntry[]>([])
+  const [itemMsg, setItemMsg] = useState<string | null>(null)
+
+  const loadItemTargets = useCallback(async (ym: string) => {
+    try {
+      const res = await api.itemTargets.list(ym)
+      setItemRows(res.items)
+    } catch (e) {
+      console.error('[TargetSetting] アイテム別目標取得エラー:', e)
+      setItemRows([])
+    }
+  }, [])
+
+  const flashItem = (msg: string) => {
+    setItemMsg(msg)
+    setTimeout(() => setItemMsg(null), 2500)
+  }
+
+  const saveItemTarget = async (mno: string, value: number) => {
+    if (!Number.isFinite(value) || value <= 0) return
+    try {
+      await api.itemTargets.upsert({ management_no: mno, year_month: yearMonth, target_sales: value })
+      await loadItemTargets(yearMonth)
+      flashItem(`${mno} の目標を保存し、目標CVR・客単価・必要アクセスを自動算出しました`)
+    } catch (e) {
+      console.error('[TargetSetting] アイテム別目標保存エラー:', e)
+      flashItem('保存に失敗しました')
+    }
+  }
+
+  const approveItemTarget = async (mno: string) => {
+    try {
+      await api.itemTargets.approve({ management_no: mno, year_month: yearMonth })
+      await loadItemTargets(yearMonth)
+      flashItem(`${mno} の参考値を確定しました（診断・逆算で使われます）`)
+    } catch (e) {
+      console.error('[TargetSetting] 参考値承認エラー:', e)
+    }
+  }
+
+  const recalcItemTarget = async (mno: string) => {
+    try {
+      await api.itemTargets.recalc({ management_no: mno, year_month: yearMonth })
+      await loadItemTargets(yearMonth)
+      flashItem(`${mno} を最新の実績で再計算しました`)
+    } catch (e) {
+      console.error('[TargetSetting] 再計算エラー:', e)
+    }
+  }
+
+  useEffect(() => { loadItemTargets(yearMonth) }, [yearMonth, loadItemTargets])
 
   useEffect(() => {
     api.targets.list()
@@ -110,7 +163,7 @@ export default function TargetSetting() {
       />
 
       <div className="flex-1 overflow-auto p-6 bg-gray-50">
-        <div className="max-w-2xl mx-auto space-y-6">
+        <div className="max-w-4xl mx-auto space-y-6">
           {/* 対象月 */}
           <div className="bg-white rounded-xl border shadow-sm p-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">対象月</h3>
@@ -222,6 +275,126 @@ export default function TargetSetting() {
                 <p className="font-bold text-blue-900">{form.target_av > 0 ? Math.round(form.target_sales / form.target_av).toLocaleString() : '—'}件</p>
               </div>
             </div>
+          </div>
+
+          {/* アイテム別目標（3-B''・第3段階） */}
+          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-700">アイテム別目標（{yearMonth}）</h3>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  入力するのは目標売上だけ。目標CVR・客単価は「現状値と前年値の低い方」を自動採用し（保守的な確定公式）、必要アクセス数を逆算します。
+                </p>
+              </div>
+              {itemMsg && (
+                <span className="flex items-center gap-1.5 text-xs text-green-600"><CheckCircle size={13} />{itemMsg}</span>
+              )}
+            </div>
+
+            {itemRows.length === 0 ? (
+              <div className="py-8 text-center text-sm text-gray-400">
+                商品データがまだありません。商品分析CSVを取り込むと商品が表示されます。
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left">商品</th>
+                      <th className="px-3 py-2.5 text-right">目標売上（入力）</th>
+                      <th className="px-3 py-2.5 text-right">目標CVR</th>
+                      <th className="px-3 py-2.5 text-right">目標客単価</th>
+                      <th className="px-3 py-2.5 text-right">必要アクセス</th>
+                      <th className="px-3 py-2.5 text-left">根拠</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {itemRows.map((r) => {
+                      const t = r.target
+                      return (
+                        <tr key={r.management_no}>
+                          <td className="px-4 py-2">
+                            <p className="text-gray-900 leading-tight">{r.product_name || r.management_no}</p>
+                            <p className="text-[10px] text-gray-400 font-mono">{r.management_no}</p>
+                            {r.latest_actual ? (
+                              <p className="text-[10px] text-gray-400">
+                                直近実績（{r.latest_actual.year_month}）: UU {r.latest_actual.access_uu.toLocaleString()} / CVR {r.latest_actual.cvr}% / 客単価 ¥{r.latest_actual.av.toLocaleString()}
+                              </p>
+                            ) : (
+                              <p className="text-[10px] text-amber-600">実績データなし（保存すると参考値を推定します）</p>
+                            )}
+                          </td>
+                          <td className="px-3 py-2 text-right whitespace-nowrap">
+                            <span className="inline-flex items-center gap-1">
+                              <span className="text-gray-400 text-xs">¥</span>
+                              <input
+                                type="number" min={0} step={10000}
+                                defaultValue={t?.target_sales ?? ''}
+                                placeholder="未設定"
+                                onBlur={(e) => {
+                                  const v = Number(e.target.value)
+                                  if (e.target.value !== '' && v > 0 && v !== (t?.target_sales ?? null)) saveItemTarget(r.management_no, v)
+                                }}
+                                className="w-28 text-right border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              />
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 text-right text-gray-700">{t?.target_cvr != null ? `${t.target_cvr}%` : '—'}</td>
+                          <td className="px-3 py-2 text-right text-gray-700">{t?.target_av != null ? `¥${Math.round(t.target_av).toLocaleString()}` : '—'}</td>
+                          <td className="px-3 py-2 text-right font-medium text-gray-900">
+                            {t?.required_access != null ? `${Math.round(t.required_access).toLocaleString()} UU` : '—'}
+                          </td>
+                          <td className="px-3 py-2">
+                            {!t ? (
+                              <span className="text-[10px] text-gray-300">—</span>
+                            ) : t.calc_basis === 'rule' ? (
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700" title={t.basis_detail ?? undefined}>
+                                自動算出（確定公式）
+                              </span>
+                            ) : t.calc_basis === 'estimated' ? (
+                              <span className="inline-flex items-center gap-1.5 flex-wrap">
+                                <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700" title={t.basis_detail ?? undefined}>
+                                  参考値（推定）
+                                </span>
+                                {t.estimated_approved ? (
+                                  <>
+                                    <span className="text-[10px] text-green-600">承認済み</span>
+                                    <button
+                                      onClick={() => recalcItemTarget(r.management_no)}
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 border text-gray-500 hover:bg-gray-50 text-[10px] rounded"
+                                      title="最新の実績・推定で洗い直します"
+                                    >
+                                      <RefreshCw size={10} />再計算
+                                    </button>
+                                  </>
+                                ) : (
+                                  <button
+                                    onClick={() => approveItemTarget(r.management_no)}
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-medium rounded"
+                                    title="承認するまで診断・逆算には使われません"
+                                  >
+                                    <Check size={10} />この参考値で確定
+                                  </button>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500" title={t.basis_detail ?? undefined}>
+                                算出不能（データ待ち）
+                              </span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+            <p className="px-4 py-2.5 text-[10px] text-gray-400 border-t bg-gray-50/60 leading-snug">
+              計算式: 目標注文件数 = 目標売上 ÷ 目標客単価、必要アクセス数 = 目標注文件数 ÷ 目標CVR。
+              実績が無い商品は同ジャンル・自店平均からの参考値を提示し、「この参考値で確定」を押すまで診断・逆算には使いません。
+              商品分析CSVを取り込むと自動で再計算されます（実測が取れた商品は確定公式に自動切替）。
+            </p>
           </div>
 
           {/* 設定済み目標一覧 */}

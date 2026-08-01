@@ -196,6 +196,20 @@ export const api = {
     upsert: (data: object) =>
       request('/targets', { method: 'POST', body: JSON.stringify(data) }),
   },
+  /* ─── アイテム別目標（3-B''・第3段階） ─────────────── */
+  itemTargets: {
+    list: (yearMonth: string) =>
+      request<import('../types').ItemTargetListResponse>(`/item-targets?year_month=${encodeURIComponent(yearMonth)}`)
+        .then((d) => d ?? { year_month: yearMonth, count: 0, items: [] }),
+    upsert: (data: { management_no: string; year_month: string; target_sales: number }) =>
+      request<import('../types').ItemTarget>('/item-targets', { method: 'POST', body: JSON.stringify(data) }),
+    approve: (data: { management_no: string; year_month: string }) =>
+      request<import('../types').ItemTarget>('/item-targets/approve', { method: 'POST', body: JSON.stringify(data) }),
+    recalc: (data: { management_no: string; year_month: string }) =>
+      request<import('../types').ItemTarget>('/item-targets/recalc', { method: 'POST', body: JSON.stringify(data) }),
+    remove: (managementNo: string, yearMonth: string) =>
+      request(`/item-targets/${encodeURIComponent(managementNo)}?year_month=${encodeURIComponent(yearMonth)}`, { method: 'DELETE' }),
+  },
   /* ─── 店舗マスタ（単一店舗前提） ─────────────────── */
   shops: {
     /** 現ユーザーのデフォルト店舗（原価率・経費率のデフォルト等） */

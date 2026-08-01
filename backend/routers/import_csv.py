@@ -1227,6 +1227,10 @@ def _import_monthly_items_bytes(content: bytes, db: Session, overwrite: bool = F
     _sync_rpp_from_monthly(db)
     # 商品マスタへ upsert（ジャンルを product_categories に正規化して紐付け）
     _sync_products_from_monthly(db, records)
+    # アイテム別目標の自動再計算（3-B''。新しい実績で MIN(現状,前年) を洗い直す。
+    # 承認済み推定値の扱いは target_calc.apply_calc のルールに従う）
+    from target_calc import recalc_all_item_targets
+    recalc_all_item_targets(db)
     db.commit()
     return {
         "message": f"{year_month}のデータをインポートしました（新規: {inserted}件 / 更新: {updated}件）",

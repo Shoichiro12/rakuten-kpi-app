@@ -698,6 +698,46 @@ export interface Classification {
   limit_cpo_evaluable: boolean
 }
 
+/* ─── アイテム別目標（設計3-B'' / /api/item-targets。第3段階） ───── */
+
+export interface ItemTarget {
+  management_no: string
+  year_month: string
+  /** 利用者が唯一手入力する値 */
+  target_sales: number
+  /** 自動算出 = MIN(現状CVR, 前年CVR)。site_uu軸(%) */
+  target_cvr: number | null
+  /** 自動算出 = MIN(現状客単価, 前年客単価) */
+  target_av: number | null
+  /** 自動算出 = (目標売上÷目標客単価)÷目標CVR */
+  required_access: number | null
+  /** rule=確定公式 / estimated=推定(参考値・要承認) / insufficient=算出不能 */
+  calc_basis: 'rule' | 'estimated' | 'insufficient'
+  basis_detail: string | null
+  estimated_approved: boolean
+  /** 診断・逆算で使ってよい状態か（rule、または承認済みestimated） */
+  usable: boolean
+}
+
+export interface ItemTargetListEntry {
+  management_no: string
+  product_name: string | null
+  target: ItemTarget | null
+  /** 直近実績（site_uu軸・参考表示用）。実績が無い商品は null */
+  latest_actual: {
+    year_month: string
+    access_uu: number
+    cvr: number
+    av: number
+  } | null
+}
+
+export interface ItemTargetListResponse {
+  year_month: string
+  count: number
+  items: ItemTargetListEntry[]
+}
+
 /** ジャンル別ベンチマーク手入力値（/api/master/benchmarks） */
 export interface GenreBenchmarkItem {
   id: number
