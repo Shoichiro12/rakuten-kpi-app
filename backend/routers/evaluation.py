@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from database import get_db
 from models import RppWeekly, Target
 from evaluation import judge_metric, evaluate_matrix
+from matrix_actions import build_matrix_actions
 from access_definitions import is_reliable, min_access_for
 from shop_metrics import get_shop_monthly
 
@@ -164,6 +165,8 @@ def get_matrix(
         sales_j, access_j, cvr_j, av_j,
         low_sample=low_sample, access_axis=access_axis, min_access=min_access,
     )
+    # 17パターンの改善アクション（見出し＋店舗全体/商品ページの打ち手）を動的生成して添える
+    result["actions"] = build_matrix_actions(result)
 
     return {
         "period": period,

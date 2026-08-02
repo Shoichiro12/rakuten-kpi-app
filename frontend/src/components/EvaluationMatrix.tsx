@@ -150,6 +150,42 @@ export default function EvaluationMatrix({ evaluation, axis }: EvaluationMatrixP
           ※ 目標もYoYデータも無い指標（{evaluation.undetermined.length}件）は未達扱いで評価しています。目標設定で精度が上がります。
         </p>
       )}
+
+      {/* 改善アクション（17パターンから動的生成。店舗全体／商品ページの2スコープ） */}
+      {evaluation.actions && (
+        <div className="border-t bg-white px-4 py-3">
+          <p className="text-sm font-bold text-gray-900 mb-2">
+            → {evaluation.actions.headline}
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div>
+              <p className="text-[11px] font-semibold text-gray-500 mb-1">店舗全体の打ち手</p>
+              <ul className="space-y-1">
+                {evaluation.actions.shop.map((a, i) => (
+                  <li key={i} className="text-xs text-gray-700 leading-snug flex gap-1.5">
+                    <span className="text-gray-300 shrink-0">・</span>
+                    <span>{a}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold text-gray-500 mb-1">商品ページの打ち手</p>
+              <ul className="space-y-1">
+                {evaluation.actions.product.map((a, i) => (
+                  <li key={i} className="text-xs text-gray-700 leading-snug flex gap-1.5">
+                    <span className="text-gray-300 shrink-0">・</span>
+                    <span>{a}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+          {evaluation.actions.note && (
+            <p className="mt-2 text-[10px] text-gray-400 leading-snug">{evaluation.actions.note}</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

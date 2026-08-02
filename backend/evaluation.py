@@ -210,8 +210,17 @@ def evaluate_matrix(
         focus = failed
     elif not none_ok:
         rank, priority = "△", "高"
-        labels = "・".join(KPI_LABELS[k] for k in failed)
-        comment = f"売上未達。{labels}がボトルネックです。達成できているKPIは維持し、未達KPIへ対策を集中してください。"
+        if failed:
+            labels = "・".join(KPI_LABELS[k] for k in failed)
+            comment = f"売上未達。{labels}がボトルネックです。達成できているKPIは維持し、未達KPIへ対策を集中してください。"
+        else:
+            # 売上のみ未達（アクセス・CVR・客単価は全達成）。売上とKPIは別々の
+            # 目標/YoYで判定するため、この組み合わせは正常に発生する。
+            # 従来はラベル列挙が空文字になり「〜。がボトルネックです」と文が壊れていた。
+            comment = (
+                "売上のみ未達です。アクセス・CVR・客単価は個別目標を達成しているため、"
+                "特定KPIではなく市場要因・販促量など全体の底上げ余地を確認してください。"
+            )
         focus = failed
     else:
         rank, priority = "×", "高"

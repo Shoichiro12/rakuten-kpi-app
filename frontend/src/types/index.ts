@@ -524,6 +524,13 @@ export interface EvaluationResult {
   min_access?: number
   /** アクセス指標の軸（要件No.5） */
   access_axis?: AccessAxis
+  /** 17パターンの改善アクション（未達KPIの組み合わせから動的生成） */
+  actions?: {
+    headline: string
+    shop: string[]
+    product: string[]
+    note: string | null
+  }
 }
 
 export interface EvaluationMatrixResponse {
