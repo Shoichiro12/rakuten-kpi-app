@@ -47,6 +47,8 @@ export default function TargetSetting() {
   const [plan, setPlan] = useState<RevenuePlanResponse | null>(null)
   const [budgetSaved, setBudgetSaved] = useState(false)
   const [budgetSaving, setBudgetSaving] = useState(false)
+  // 年間目標プランナーの表示切替（サマリ=5列 / 詳細=9列）
+  const [planView, setPlanView] = useState<'summary' | 'detail'>('summary')
 
   const loadPlan = useCallback(async (ym: string) => {
     try {
@@ -307,8 +309,21 @@ export default function TargetSetting() {
                   <>
                     <div className="flex items-center gap-2 flex-wrap mb-2">
                       <p className="text-xs font-semibold text-gray-600">
-                        月次按分プレビュー（{plan.budget_year.from} 〜 {plan.budget_year.to}）
+                        年間目標プランナー（{plan.budget_year.from} 〜 {plan.budget_year.to}）
                       </p>
+                      <div className="flex gap-0.5 border border-gray-200 rounded-md p-0.5">
+                        {(['summary', 'detail'] as const).map(v => (
+                          <button
+                            key={v}
+                            onClick={() => setPlanView(v)}
+                            className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                              planView === v ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
+                            }`}
+                          >
+                            {v === 'summary' ? 'サマリ' : '詳細'}
+                          </button>
+                        ))}
+                      </div>
                       {plan.seasonal_index.confidence && CONFIDENCE_LABELS[plan.seasonal_index.confidence] && (
                         <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${CONFIDENCE_LABELS[plan.seasonal_index.confidence].cls}`}>
                           {CONFIDENCE_LABELS[plan.seasonal_index.confidence].label}
@@ -325,17 +340,23 @@ export default function TargetSetting() {
                         <thead className="bg-gray-50 text-[10px] text-gray-500 uppercase">
                           <tr>
                             <th className="px-2 py-1.5 text-left">月</th>
-                            <th className="px-2 py-1.5 text-right">季節指数</th>
-                            <th className="px-2 py-1.5 text-right">月次売上予算（編集で手動補正）</th>
-                            <th className="px-2 py-1.5 text-right">実績</th>
+                            {planView === 'detail' && <th className="px-2 py-1.5 text-right">季節指数</th>}
+                            <th className="px-2 py-1.5 text-right">売上予算（編集で手動補正）</th>
+                            <th className="px-2 py-1.5 text-right">必要アクセス</th>
+                            {planView === 'detail' && <th className="px-2 py-1.5 text-right">目標CVR</th>}
+                            {planView === 'detail' && <th className="px-2 py-1.5 text-right">目標客単価</th>}
+                            <th className="px-2 py-1.5 text-right">想定追加広告費</th>
+                            {planView === 'detail' && <th className="px-2 py-1.5 text-right">実績売上</th>}
                             <th className="px-2 py-1.5 text-right">達成率</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
                           {plan.months.map(m => (
                             <tr key={m.year_month} className={m.year_month === yearMonth ? 'bg-blue-50' : ''}>
-                              <td className="px-2 py-1.5 font-medium text-gray-800">{m.year_month}</td>
-                              <td className="px-2 py-1.5 text-right text-gray-600">{m.index != null ? m.index.toFixed(2) : '—'}</td>
+                              <td className="px-2 py-1.5 font-medium text-gray-800 whitespace-nowrap">{m.year_month}</td>
+                              {planView === 'detail' && (
+                                <td className="px-2 py-1.5 text-right text-gray-600">{m.index != null ? m.index.toFixed(2) : '—'}</td>
+                              )}
                               <td className="px-2 py-1.5 text-right whitespace-nowrap">
                                 <span className="inline-flex items-center gap-1 justify-end">
                                   {m.sales_budget_source === 'manual' && (
@@ -372,7 +393,39 @@ export default function TargetSetting() {
                                   />
                                 </span>
                               </td>
-                              <td className="px-2 py-1.5 text-right text-gray-600">{m.actual_sales != null ? `¥${Math.round(m.actual_sales).toLocaleString()}` : '—'}</td>
+                              <td className="px-2 py-1.5 text-right text-gray-900 whitespace-nowrap" title={m.basis_detail ?? undefined}>
+                                {m.required_access != null ? `${Math.round(m.required_access).toLocaleString()} UU` : '—'}
+                              </td>
+                              {planView === 'detail' && (
+                                <td className="px-2 py-1.5 text-right text-gray-700 whitespace-nowrap" title={m.basis_detail ?? undefined}>
+                                  {m.target_cvr != null ? `${m.target_cvr}%` : '—'}
+                                  {m.target_cvr_basis === 'manual' && <span className="ml-0.5 text-[9px] text-violet-600" title="目標設定画面の手入力を採用">手</span>}
+                                </td>
+                              )}
+                              {planView === 'detail' && (
+                                <td className="px-2 py-1.5 text-right text-gray-700 whitespace-nowrap" title={m.basis_detail ?? undefined}>
+                                  {m.target_av != null ? `¥${Math.round(m.target_av).toLocaleString()}` : '—'}
+                                  {m.target_av_basis === 'manual' && <span className="ml-0.5 text-[9px] text-violet-600" title="目標設定画面の手入力を採用">手</span>}
+                                </td>
+                              )}
+                              <td
+                                className="px-2 py-1.5 text-right whitespace-nowrap"
+                                title={m.cpc != null ? `CPC ¥${m.cpc.toLocaleString()}（${m.cpc_source_month}実績${m.cpc_is_fallback ? '・直近月で代用' : ''}）${m.actual_access_month && m.actual_access_month !== m.year_month ? `／現状アクセスは${m.actual_access_month}実績を見込みとして使用` : ''}` : m.basis_detail ?? undefined}
+                              >
+                                {m.shortfall_access != null && m.shortfall_access <= 0 ? (
+                                  <span className="text-green-600 font-medium">充足</span>
+                                ) : m.est_ad_cost != null ? (
+                                  <span className="text-gray-900">
+                                    ¥{Math.round(m.est_ad_cost).toLocaleString()}
+                                    {m.cpc_is_fallback && <span className="text-gray-400">※</span>}
+                                  </span>
+                                ) : (
+                                  '—'
+                                )}
+                              </td>
+                              {planView === 'detail' && (
+                                <td className="px-2 py-1.5 text-right text-gray-600 whitespace-nowrap">{m.actual_sales != null ? `¥${Math.round(m.actual_sales).toLocaleString()}` : '—'}</td>
+                              )}
                               <td className={`px-2 py-1.5 text-right font-medium ${m.achievement_rate == null ? 'text-gray-300' : m.achievement_rate >= 100 ? 'text-green-600' : 'text-red-500'}`}>
                                 {m.achievement_rate != null ? `${m.achievement_rate}%` : '—'}
                               </td>
@@ -381,6 +434,18 @@ export default function TargetSetting() {
                         </tbody>
                       </table>
                     </div>
+                    {/* CPC注記（想定広告費の前提。CPCの季節変動はスコープ外の簡略化） */}
+                    {(() => {
+                      const fb = plan.months.find(m => m.cpc_is_fallback && m.cpc_source_month)
+                      if (!plan.months.some(m => m.est_ad_cost != null)) return null
+                      return (
+                        <p className="mt-1.5 text-[10px] text-gray-400 leading-snug">
+                          想定追加広告費は各月のRPP実績CPCに基づく試算です
+                          {fb && `（※印の月はRPP実績が無いため、直近実績月 ${fb.cpc_source_month} のCPC ¥${fb.cpc?.toLocaleString()} で代用）`}。
+                          CPCの季節変動は考慮していません。実績が無い月の現状アクセスは直近実績月の値を見込みとして使っています。
+                        </p>
+                      )
+                    })()}
                     {/* 12ヶ月合計と年間予算の差分（手動補正は他月へ再配分しないため乖離しうる） */}
                     {plan.annual_sales_budget != null && (() => {
                       const total = plan.months.reduce((s, m) => s + (m.sales_budget ?? 0), 0)

@@ -110,6 +110,21 @@ export interface RevenuePlanMonth {
   sales_budget_source: 'index' | 'manual' | null
   actual_sales: number | null
   achievement_rate: number | null
+  /* ── 12ヶ月フル逆算（追加指示書3章）。算出できない月は null＋basis_detail ── */
+  required_access: number | null
+  target_cvr: number | null
+  target_cvr_basis: 'manual' | 'rule' | null
+  target_av: number | null
+  target_av_basis: 'manual' | 'rule' | null
+  basis_detail: string | null
+  actual_access: number | null
+  /** actual_access の出どころ月。当月以外なら直近実績月を見込みとして使用 */
+  actual_access_month: string | null
+  shortfall_access: number | null
+  cpc: number | null
+  cpc_source_month: string | null
+  cpc_is_fallback: boolean | null
+  est_ad_cost: number | null
 }
 
 export interface RevenuePlanResponse {
