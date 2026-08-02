@@ -375,6 +375,145 @@ def build_current_breakdown(db: Session, base_ym: str, sales_budget: Optional[fl
     }
 
 
+# ─── ギャップ逆算（区切り3） ─────────────────────────────────────────────────
+
+def build_gap_options(
+    db: Session,
+    current: dict,
+    allowable_ad_cost: float,
+    cvr_ceiling_candidates: list,
+) -> dict:
+    """許容広告費を超える不足分を、CVR・客単価のどちらでどれだけ埋めるかを逆算する。
+
+    順序型（オーナー承認済み 2026-08-02。evaluation.KPI_PRIORITY = access→cvr→av を踏襲）:
+      1. 許容広告費で買える追加クリックを実CPCで算出 → 到達可能アクセス
+      2. 案A: CVR改善のみで埋める場合の必要CVR
+         上限 = MAX(現状CVR, 前年CVR)＝過去に実際に到達した水準（目標算出のMINと対の
+         決定的ルール）。実績が無い場合はベンチマーク解決値（出どころ明示）
+      3. 必要CVRが上限超過の場合のみ 案B: CVRを上限に固定し、残りを客単価で埋める
+    案A・案Bは選択肢として並列に返す（自動では何も実行しない。保存もしない）。
+    """
+    sales_budget = current["sales_budget"]
+    target_cvr = current["target_cvr"]
+    target_av = current["target_av"]
+    actual_access = current["actual_access"] or 0
+    cpc = current["cpc"]
+
+    base = {
+        "allowable_ad_cost": allowable_ad_cost,
+        "within_budget": None,
+        "affordable_extra_ct": None,
+        "affordable_access": None,
+        "remaining_shortfall_access": None,
+        "options": [],
+        "note": None,
+    }
+
+    if cpc is None or cpc <= 0:
+        base["note"] = "RPP実績（CPC）が無いため、許容広告費で買える追加アクセスを試算できません。RPPデータを取り込むと利用できます。"
+        return base
+
+    est = current["est_ad_cost"]
+    if est is not None and allowable_ad_cost >= est:
+        base["within_budget"] = True
+        base["note"] = (
+            f"必要な追加広告費（試算 ¥{est:,.0f}）は許容額の範囲内です。"
+            "アクセス補填（広告）だけで月次売上予算に届く計算になります。"
+        )
+        return base
+
+    base["within_budget"] = False
+    affordable_extra_ct = allowable_ad_cost / cpc
+    affordable_access = actual_access + affordable_extra_ct
+    base["affordable_extra_ct"] = round(affordable_extra_ct, 0)
+    base["affordable_access"] = round(affordable_access, 0)
+    base["remaining_shortfall_access"] = round(
+        max(0.0, current["required_access"] - affordable_access), 0
+    )
+
+    if affordable_access <= 0:
+        base["note"] = "現状アクセスの実績が無く、許容広告費だけでは到達可能アクセスを算出できません。"
+        return base
+
+    # ── CVR改善の上限: 過去に実際に到達した水準（無ければベンチマーク解決値）──
+    if cvr_ceiling_candidates:
+        ceiling = max(cvr_ceiling_candidates)
+        ceiling_source = "過去実績の最高水準（MAX(現状, 前年)）"
+    else:
+        from benchmarks import resolve_benchmark
+        bench = resolve_benchmark(db, "page_cvr")
+        ceiling = bench["value"]
+        ceiling_source = f"ベンチマーク（{bench['source_label']}）"
+
+    # 案A: アクセスは予算内の到達可能値で固定し、CVR改善のみで埋める
+    required_cvr = round(sales_budget / target_av / affordable_access * 100, 2)
+    feasible_a = required_cvr <= ceiling
+    base["options"].append({
+        "type": "cvr",
+        "label": "案A: CVR改善で埋める",
+        "required_cvr": required_cvr,
+        "current_target_cvr": target_cvr,
+        "improvement_pct": round((required_cvr / target_cvr - 1) * 100, 1) if target_cvr > 0 else None,
+        "ceiling": round(float(ceiling), 2),
+        "ceiling_source": ceiling_source,
+        "feasible": feasible_a,
+        "detail": (
+            f"到達可能アクセス {affordable_access:,.0f} UU のまま、CVRを {target_cvr}% → {required_cvr}% に"
+            f"改善できれば予算に届きます（上限めやす: {ceiling}%＝{ceiling_source}）"
+        ),
+    })
+
+    # 案B: 必要CVRが上限を超える場合のみ、CVRを上限に固定して残りを客単価で埋める
+    if not feasible_a:
+        required_av = round(sales_budget / affordable_access / (ceiling / 100.0), 0)
+        base["options"].append({
+            "type": "cvr_plus_av",
+            "label": "案B: CVR上限＋客単価改善で埋める",
+            "cvr_at_ceiling": round(float(ceiling), 2),
+            "required_av": required_av,
+            "current_target_av": target_av,
+            "improvement_pct": round((required_av / target_av - 1) * 100, 1) if target_av > 0 else None,
+            "feasible": None,
+            "detail": (
+                f"CVRを上限めやす {ceiling}% まで改善したうえで、客単価を ¥{target_av:,.0f} → ¥{required_av:,.0f} に"
+                "引き上げられれば予算に届きます（セット販売・同梱提案・送料ライン見直し等）"
+            ),
+        })
+
+    base["note"] = (
+        "改善順序は アクセス → CVR → 客単価 のウォーターフォール（設計の固定順）。"
+        "いずれも試算値であり、自動では何も実行・保存されません。"
+    )
+    return base
+
+
+def item_target_consistency(db: Session, base_ym: str, sales_budget: Optional[float]) -> dict:
+    """アイテム別目標（第3段階・手入力）と月次売上予算の整合性チェック（警告のみ）。
+
+    アイテム目標は全商品に入れる運用ではないため、合計が予算を下回るのは正常。
+    超過したときだけ警告フラグを立てる（強制同期はしない。オーナー承認済み 2026-08-02）。
+    """
+    from models import ItemTarget
+
+    rows = db.query(
+        func.count(ItemTarget.id),
+        func.coalesce(func.sum(ItemTarget.target_sales), 0.0),
+    ).filter(ItemTarget.year_month == base_ym).one()
+    count, total = int(rows[0] or 0), float(rows[1] or 0)
+
+    coverage = None
+    over = False
+    if sales_budget and sales_budget > 0 and count > 0:
+        coverage = round(total / sales_budget * 100, 1)
+        over = total > sales_budget
+    return {
+        "count": count,
+        "sum": round(total, 0),
+        "coverage_rate": coverage,
+        "over_budget": over,
+    }
+
+
 # ─── 予算プランの構築 ────────────────────────────────────────────────────────
 
 def build_budget_plan(db: Session, shop, base_ym: str,
@@ -434,8 +573,17 @@ def build_budget_plan(db: Session, shop, base_ym: str,
         base_budget = base_row["sales_budget"] if base_row else None
         current = build_current_breakdown(db, base_ym, base_budget)
     cvr_ceiling_candidates = current.pop("_cvr_ceiling_candidates", []) if current else []
-    # cvr_ceiling_candidates はギャップ逆算（区切り3）でCVR改善上限の算出に使う
-    _ = cvr_ceiling_candidates
+
+    # ── ギャップ逆算（区切り3）: 許容広告費が入力されたときだけ試算する（保存しない）──
+    gap = None
+    if current is not None and allowable_ad_cost is not None and allowable_ad_cost >= 0:
+        gap = build_gap_options(db, current, float(allowable_ad_cost), cvr_ceiling_candidates)
+
+    # ── アイテム別目標との整合性（警告のみ・強制同期なし）──
+    base_budget_for_check = None
+    if current is not None:
+        base_budget_for_check = current["sales_budget"]
+    item_check = item_target_consistency(db, base_ym, base_budget_for_check)
 
     return {
         "status": status,
@@ -455,6 +603,8 @@ def build_budget_plan(db: Session, shop, base_ym: str,
         },
         "months": month_rows,
         "current": current,
+        "gap": gap,
+        "item_target_check": item_check,
         "guide": guide,
     }
 

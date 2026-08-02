@@ -129,7 +129,38 @@ export interface RevenuePlanResponse {
   months: RevenuePlanMonth[]
   /** 基準月の一気通貫: 予算→必要アクセス→想定広告費（ok/flat時のみ） */
   current: RevenuePlanCurrent | null
+  /** ギャップ逆算（allowable_ad_cost 指定時のみ） */
+  gap: RevenuePlanGap | null
+  /** アイテム別目標との整合性（警告のみ・強制同期なし） */
+  item_target_check: { count: number; sum: number; coverage_rate: number | null; over_budget: boolean }
   guide: { title: string; message: string }
+}
+
+export interface RevenuePlanGapOption {
+  type: 'cvr' | 'cvr_plus_av'
+  label: string
+  detail: string
+  feasible: boolean | null
+  improvement_pct: number | null
+  /* 案A（cvr） */
+  required_cvr?: number
+  current_target_cvr?: number
+  ceiling?: number
+  ceiling_source?: string
+  /* 案B（cvr_plus_av） */
+  cvr_at_ceiling?: number
+  required_av?: number
+  current_target_av?: number
+}
+
+export interface RevenuePlanGap {
+  allowable_ad_cost: number
+  within_budget: boolean | null
+  affordable_extra_ct: number | null
+  affordable_access: number | null
+  remaining_shortfall_access: number | null
+  options: RevenuePlanGapOption[]
+  note: string | null
 }
 
 export interface RevenuePlanCurrent {

@@ -11,10 +11,13 @@ import type { RevenuePlanResponse } from '../../types'
  */
 export default function RevenuePlanPanel({ yearMonth }: { yearMonth: string }) {
   const [plan, setPlan] = useState<RevenuePlanResponse | null>(null)
+  // 許容広告費（ギャップ逆算）。都度入力・保存しない（オーナー確定の仕様）
+  const [allowableInput, setAllowableInput] = useState('')
+  const [simulating, setSimulating] = useState(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (allowable?: number) => {
     try {
-      const res = await api.revenuePlan.get(yearMonth)
+      const res = await api.revenuePlan.get(yearMonth, allowable)
       setPlan(res ?? null)
     } catch (e) {
       console.error('[RevenuePlanPanel] 取得エラー:', e)
@@ -22,7 +25,18 @@ export default function RevenuePlanPanel({ yearMonth }: { yearMonth: string }) {
     }
   }, [yearMonth])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { setAllowableInput(''); load() }, [load])
+
+  const simulate = async () => {
+    const v = Number(allowableInput)
+    if (!Number.isFinite(v) || v < 0) return
+    setSimulating(true)
+    try {
+      await load(v)
+    } finally {
+      setSimulating(false)
+    }
+  }
 
   if (!plan) return null
 
@@ -111,6 +125,106 @@ export default function RevenuePlanPanel({ yearMonth }: { yearMonth: string }) {
             根拠: {cur.target_basis_detail}。{cur.note}。
             {plan.status === 'flat' && ` ${plan.guide.message}`}
           </p>
+
+          {/* アイテム別目標との整合性（警告のみ・強制同期なし） */}
+          {plan.item_target_check.count > 0 && (
+            plan.item_target_check.over_budget ? (
+              <div className="mt-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                <p className="text-xs text-red-700">
+                  ⚠️ アイテム別目標の合計 ¥{Math.round(plan.item_target_check.sum).toLocaleString()} が
+                  月次売上予算 ¥{Math.round(cur.sales_budget).toLocaleString()} を上回っています
+                  （{plan.item_target_check.coverage_rate}%）。どちらかの見直しを検討してください（自動では変更しません）。
+                </p>
+              </div>
+            ) : plan.item_target_check.coverage_rate != null ? (
+              <p className="mt-1.5 text-[10px] text-gray-400">
+                アイテム別目標設定済み: {plan.item_target_check.count}商品・合計 ¥{Math.round(plan.item_target_check.sum).toLocaleString()}
+                （月次予算の{plan.item_target_check.coverage_rate}%。全商品に設定する運用ではないため下回っていても正常です）
+              </p>
+            ) : null
+          )}
+
+          {/* ギャップ逆算: 許容広告費の入力（都度入力・保存しない） */}
+          {cur.shortfall_access > 0 && (
+            <div className="mt-3 border-t pt-3">
+              <p className="text-xs font-semibold text-gray-600 mb-1.5">
+                広告費にいくらまでかけられますか？（ギャップ逆算・試算のみ）
+              </p>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-sm text-gray-500">¥</span>
+                <input
+                  type="number"
+                  min={0}
+                  step={50000}
+                  value={allowableInput}
+                  onChange={e => setAllowableInput(e.target.value)}
+                  placeholder="例: 300000"
+                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm w-36 focus:outline-none focus:ring-2 focus:ring-violet-500"
+                />
+                <button
+                  onClick={simulate}
+                  disabled={simulating || allowableInput === ''}
+                  className="px-3 py-1.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors"
+                >
+                  この予算で試算
+                </button>
+                <span className="text-[10px] text-gray-400">入力値は保存されません</span>
+              </div>
+
+              {plan.gap && (
+                <div className="mt-3 space-y-2">
+                  {plan.gap.within_budget === true && (
+                    <div className="bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                      <p className="text-xs text-green-700">{plan.gap.note}</p>
+                    </div>
+                  )}
+                  {plan.gap.within_budget === false && (
+                    <>
+                      <p className="text-[10px] text-gray-500">
+                        許容広告費 ¥{plan.gap.allowable_ad_cost.toLocaleString()} で買える追加アクセスは
+                        約 {Math.round(plan.gap.affordable_extra_ct ?? 0).toLocaleString()} クリック
+                        （到達可能アクセス {Math.round(plan.gap.affordable_access ?? 0).toLocaleString()} UU、
+                        残り不足 {Math.round(plan.gap.remaining_shortfall_access ?? 0).toLocaleString()} UU）。
+                        この不足をアクセス以外のレバーで埋める選択肢:
+                      </p>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-2">
+                        {plan.gap.options.map(o => (
+                          <div
+                            key={o.type}
+                            className={`border rounded-lg p-3 ${
+                              o.feasible === false ? 'bg-gray-50 border-gray-200 opacity-75' : 'bg-white border-violet-200'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className="text-xs font-bold text-gray-800">{o.label}</p>
+                              {o.feasible === true && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-green-100 text-green-700">過去実績の範囲内</span>
+                              )}
+                              {o.feasible === false && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-red-100 text-red-600">上限めやす超過</span>
+                              )}
+                            </div>
+                            <p className="text-xs text-gray-600 mt-1 leading-relaxed">{o.detail}</p>
+                            {o.improvement_pct != null && (
+                              <p className="text-[10px] text-gray-400 mt-1">現在の目標値からの改善幅: +{o.improvement_pct}%</p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {plan.gap.within_budget === null && plan.gap.note && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                      <p className="text-xs text-amber-700">{plan.gap.note}</p>
+                    </div>
+                  )}
+                  {plan.gap.within_budget === false && plan.gap.note && (
+                    <p className="text-[10px] text-gray-400 leading-snug">{plan.gap.note}</p>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </>
       )}
     </div>

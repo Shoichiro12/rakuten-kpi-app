@@ -224,7 +224,7 @@ export const api = {
     get: (yearMonth?: string, allowableAdCost?: number) => {
       const q = new URLSearchParams()
       if (yearMonth) q.set('year_month', yearMonth)
-      if (allowableAdCost != null && allowableAdCost > 0) q.set('allowable_ad_cost', String(allowableAdCost))
+      if (allowableAdCost != null && allowableAdCost >= 0) q.set('allowable_ad_cost', String(allowableAdCost))
       const qs = q.toString()
       return request<import('../types').RevenuePlanResponse>(`/revenue-plan${qs ? `?${qs}` : ''}`)
     },
