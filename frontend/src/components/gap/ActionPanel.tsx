@@ -11,11 +11,11 @@ interface ActionDef {
   category: 'Promotion' | 'Price' | 'Product' | 'Place' | '仕入れ'
   issue: IssueType[]
   text: string
-  /** 具体的なタクティクスの補足（NATIONS資料の4Pアクション例より）。 */
+  /** 具体的なタクティクスの補足（4P分析の実務例をもとに自社文言で作成）。 */
   detail?: string
 }
 
-// 4P改善アクション（要件No.10: NATIONS資料のタクティクスをカテゴリ別に網羅）。
+// 4P改善アクション（要件No.10: 4P分析のタクティクスをカテゴリ別に網羅）。
 // 既存の action_key は保存済みチェック状態との互換のため変更しない。新規タクティクスを追加している。
 const ACTIONS: ActionDef[] = [
   // ── アクセス課題（Promotion） ─────────────────────────────
@@ -87,7 +87,7 @@ interface ActionPanelProps {
   onClose: () => void
 }
 
-/** アクセス母数がこの値未満の場合、CVR・客単価は統計的に信用しない（NATIONS講座ルール） */
+/** アクセス母数がこの値未満の場合、CVR・客単価は統計的に信用しない（EC実務基準） */
 const MIN_ACCESS_FOR_CVR_EVAL = 100
 
 /**
