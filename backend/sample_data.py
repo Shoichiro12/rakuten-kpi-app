@@ -419,9 +419,16 @@ def generate_sample_data(db: Session):
     COST_UNSET = {"RUN-002", "ACC-004"}
 
     shop = get_or_create_default_shop(db)
-    # 売上予算プラン（第4段階v2）のデモ: 年間売上予算と予算年度起点（1月=暦年）
-    shop.annual_sales_budget = DEMO_ANNUAL_SALES_BUDGET
-    shop.budget_year_start_month = 1
+    # 売上予算プラン（第4段階v2）のデモ: 年間売上予算と予算年度起点（1月=暦年）。
+    # ⚠️ 上書きガード（2026-08-02 オーナー指示）: Shopの設定値はサンプル再生成で
+    # 消えてはいけない利用者データ。現在値が NULL のときだけデモ値を埋め、
+    # 既に値が入っている場合（UIから設定済み・デモ値済みとも）は触らない。
+    # 本番で「UIから設定した年間予算が再生成で問答無用に上書きされる」事象が
+    # 実際に確認されたための修正。変更検知のような複雑な判定はしない方針。
+    if shop.annual_sales_budget is None:
+        shop.annual_sales_budget = DEMO_ANNUAL_SALES_BUDGET
+    if shop.budget_year_start_month is None:
+        shop.budget_year_start_month = 1
     for product in PRODUCTS:
         mno = product["management_no"]
         g_parts = product["genre"].split("/")
