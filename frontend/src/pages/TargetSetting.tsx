@@ -60,6 +60,16 @@ export default function TargetSetting() {
 
   useEffect(() => { loadPlan(yearMonth) }, [yearMonth, loadPlan])
 
+  // 月次売上予算の手動補正（追加指示書2章）: 月ごとにonBlur保存・nullで解除
+  const saveOverride = async (ym: string, value: number | null) => {
+    try {
+      await api.revenuePlan.override(ym, value)
+      await loadPlan(yearMonth)
+    } catch (e) {
+      console.error('[TargetSetting] 月次予算補正エラー:', e)
+    }
+  }
+
   const saveBudget = async () => {
     setBudgetSaving(true)
     try {
@@ -316,7 +326,7 @@ export default function TargetSetting() {
                           <tr>
                             <th className="px-2 py-1.5 text-left">月</th>
                             <th className="px-2 py-1.5 text-right">季節指数</th>
-                            <th className="px-2 py-1.5 text-right">月次売上予算</th>
+                            <th className="px-2 py-1.5 text-right">月次売上予算（編集で手動補正）</th>
                             <th className="px-2 py-1.5 text-right">実績</th>
                             <th className="px-2 py-1.5 text-right">達成率</th>
                           </tr>
@@ -326,7 +336,42 @@ export default function TargetSetting() {
                             <tr key={m.year_month} className={m.year_month === yearMonth ? 'bg-blue-50' : ''}>
                               <td className="px-2 py-1.5 font-medium text-gray-800">{m.year_month}</td>
                               <td className="px-2 py-1.5 text-right text-gray-600">{m.index != null ? m.index.toFixed(2) : '—'}</td>
-                              <td className="px-2 py-1.5 text-right text-gray-900">{m.sales_budget != null ? `¥${Math.round(m.sales_budget).toLocaleString()}` : '—'}</td>
+                              <td className="px-2 py-1.5 text-right whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1 justify-end">
+                                  {m.sales_budget_source === 'manual' && (
+                                    <>
+                                      <span className="inline-block px-1 py-0.5 rounded text-[9px] font-medium bg-violet-100 text-violet-700" title="手動補正中。空欄で保存すると自動按分に戻ります">手動</span>
+                                      <button
+                                        onClick={() => saveOverride(m.year_month, null)}
+                                        className="text-[9px] text-gray-400 hover:text-red-500 underline"
+                                        title="補正を解除して自動按分に戻す"
+                                      >解除</button>
+                                    </>
+                                  )}
+                                  <span className="text-gray-400 text-[10px]">¥</span>
+                                  <input
+                                    key={`${m.year_month}:${m.sales_budget ?? ''}:${m.sales_budget_source ?? ''}`}
+                                    type="number" min={0} step={100000}
+                                    defaultValue={m.sales_budget != null ? Math.round(m.sales_budget) : ''}
+                                    placeholder="—"
+                                    onBlur={(e) => {
+                                      const raw = e.target.value
+                                      if (raw === '') {
+                                        // 空欄=解除（手動月のみ意味を持つ。自動月は何もしない）
+                                        if (m.sales_budget_source === 'manual') saveOverride(m.year_month, null)
+                                        return
+                                      }
+                                      const v = Number(raw)
+                                      if (Number.isFinite(v) && v > 0 && v !== (m.sales_budget != null ? Math.round(m.sales_budget) : null)) {
+                                        saveOverride(m.year_month, v)
+                                      }
+                                    }}
+                                    className={`w-24 text-right border rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 ${
+                                      m.sales_budget_source === 'manual' ? 'border-violet-300 bg-violet-50/50' : 'border-gray-200'
+                                    }`}
+                                  />
+                                </span>
+                              </td>
                               <td className="px-2 py-1.5 text-right text-gray-600">{m.actual_sales != null ? `¥${Math.round(m.actual_sales).toLocaleString()}` : '—'}</td>
                               <td className={`px-2 py-1.5 text-right font-medium ${m.achievement_rate == null ? 'text-gray-300' : m.achievement_rate >= 100 ? 'text-green-600' : 'text-red-500'}`}>
                                 {m.achievement_rate != null ? `${m.achievement_rate}%` : '—'}
@@ -336,6 +381,17 @@ export default function TargetSetting() {
                         </tbody>
                       </table>
                     </div>
+                    {/* 12ヶ月合計と年間予算の差分（手動補正は他月へ再配分しないため乖離しうる） */}
+                    {plan.annual_sales_budget != null && (() => {
+                      const total = plan.months.reduce((s, m) => s + (m.sales_budget ?? 0), 0)
+                      const diff = total - plan.annual_sales_budget
+                      return (
+                        <p className={`mt-1.5 text-[10px] ${Math.abs(diff) >= 1 ? 'text-amber-600' : 'text-gray-400'}`}>
+                          12ヶ月合計 ¥{Math.round(total).toLocaleString()}／年間予算 ¥{Math.round(plan.annual_sales_budget).toLocaleString()}
+                          {Math.abs(diff) >= 1 && `（差 ${diff > 0 ? '+' : ''}¥${Math.round(diff).toLocaleString()}。手動補正した月は他月へ再配分しないため合計がズレることがあります）`}
+                        </p>
+                      )
+                    })()}
                   </>
                 )}
               </div>

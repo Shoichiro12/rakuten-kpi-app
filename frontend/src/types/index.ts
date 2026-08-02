@@ -106,6 +106,8 @@ export interface RevenuePlanMonth {
   /** 季節指数（平均=1.0）。按分できない状態では null */
   index: number | null
   sales_budget: number | null
+  /** index=自動按分（季節/均等） / manual=手動補正 */
+  sales_budget_source: 'index' | 'manual' | null
   actual_sales: number | null
   achievement_rate: number | null
 }

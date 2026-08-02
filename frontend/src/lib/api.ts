@@ -228,6 +228,12 @@ export const api = {
       const qs = q.toString()
       return request<import('../types').RevenuePlanResponse>(`/revenue-plan${qs ? `?${qs}` : ''}`)
     },
+    /** 月次売上予算の手動補正。salesBudget=null で解除（自動按分に戻す）。保存はTarget.target_sales_budgetのみ */
+    override: (yearMonth: string, salesBudget: number | null) =>
+      request<{ year_month: string; sales_budget: number | null; message: string }>(
+        '/revenue-plan/override',
+        { method: 'POST', body: JSON.stringify({ year_month: yearMonth, sales_budget: salesBudget }) },
+      ),
   },
   /* ─── 商品マスタ・カテゴリ ─────────────────── */
   master: {

@@ -557,12 +557,32 @@ def build_budget_plan(db: Session, shop, base_ym: str,
             "year_month": ym,
             "index": round(share * 12, 3) if share is not None else None,  # 平均=1.0 の指数
             "sales_budget": budget,
+            "sales_budget_source": "index" if budget is not None else None,
             "actual_sales": round(actual, 0) if actual is not None else None,
             "achievement_rate": (
                 round(actual / budget * 100, 1)
                 if budget and budget > 0 and actual is not None else None
             ),
         })
+
+    # ── 月次売上予算の手動補正（2章）: 補正がある月はその値を優先する ──────────
+    # 上書きした月以外の自動按分値は変えない（再配分しない。オーナー承認済み）。
+    # そのため12ヶ月合計は年間予算とズレうる（フロントで差分を情報表示する）。
+    overrides = {
+        t.year_month: float(t.target_sales_budget)
+        for t in db.query(Target).filter(Target.year_month.in_(months)).all()
+        if t.target_sales_budget is not None and t.target_sales_budget > 0
+    }
+    for row in month_rows:
+        ov = overrides.get(row["year_month"])
+        if ov is None:
+            continue
+        row["sales_budget"] = round(ov, 0)
+        row["sales_budget_source"] = "manual"
+        actual = index["monthly_sales"].get(row["year_month"])
+        row["achievement_rate"] = (
+            round(actual / ov * 100, 1) if ov > 0 and actual is not None else None
+        )
 
     guide = _build_guide(status, index)
 

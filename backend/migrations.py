@@ -59,6 +59,8 @@ _EXTRA_COLUMNS = {
         ("annual_sales_budget", "FLOAT"),
         ("budget_year_start_month", "INTEGER DEFAULT 1"),
     ],
+    # 月次売上予算の手動補正（追加指示書2026-08-02 2章。null=自動按分）
+    "targets": [("target_sales_budget", "FLOAT")],
     # アクション提案ロジックのゲート用状態（設計ドキュメント2026-08-01 2-A / 3-A）
     "products": [
         ("launch_month", "VARCHAR"),

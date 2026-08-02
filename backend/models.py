@@ -51,6 +51,12 @@ class Target(Base, UserScopedMixin):
     target_cvr = Column(Float, default=0)      # CVR目標(%)
     target_av = Column(Float, default=0)       # 客単価目標
     expense_rate = Column(Float, default=0.15) # 経費率
+    # 月次売上予算の手動補正（追加指示書2026-08-02 2章）。
+    # null=年間売上予算からの自動按分値を採用 / 値あり=その月はこの値を優先。
+    # ⚠️ routers/targets.py の既存upsert（KGIフォーム）では絶対に更新しないこと。
+    #    更新は routers/revenue_plan.py の override 専用エンドポイントのみ
+    #    （フォーム保存のたびに補正が消える事故を防ぐため）。
+    target_sales_budget = Column(Float, nullable=True)
     created_at = Column(DateTime, default=func.now())
 
     __table_args__ = (
