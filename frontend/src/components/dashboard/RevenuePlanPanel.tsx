@@ -78,6 +78,11 @@ export default function RevenuePlanPanel({ yearMonth }: { yearMonth: string }) {
               目標設定画面で年間売上予算を入力する →
             </Link>
           )}
+          {plan.status === 'collect_data' && (
+            <Link to="/import" className="inline-block mt-2 text-xs font-medium text-blue-600 hover:underline">
+              データ取込み画面で商品分析レポートを取り込む →
+            </Link>
+          )}
         </div>
       )}
 
