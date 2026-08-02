@@ -3,7 +3,13 @@ import { Save, CheckCircle, Check, RefreshCw } from 'lucide-react'
 import Header from '../components/layout/Header'
 import { api } from '../lib/api'
 import { getCurrentYearMonth } from '../lib/utils'
-import type { Target, ItemTargetListEntry } from '../types'
+import type { Target, ItemTargetListEntry, RevenuePlanResponse } from '../types'
+
+const CONFIDENCE_LABELS: Record<string, { label: string; cls: string }> = {
+  high: { label: '精度: 高（2年分以上の実績）', cls: 'bg-green-100 text-green-700' },
+  medium: { label: '精度: 中（実績1周分）', cls: 'bg-blue-100 text-blue-700' },
+  low: { label: '均等按分（実績12ヶ月未満）', cls: 'bg-amber-100 text-amber-700' },
+}
 
 function Field({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
   return (
@@ -34,6 +40,42 @@ export default function TargetSetting() {
   // アイテム別目標（3-B''・第3段階）
   const [itemRows, setItemRows] = useState<ItemTargetListEntry[]>([])
   const [itemMsg, setItemMsg] = useState<string | null>(null)
+
+  // 売上予算プラン（第4段階v2）: 年間売上予算・予算年度起点と按分プレビュー
+  const [annualBudget, setAnnualBudget] = useState<number | ''>('')
+  const [startMonth, setStartMonth] = useState(1)
+  const [plan, setPlan] = useState<RevenuePlanResponse | null>(null)
+  const [budgetSaved, setBudgetSaved] = useState(false)
+  const [budgetSaving, setBudgetSaving] = useState(false)
+
+  const loadPlan = useCallback(async (ym: string) => {
+    try {
+      const res = await api.revenuePlan.get(ym)
+      setPlan(res ?? null)
+    } catch (e) {
+      console.error('[TargetSetting] 売上予算プラン取得エラー:', e)
+      setPlan(null)
+    }
+  }, [])
+
+  useEffect(() => { loadPlan(yearMonth) }, [yearMonth, loadPlan])
+
+  const saveBudget = async () => {
+    setBudgetSaving(true)
+    try {
+      await api.shops.update({
+        annual_sales_budget: annualBudget === '' ? null : annualBudget,
+        budget_year_start_month: startMonth,
+      })
+      await loadPlan(yearMonth)
+      setBudgetSaved(true)
+      setTimeout(() => setBudgetSaved(false), 2000)
+    } catch (e) {
+      console.error('[TargetSetting] 年間売上予算保存エラー:', e)
+    } finally {
+      setBudgetSaving(false)
+    }
+  }
 
   const loadItemTargets = useCallback(async (ym: string) => {
     try {
@@ -98,6 +140,10 @@ export default function TargetSetting() {
     api.shops.me()
       .then((shop) => {
         if (shop && typeof shop.default_cost_rate === 'number') setCostRate(shop.default_cost_rate)
+        if (shop) {
+          setAnnualBudget(shop.annual_sales_budget ?? '')
+          setStartMonth(shop.budget_year_start_month ?? 1)
+        }
       })
       .catch((e: unknown) => {
         console.error('[TargetSetting] 店舗設定取得エラー:', e)
@@ -191,6 +237,109 @@ export default function TargetSetting() {
                 />
               </div>
             </Field>
+          </div>
+
+          {/* 年間売上予算（売上予算プラン・第4段階v2） */}
+          <div className="bg-white rounded-xl border shadow-sm p-6">
+            <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
+              <h3 className="text-sm font-semibold text-gray-700">年間売上予算</h3>
+              {budgetSaved && (
+                <span className="flex items-center gap-1.5 text-xs text-green-600"><CheckCircle size={13} />保存しました</span>
+              )}
+            </div>
+            <p className="text-xs text-gray-500 mb-4">
+              過去実績の季節性で月次に自動按分します（按分値は保存せず、実績の蓄積で自動的に精度が上がります）
+            </p>
+            <Field label="年間売上予算" description="未入力に戻すと機能をオフにできます">
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-500">¥</span>
+                <input
+                  type="number"
+                  value={annualBudget}
+                  min={0}
+                  step={1000000}
+                  placeholder="未設定"
+                  onChange={e => setAnnualBudget(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </Field>
+            <Field label="予算年度の起点月" description="決算期に合わせられます（既定: 1月=暦年）">
+              <select
+                value={startMonth}
+                onChange={e => setStartMonth(Number(e.target.value))}
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                  <option key={m} value={m}>{m}月</option>
+                ))}
+              </select>
+            </Field>
+            <div className="pt-4">
+              <button
+                onClick={saveBudget}
+                disabled={budgetSaving}
+                className="px-4 py-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors"
+              >
+                年間予算を保存して按分を更新
+              </button>
+            </div>
+
+            {/* 按分プレビュー */}
+            {plan && (
+              <div className="mt-5 border-t pt-4">
+                {plan.status === 'no_budget' || plan.status === 'collect_data' ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+                    <p className="text-sm font-medium text-gray-700">{plan.guide.title}</p>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">{plan.guide.message}</p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-2 flex-wrap mb-2">
+                      <p className="text-xs font-semibold text-gray-600">
+                        月次按分プレビュー（{plan.budget_year.from} 〜 {plan.budget_year.to}）
+                      </p>
+                      {plan.seasonal_index.confidence && CONFIDENCE_LABELS[plan.seasonal_index.confidence] && (
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${CONFIDENCE_LABELS[plan.seasonal_index.confidence].cls}`}>
+                          {CONFIDENCE_LABELS[plan.seasonal_index.confidence].label}
+                        </span>
+                      )}
+                      <span className="text-[10px] text-gray-400">
+                        根拠: 有効実績{plan.seasonal_index.valid_months}ヶ月
+                        {plan.seasonal_index.period_from && `（${plan.seasonal_index.period_from}〜${plan.seasonal_index.period_to}）`}
+                      </span>
+                    </div>
+                    <p className="text-[10px] text-gray-400 mb-2 leading-snug">{plan.guide.message}</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead className="bg-gray-50 text-[10px] text-gray-500 uppercase">
+                          <tr>
+                            <th className="px-2 py-1.5 text-left">月</th>
+                            <th className="px-2 py-1.5 text-right">季節指数</th>
+                            <th className="px-2 py-1.5 text-right">月次売上予算</th>
+                            <th className="px-2 py-1.5 text-right">実績</th>
+                            <th className="px-2 py-1.5 text-right">達成率</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {plan.months.map(m => (
+                            <tr key={m.year_month} className={m.year_month === yearMonth ? 'bg-blue-50' : ''}>
+                              <td className="px-2 py-1.5 font-medium text-gray-800">{m.year_month}</td>
+                              <td className="px-2 py-1.5 text-right text-gray-600">{m.index != null ? m.index.toFixed(2) : '—'}</td>
+                              <td className="px-2 py-1.5 text-right text-gray-900">{m.sales_budget != null ? `¥${Math.round(m.sales_budget).toLocaleString()}` : '—'}</td>
+                              <td className="px-2 py-1.5 text-right text-gray-600">{m.actual_sales != null ? `¥${Math.round(m.actual_sales).toLocaleString()}` : '—'}</td>
+                              <td className={`px-2 py-1.5 text-right font-medium ${m.achievement_rate == null ? 'text-gray-300' : m.achievement_rate >= 100 ? 'text-green-600' : 'text-red-500'}`}>
+                                {m.achievement_rate != null ? `${m.achievement_rate}%` : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
           </div>
 
           {/* KPI */}

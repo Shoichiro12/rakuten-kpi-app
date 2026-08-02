@@ -53,7 +53,12 @@ _USER_SCOPED_TABLES = {
 # user_id 以外で、後から追加した通常カラム（既存DBへ冪等にALTERで足す）。
 # {テーブル名: [(列名, 型DDL), ...]}
 _EXTRA_COLUMNS = {
-    "shops": [("restock_lead_days", "INTEGER DEFAULT 14")],
+    "shops": [
+        ("restock_lead_days", "INTEGER DEFAULT 14"),
+        # 売上予算プラン（第4段階v2）: 年間売上予算と予算年度の起点月
+        ("annual_sales_budget", "FLOAT"),
+        ("budget_year_start_month", "INTEGER DEFAULT 1"),
+    ],
     # アクション提案ロジックのゲート用状態（設計ドキュメント2026-08-01 2-A / 3-A）
     "products": [
         ("launch_month", "VARCHAR"),

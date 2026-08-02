@@ -99,6 +99,18 @@ MONTHLY_ITEM_CONFIG = {
 # 取扱停止アクションを検証するため、特別パターン（低母数/欠品/僅少）と重複しない商品を選ぶ。
 DISCONTINUED_MANAGEMENT_NO = "SPW-002"
 
+# ─── 売上予算プラン（第4段階v2）のデモ配置 ─────────────────────────────────
+# 暦月ごとの季節係数（MonthlyItemSalesの月次生成に適用。平均≒1.0）。
+# 12月=歳末商戦・3月=新生活の山、2月・8月の谷という一般的なEC季節性を模す。
+_SEASONAL_FACTORS = {
+    1: 0.90, 2: 0.80, 3: 1.15, 4: 0.95, 5: 0.90, 6: 1.00,
+    7: 0.95, 8: 0.85, 9: 1.05, 10: 0.95, 11: 1.10, 12: 1.40,
+}
+# デモ店舗の年間売上予算。月平均実績（約200万円）より少し高めに置き、
+# 「予算に対して不足 → 必要アクセス・想定広告費・ギャップ逆算」のデモが
+# 決定的に発火するようにする（30,000,000 ÷ 12 = 月250万円）。
+DEMO_ANNUAL_SALES_BUDGET = 30_000_000
+
 # ─── ゲート判定（gates.py / 設計ドキュメント2-A）のデモ配置 ─────────────────
 # RPP診断のゲート・フェーズ・意図確認が一通り確認できるよう、商品ごとに状態を仕込む。
 #   BAG-002 … 在庫0（MONTHLY_ITEM_CONFIG）→ 在庫ゲートで診断から除外・入荷提案
@@ -312,15 +324,26 @@ def generate_sample_data(db: Session):
     # ── 月次商品分析（MonthlyItemSales / 新スキーマ）──
     # site_uu 軸（アクセスUU）の集計・GAP分析・商品別KPI・在庫アラート・
     # 100UUルール（reliable=false）をこのデータで検証する。
-    for month_offset in range(2):
-        month_date = date(today.year, today.month, 1)
-        if month_offset == 1:
-            if month_date.month == 1:
-                month_date = date(month_date.year - 1, 12, 1)
-            else:
-                month_date = date(month_date.year, month_date.month - 1, 1)
+    #
+    # 第4段階v2（売上予算プラン）から14ヶ月分を生成する:
+    #   - 暦月12種をカバーする12ヶ月以上の有効実績 → 季節指数按分（confidence=medium）
+    #     がサンプルデータ上で決定的に発火する
+    #   - 12月（歳末商戦）と3月（新生活）に山のある季節カーブを仕込み、按分プレビューで
+    #     月ごとの予算差が目視できるようにする
+    # 商品ごとの基準CVRを固定する（毎月引き直すと乱数ノイズが季節係数を埋もれさせ、
+    # 按分プレビューの季節カーブが読めなくなるため。月ごとの揺らぎは±5%に抑える）
+    _item_base_cvr = {p["management_no"]: rng.uniform(0.8, 3.0) for p in PRODUCTS}
+
+    for month_offset in range(14):
+        y = today.year
+        m = today.month - month_offset
+        while m <= 0:
+            m += 12
+            y -= 1
+        month_date = date(y, m, 1)
         year_month = month_date.strftime("%Y-%m")
-        factor = 1.0 if month_offset == 0 else 0.9
+        # 暦月ごとの季節係数（平均≒1.0）。12月・3月が山、2月・8月が谷。
+        factor = _SEASONAL_FACTORS[month_date.month]
 
         for product in PRODUCTS:
             mgmt_no = product["management_no"]
@@ -334,8 +357,12 @@ def generate_sample_data(db: Session):
             genre_u3 = cfg["genre_u3"]
 
             access_uu = int(rng.randint(*cfg["uu"]) * factor)
-            # 転換率は商品ごとに0.8〜3.0%の範囲でばらつかせる（UU→注文）
-            cvr = round(rng.uniform(0.8, 3.0), 2)
+            # ACC-001 はUU母数不足（<100 → reliable=false）のデモ商品。季節係数で
+            # 100を超えてデモが壊れないよう上限を固定する。
+            if mgmt_no == "ACC-001":
+                access_uu = min(access_uu, 95)
+            # 転換率は商品ごとの基準値（0.8〜3.0%）に月±5%の揺らぎ（UU→注文）
+            cvr = round(_item_base_cvr[mgmt_no] * rng.uniform(0.95, 1.05), 2)
             cv = max(0, round(access_uu * cvr / 100))
             sales = round(cv * unit_price * rng.uniform(0.95, 1.05), 0)
             zero_days = cfg["zero_days"]
@@ -392,6 +419,9 @@ def generate_sample_data(db: Session):
     COST_UNSET = {"RUN-002", "ACC-004"}
 
     shop = get_or_create_default_shop(db)
+    # 売上予算プラン（第4段階v2）のデモ: 年間売上予算と予算年度起点（1月=暦年）
+    shop.annual_sales_budget = DEMO_ANNUAL_SALES_BUDGET
+    shop.budget_year_start_month = 1
     for product in PRODUCTS:
         mno = product["management_no"]
         g_parts = product["genre"].split("/")

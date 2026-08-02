@@ -113,6 +113,24 @@ CTR_BASELINE = 2.0
 NEW_PRODUCT_DEFAULT_MONTHS = 3
 RPP_MIN_CT_NEW_PRODUCT = 50
 
+# ─── 売上予算プランの季節指数（第4段階v2 / revenue_plan.py）──────────────────
+#
+# 年間売上予算を月次按分する季節指数の信頼区分。「有効実績月」= 月次の母数ゲート
+# （access_definitions.min_access_for("monthly")=430）を通過した月のみを算入する。
+#   - 24ヶ月以上（同じ暦月を2回以上観測）… confidence=high。暦月ごとの平均シェアで按分
+#   - 12〜23ヶ月（暦月12種を1周カバー）  … confidence=medium。1周分のシェアで按分
+#     （トレンドと季節性を分離できない旨を注記する）
+#   - 1〜11ヶ月                          … confidence=low。季節指数は出さず均等按分
+#     （開業直後のたまたまの山を季節性として学習しないため）
+#   - 0ヶ月                              … 新規店舗。按分せず「まず1ヶ月データ収集」案内
+# 統計的には季節分解は2周期（24ヶ月）が定石だが、実務上は12ヶ月で運用開始し、
+# 蓄積が進むと自動的に精度が上がる設計（指数は保存せず都度算出）。
+SEASONAL_HIGH_MONTHS = 24
+SEASONAL_MIN_MONTHS = 12
+
+SeasonalConfidence = Literal["high", "medium", "low"]
+RevenuePlanStatus = Literal["ok", "flat", "collect_data", "no_budget"]
+
 
 def detect_rpp_issues(
     ct: int,

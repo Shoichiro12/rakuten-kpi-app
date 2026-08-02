@@ -233,6 +233,13 @@ class Shop(Base, UserScopedMixin):
     default_cost_rate = Column(Float, default=0.6)
     default_expense_rate = Column(Float, default=0.15)
     restock_lead_days = Column(Integer, default=14)  # 在庫がこの日数分を切ったら発注アラート
+    # ── 売上予算プラン（設計3-G改め v2 / 第4段階）────────────────────────
+    # annual_sales_budget: 年間売上予算（円）。null=未設定（売上予算プラン機能はオフ表示）。
+    #   月次への按分値は保存せず、revenue_plan.py が季節指数から都度算出する
+    #   （保存すると指数更新・予算変更のたびに12行の同期が必要になるため）。
+    # budget_year_start_month: 予算年度の起点月（1〜12、既定1=暦年）。
+    annual_sales_budget = Column(Float, nullable=True)
+    budget_year_start_month = Column(Integer, default=1)
     is_active = Column(Boolean, default=True)
     created_at = Column(DateTime, default=func.now())
 

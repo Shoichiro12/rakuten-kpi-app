@@ -89,7 +89,45 @@ export interface Shop {
   default_cost_rate: number
   default_expense_rate: number
   restock_lead_days: number
+  /** 年間売上予算（円）。null=未設定（売上予算プランはオフ表示） */
+  annual_sales_budget: number | null
+  /** 予算年度の起点月（1〜12、既定1=暦年） */
+  budget_year_start_month: number
   is_active: boolean
+}
+
+/* ─── 売上予算プラン（第4段階v2 / /api/revenue-plan） ─────────────── */
+
+export type RevenuePlanStatus = 'ok' | 'flat' | 'collect_data' | 'no_budget'
+export type SeasonalConfidence = 'high' | 'medium' | 'low'
+
+export interface RevenuePlanMonth {
+  year_month: string
+  /** 季節指数（平均=1.0）。按分できない状態では null */
+  index: number | null
+  sales_budget: number | null
+  actual_sales: number | null
+  achievement_rate: number | null
+}
+
+export interface RevenuePlanResponse {
+  status: RevenuePlanStatus
+  annual_sales_budget: number | null
+  budget_year_start_month: number
+  budget_year: { from: string; to: string }
+  base_month: string
+  seasonal_index: {
+    source: 'item_sales' | 'rpp'
+    access_axis: 'site_uu' | 'rpp_click'
+    confidence: SeasonalConfidence | null
+    valid_months: number
+    covered_calendar_months: number
+    period_from: string | null
+    period_to: string | null
+    min_access_per_month: number
+  }
+  months: RevenuePlanMonth[]
+  guide: { title: string; message: string }
 }
 
 export interface MasterProduct {

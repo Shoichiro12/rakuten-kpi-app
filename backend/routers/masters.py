@@ -582,6 +582,9 @@ def _shop_to_dict(s: Shop) -> dict:
         "default_cost_rate": s.default_cost_rate if s.default_cost_rate is not None else DEFAULT_COST_RATE,
         "default_expense_rate": s.default_expense_rate if s.default_expense_rate is not None else 0.15,
         "restock_lead_days": s.restock_lead_days if s.restock_lead_days is not None else 14,
+        # 売上予算プラン（第4段階v2）: 年間売上予算（null=未設定）と予算年度の起点月
+        "annual_sales_budget": s.annual_sales_budget,
+        "budget_year_start_month": s.budget_year_start_month if s.budget_year_start_month is not None else 1,
         "is_active": s.is_active,
     }
 
@@ -597,6 +600,9 @@ class ShopUpdatePayload(BaseModel):
     default_cost_rate: Optional[float] = None
     default_expense_rate: Optional[float] = None
     restock_lead_days: Optional[int] = None
+    # 売上予算プラン（第4段階v2）。annual_sales_budget は 0 以下・null で「未設定に戻す」
+    annual_sales_budget: Optional[float] = None
+    budget_year_start_month: Optional[int] = None
 
 
 @shops_router.put("/me")
@@ -616,6 +622,13 @@ def update_my_shop(payload: ShopUpdatePayload, db: Session = Depends(get_db)):
         shop.default_expense_rate = min(max(r / 100.0 if r > 1 else r, 0.0), 1.0)
     if "restock_lead_days" in data and data["restock_lead_days"] is not None:
         shop.restock_lead_days = max(1, int(data["restock_lead_days"]))
+    # 年間売上予算: 明示的に送られたときだけ更新する。0以下・null は「未設定に戻す」
+    # （按分値は保存していないので、ここを消せば売上予算プランは即 no_budget 表示に戻る）
+    if "annual_sales_budget" in data:
+        v = data["annual_sales_budget"]
+        shop.annual_sales_budget = float(v) if v is not None and float(v) > 0 else None
+    if "budget_year_start_month" in data and data["budget_year_start_month"] is not None:
+        shop.budget_year_start_month = min(max(int(data["budget_year_start_month"]), 1), 12)
     # デフォルト原価率が変わったら、それを適用している商品の RppWeekly を掛け直す
     # （/api/costs/default と挙動を揃え、KPIが古い原価のまま残らないようにする）。
     if cost_rate_changed:

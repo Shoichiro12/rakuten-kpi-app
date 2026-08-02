@@ -214,9 +214,20 @@ export const api = {
   shops: {
     /** 現ユーザーのデフォルト店舗（原価率・経費率のデフォルト等） */
     me: () => request<import('../types').Shop>('/shops/me'),
-    /** 店舗名・デフォルト原価率・デフォルト経費率・発注アラート閾値の更新 */
-    update: (data: Partial<Pick<import('../types').Shop, 'name' | 'default_cost_rate' | 'default_expense_rate' | 'restock_lead_days'>>) =>
+    /** 店舗名・デフォルト原価率・デフォルト経費率・発注アラート閾値・年間売上予算の更新 */
+    update: (data: Partial<Pick<import('../types').Shop, 'name' | 'default_cost_rate' | 'default_expense_rate' | 'restock_lead_days' | 'annual_sales_budget' | 'budget_year_start_month'>>) =>
       request<import('../types').Shop>('/shops/me', { method: 'PUT', body: JSON.stringify(data) }),
+  },
+  /* ─── 売上予算プラン（第4段階v2） ─────────────────── */
+  revenuePlan: {
+    /** 年間売上予算の月次按分＋基準月の必要アクセス・想定広告費。allowableAdCost 指定時はギャップ逆算も返る */
+    get: (yearMonth?: string, allowableAdCost?: number) => {
+      const q = new URLSearchParams()
+      if (yearMonth) q.set('year_month', yearMonth)
+      if (allowableAdCost != null && allowableAdCost > 0) q.set('allowable_ad_cost', String(allowableAdCost))
+      const qs = q.toString()
+      return request<import('../types').RevenuePlanResponse>(`/revenue-plan${qs ? `?${qs}` : ''}`)
+    },
   },
   /* ─── 商品マスタ・カテゴリ ─────────────────── */
   master: {
