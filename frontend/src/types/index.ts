@@ -127,7 +127,29 @@ export interface RevenuePlanResponse {
     min_access_per_month: number
   }
   months: RevenuePlanMonth[]
+  /** 基準月の一気通貫: 予算→必要アクセス→想定広告費（ok/flat時のみ） */
+  current: RevenuePlanCurrent | null
   guide: { title: string; message: string }
+}
+
+export interface RevenuePlanCurrent {
+  year_month: string
+  sales_budget: number
+  target_cvr: number
+  target_av: number
+  /** manual=手入力目標 / rule=MIN(現状,前年) / mixed=指標で出どころが異なる */
+  target_basis: 'manual' | 'rule' | 'mixed'
+  target_basis_detail: string
+  required_access: number
+  access_axis: 'site_uu'
+  actual_access: number | null
+  actual_access_month: string | null
+  shortfall_access: number
+  cpc: number | null
+  cpc_source_month: string | null
+  cpc_is_fallback: boolean | null
+  est_ad_cost: number | null
+  note: string
 }
 
 export interface MasterProduct {

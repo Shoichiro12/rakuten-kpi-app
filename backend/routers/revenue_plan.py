@@ -34,5 +34,5 @@ def get_revenue_plan(
     base_ym = (year_month or date.today().strftime("%Y-%m"))[:7]
     shop = get_or_create_default_shop(db)
 
-    plan = build_budget_plan(db, shop, base_ym)
+    plan = build_budget_plan(db, shop, base_ym, allowable_ad_cost=allowable_ad_cost)
     return plan

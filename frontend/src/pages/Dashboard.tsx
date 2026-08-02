@@ -8,6 +8,7 @@ import PeriodSelector from '../components/PeriodSelector'
 import EmptyState from '../components/EmptyState'
 import EvaluationMatrix from '../components/EvaluationMatrix'
 import AccessPlanner from '../components/dashboard/AccessPlanner'
+import RevenuePlanPanel from '../components/dashboard/RevenuePlanPanel'
 import TodayActions from '../components/dashboard/TodayActions'
 import ActionOutcomes from '../components/dashboard/ActionOutcomes'
 import { api } from '../lib/api'
@@ -165,7 +166,10 @@ export default function Dashboard() {
           <EvaluationMatrix evaluation={evaluation} />
         )}
 
-        {/* アクセス逆算パネル（売上の最速レバー＝アクセスの現在地） */}
+        {/* 売上予算プラン（年間予算の按分 → 必要アクセス → 想定広告費。第4段階v2） */}
+        <RevenuePlanPanel yearMonth={dateValue.slice(0, 7)} />
+
+        {/* アクセス逆算パネル（月次目標売上ベース。売上予算プランとは別軸の試算） */}
         {accessPlan && (
           <AccessPlanner plan={accessPlan} />
         )}

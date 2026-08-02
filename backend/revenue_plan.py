@@ -27,9 +27,10 @@ from typing import Literal, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from models import MonthlyItemSales, RppWeekly
+from models import MonthlyItemSales, RppWeekly, Target
 from access_definitions import min_access_for
 from calculations import SEASONAL_HIGH_MONTHS, SEASONAL_MIN_MONTHS
+from shop_metrics import get_shop_monthly
 
 IndexSource = Literal["item_sales", "rpp"]
 
@@ -173,9 +174,211 @@ def monthly_sales_index(db: Session) -> dict:
     return result
 
 
+# ─── 店舗全体の目標CVR・客単価（区切り2） ────────────────────────────────────
+
+def _shop_month_at_or_before(db: Session, ym: str) -> Optional[dict]:
+    """対象月以前の直近実績月の店舗合算を返す（無ければ全体の最新実績月）。
+
+    target_calc._actual_at_or_before の店舗全体版。site_uu 軸。
+    Returns: {"year_month", "sales", "access", "cv", "cvr", "av"} | None
+    """
+    latest = (
+        db.query(MonthlyItemSales.year_month)
+        .filter(MonthlyItemSales.year_month <= ym)
+        .order_by(MonthlyItemSales.year_month.desc())
+        .limit(1)
+        .scalar()
+    )
+    if not latest:
+        latest = (
+            db.query(MonthlyItemSales.year_month)
+            .order_by(MonthlyItemSales.year_month.desc())
+            .limit(1)
+            .scalar()
+        )
+    if not latest:
+        return None
+    agg = get_shop_monthly(db, latest)
+    if not agg:
+        return None
+    return {"year_month": latest, **agg}
+
+
+def shop_target_rates(db: Session, base_ym: str) -> Optional[dict]:
+    """店舗全体の目標CVR・客単価を解決する（実装計画書1-(a)。案1）。
+
+    優先順位（オーナー承認済み 2026-08-02）:
+      1. Target（店舗×月のKGI設定）に手入力の target_cvr / target_av があれば
+         指標ごとにそれを優先する（第1段階ベンチマークの「手入力が常に勝つ」原則）
+      2. 無ければ確定公式 MIN(現状値, 前年値) を店舗全体に適用する
+         （現状値=対象月以前の直近実績月の店舗合算、前年値=前年同月の店舗合算。
+          片方欠損は存在する方のみ採用し basis に明記。target_calc.py と同じ規約）
+
+    Returns:
+        {"target_cvr", "target_av", "basis", "basis_detail"} | None（実績が全く無い場合）
+        basis: 'manual' | 'rule' | 'mixed'（CVRと客単価で出どころが異なる場合）
+    """
+    manual = db.query(Target).filter(Target.year_month == base_ym).first()
+    manual_cvr = manual.target_cvr if manual and (manual.target_cvr or 0) > 0 else None
+    manual_av = manual.target_av if manual and (manual.target_av or 0) > 0 else None
+
+    cur = _shop_month_at_or_before(db, base_ym)
+    py = get_shop_monthly(db, f"{int(base_ym[:4]) - 1}-{base_ym[5:7]}")
+
+    cvr_cands = []
+    av_cands = []
+    if cur and cur["cvr"] > 0:
+        cvr_cands.append(("現状値", cur["year_month"], cur["cvr"]))
+    if py and py["cvr"] > 0:
+        cvr_cands.append(("前年値", f"{int(base_ym[:4]) - 1}-{base_ym[5:7]}", py["cvr"]))
+    if cur and cur["av"] > 0:
+        av_cands.append(("現状値", cur["year_month"], cur["av"]))
+    if py and py["av"] > 0:
+        av_cands.append(("前年値", f"{int(base_ym[:4]) - 1}-{base_ym[5:7]}", py["av"]))
+
+    details = []
+    if manual_cvr is not None:
+        target_cvr = manual_cvr
+        details.append(f"目標CVR={target_cvr}%（目標設定画面の手入力を採用）")
+        cvr_from_manual = True
+    elif cvr_cands:
+        pick = min(cvr_cands, key=lambda x: x[2])
+        target_cvr = pick[2]
+        details.append(f"目標CVR={target_cvr}%（{pick[0]} {pick[1]}を採用。MIN(現状, 前年)）")
+        cvr_from_manual = False
+    else:
+        return None
+
+    if manual_av is not None:
+        target_av = manual_av
+        details.append(f"目標客単価=¥{int(target_av):,}（目標設定画面の手入力を採用）")
+        av_from_manual = True
+    elif av_cands:
+        pick = min(av_cands, key=lambda x: x[2])
+        target_av = pick[2]
+        details.append(f"目標客単価=¥{int(target_av):,}（{pick[0]} {pick[1]}を採用。MIN(現状, 前年)）")
+        av_from_manual = False
+    else:
+        return None
+
+    if cvr_from_manual and av_from_manual:
+        basis = "manual"
+    elif not cvr_from_manual and not av_from_manual:
+        basis = "rule"
+    else:
+        basis = "mixed"
+
+    return {
+        "target_cvr": round(float(target_cvr), 2),
+        "target_av": round(float(target_av), 0),
+        "basis": basis,
+        "basis_detail": "／".join(details),
+        # ギャップ逆算（区切り3）のCVR上限に使う: 過去に実際に到達した水準
+        "cvr_ceiling_candidates": [c[2] for c in cvr_cands],
+    }
+
+
+def _rpp_month_cpc(db: Session, ym: str) -> Optional[dict]:
+    """指定月のRPP実績CPC（rpp_click 軸）。無ければ直近実績月へフォールバック。
+
+    Returns: {"cpc", "source_month", "is_fallback"} | None（RPPデータが全く無い）
+    """
+    def _agg_month(target_ym: str) -> Optional[float]:
+        y, m = int(target_ym[:4]), int(target_ym[5:7])
+        from datetime import date as _date
+        start = _date(y, m, 1)
+        end = _date(y + 1, 1, 1) if m == 12 else _date(y, m + 1, 1)
+        row = db.query(
+            func.coalesce(func.sum(RppWeekly.ad_cost), 0.0),
+            func.coalesce(func.sum(RppWeekly.ct), 0),
+        ).filter(RppWeekly.week_start >= start, RppWeekly.week_start < end).one()
+        ad_cost, ct = float(row[0] or 0), int(row[1] or 0)
+        return round(ad_cost / ct, 1) if ct > 0 else None
+
+    cpc = _agg_month(ym)
+    if cpc is not None:
+        return {"cpc": cpc, "source_month": ym, "is_fallback": False}
+
+    # フォールバック: RppWeekly が存在する直近の月
+    latest_week = (
+        db.query(RppWeekly.week_start)
+        .order_by(RppWeekly.week_start.desc())
+        .limit(1)
+        .scalar()
+    )
+    if latest_week is None:
+        return None
+    latest_ym = latest_week.strftime("%Y-%m")
+    cpc = _agg_month(latest_ym)
+    if cpc is None:
+        return None
+    return {"cpc": cpc, "source_month": latest_ym, "is_fallback": True}
+
+
+def build_current_breakdown(db: Session, base_ym: str, sales_budget: Optional[float]) -> Optional[dict]:
+    """基準月の一気通貫ブロック: 月次売上予算 → 必要アクセス → 想定広告費。
+
+    既存 /api/evaluation/access-plan と同じ逆算式（必要アクセス = 目標売上 ÷ (CVR×客単価)）を
+    使い、実績CVR・客単価の代わりに店舗全体の目標CVR・客単価（shop_target_rates）を使う。
+    不足アクセス(UU)を広告クリックで1:1に埋める近似も access-plan を踏襲する（試算である
+    旨を note で明示）。
+    """
+    if not sales_budget or sales_budget <= 0:
+        return None
+    rates = shop_target_rates(db, base_ym)
+    if rates is None:
+        return None
+
+    target_cvr = rates["target_cvr"]
+    target_av = rates["target_av"]
+    if target_cvr <= 0 or target_av <= 0:
+        return None
+
+    required_access = round(sales_budget / target_av / (target_cvr / 100.0), 0)
+
+    # 現状アクセス: 基準月の実績UUがあればそれ、無ければ直近実績月のUUを「見込み」として使う
+    cur_month = get_shop_monthly(db, base_ym)
+    if cur_month:
+        actual_access = cur_month["access"]
+        access_source_month = base_ym
+    else:
+        prev = _shop_month_at_or_before(db, base_ym)
+        actual_access = prev["access"] if prev else None
+        access_source_month = prev["year_month"] if prev else None
+
+    shortfall = max(0.0, required_access - (actual_access or 0))
+
+    cpc_info = _rpp_month_cpc(db, base_ym)
+    est_ad_cost = round(shortfall * cpc_info["cpc"], 0) if cpc_info and shortfall > 0 else (0.0 if shortfall == 0 else None)
+
+    return {
+        "year_month": base_ym,
+        "sales_budget": round(sales_budget, 0),
+        "target_cvr": target_cvr,
+        "target_av": target_av,
+        "target_basis": rates["basis"],
+        "target_basis_detail": rates["basis_detail"],
+        "required_access": required_access,
+        "access_axis": "site_uu",
+        "actual_access": actual_access,
+        "actual_access_month": access_source_month,
+        "shortfall_access": round(shortfall, 0),
+        "cpc": cpc_info["cpc"] if cpc_info else None,
+        "cpc_source_month": cpc_info["source_month"] if cpc_info else None,
+        "cpc_is_fallback": cpc_info["is_fallback"] if cpc_info else None,
+        "est_ad_cost": est_ad_cost,
+        "note": (
+            "必要アクセスはページ全体アクセス(UU)、広告費試算はRPPのCPC実績で"
+            "不足分を広告クリック1:1で埋める近似（既存アクセス逆算プランと同じ前提の試算値）"
+        ),
+        "_cvr_ceiling_candidates": rates["cvr_ceiling_candidates"],
+    }
+
+
 # ─── 予算プランの構築 ────────────────────────────────────────────────────────
 
-def build_budget_plan(db: Session, shop, base_ym: str) -> dict:
+def build_budget_plan(db: Session, shop, base_ym: str,
+                      allowable_ad_cost: Optional[float] = None) -> dict:
     """年間売上予算の月次按分プラン（12ヶ月分）を構築する。
 
     Args:
@@ -224,6 +427,16 @@ def build_budget_plan(db: Session, shop, base_ym: str) -> dict:
 
     guide = _build_guide(status, index)
 
+    # ── 基準月の一気通貫ブロック（区切り2）: 予算 → 必要アクセス → 想定広告費 ──
+    current = None
+    if status in ("ok", "flat"):
+        base_row = next((m for m in month_rows if m["year_month"] == base_ym), None)
+        base_budget = base_row["sales_budget"] if base_row else None
+        current = build_current_breakdown(db, base_ym, base_budget)
+    cvr_ceiling_candidates = current.pop("_cvr_ceiling_candidates", []) if current else []
+    # cvr_ceiling_candidates はギャップ逆算（区切り3）でCVR改善上限の算出に使う
+    _ = cvr_ceiling_candidates
+
     return {
         "status": status,
         "annual_sales_budget": annual_budget,
@@ -241,6 +454,7 @@ def build_budget_plan(db: Session, shop, base_ym: str) -> dict:
             "min_access_per_month": min_access_for("monthly"),
         },
         "months": month_rows,
+        "current": current,
         "guide": guide,
     }
 
