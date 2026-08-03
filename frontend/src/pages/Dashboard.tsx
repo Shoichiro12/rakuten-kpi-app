@@ -13,6 +13,8 @@ import TodayActions from '../components/dashboard/TodayActions'
 import ActionOutcomes from '../components/dashboard/ActionOutcomes'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
+import { formatYen, formatYenAxis } from '../lib/format'
+import BulletChart from '../components/kpi/BulletChart'
 import { usePeriodState } from '../lib/usePeriodState'
 import type {
   DashboardData, Alert, TrendPoint, EvaluationResult, AccessPlan, RecommendationsResponse, OutcomesResponse,
@@ -100,6 +102,9 @@ export default function Dashboard() {
   const hasAnyData = Boolean(kpis || shop)
   const changes = data?.changes ?? {}
 
+  // 実績（軸は混ぜない。商品分析があればそちら、無ければRPP経由）
+  const actualSales = shop ? shop.sales : kpis?.gross ?? null
+
   // ── 着地見込み（1層ヒーロー用）───────────────────────────────
   // 対象期間が「現在進行中」のときだけ、実績 ÷ 経過割合 で単純予測する。
   // 過去期間は実績＝確定なので出さない。経過1割未満は振れが大きすぎるため出さない。
@@ -133,6 +138,19 @@ export default function Dashboard() {
   // ── 売上3分解（1層ヒーロー用）。軸を混ぜない ─────────────────
   // 週次: dashboard本体（RPP軸: ct/cvr/av + changes）
   // 月次・年次: gap/shop（商品分析=店舗全体軸: access/cvr/av + changes）
+  // ペーサー（あるべき進捗）= 目標 × 経過割合。
+  // 経過割合は forecast（= 実績 ÷ 経過割合）から逆算できるので、新しいデータは要らない。
+  // ⚠️ これは線形按分。ECは日次が一様ではない（スーパーSALE等）ので、
+  //    季節指数で重み付けする改良は別チケット（規約 3-4 に記載）。
+  const pacer = (() => {
+    const target = data?.target_sales
+    if (target == null || target <= 0) return null
+    if (forecast == null || forecast <= 0 || actualSales == null) return null
+    const elapsed = actualSales / forecast
+    if (!Number.isFinite(elapsed) || elapsed <= 0 || elapsed >= 1) return null
+    return target * elapsed
+  })()
+
   const decompCards = (() => {
     if (period === 'weekly') {
       if (!kpis) return null
@@ -216,23 +234,46 @@ export default function Dashboard() {
                 {shop ? '商品分析（店舗全体）' : 'RPP経由売上'}
               </span>
             </div>
-            <p className="text-3xl font-bold text-gray-900 mt-1.5 tabular-nums">
-              {formatCurrency(shop ? shop.sales : kpis?.gross)}
+            {/* 金額はカード上では万・億で丸める（規約: docs/ui_number_and_chart_rules_2026-08-04.md 1-1）。
+                表・ツールチップ・CSVは丸めない */}
+            <p className="text-[40px] leading-[1.05] font-bold text-gray-900 mt-1.5 tracking-tight">
+              {formatYen(shop ? shop.sales : kpis?.gross)}
             </p>
             {data?.target_sales != null && data.target_sales > 0 ? (
               <>
-                <div className="w-full bg-gray-100 rounded-full h-2.5 mt-3">
-                  <div
-                    className={`h-2.5 rounded-full transition-all ${
-                      (data.achievement_rate ?? 0) >= 100 ? 'bg-green-500'
-                      : (data.achievement_rate ?? 0) >= 70 ? 'bg-blue-500' : 'bg-amber-500'
-                    }`}
-                    style={{ width: `${Math.min(data.achievement_rate ?? 0, 100)}%` }}
+                {/* 進捗バーではなく弾丸グラフ（規約 3-3）。進捗バーは上限100%で目標超過を表現できない。
+                    ペーサー = 目標 × 経過割合。経過割合は forecast（実績÷経過割合）から逆算できる */}
+                <div className="mt-3">
+                  <BulletChart
+                    value={actualSales ?? 0}
+                    target={data.target_sales}
+                    pace={pacer}
+                    projection={forecast}
+                    lowerIsBetter={false}
+                    formatTick={(v) => formatYenAxis(v)}
+                    valueLabel={formatYen(actualSales)}
+                    projectionLabel={forecast != null ? `着地見込 ${formatYen(forecast)}` : undefined}
+                    ariaLabel={`売上の弾丸グラフ。実績 ${formatYen(actualSales)}、目標 ${formatYen(data.target_sales)}`}
+                    height={86}
                   />
                 </div>
-                <div className="flex items-center justify-between text-xs text-gray-500 mt-1.5">
-                  <span>目標 {formatCurrency(data.target_sales)}</span>
-                  <span className="font-bold text-gray-900 text-sm">達成率 {data.achievement_rate?.toFixed(1)}%</span>
+                <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
+                  <span>
+                    {pacer != null && actualSales != null && (
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${
+                          actualSales >= pacer
+                            ? 'border-[#bfe3bf] bg-[#f2faf2] text-[#0a7a0a]'
+                            : 'border-[#f0cfcf] bg-[#fdf4f4] text-[#b2312f]'
+                        }`}
+                      >
+                        {actualSales >= pacer ? '● 順調' : '● 遅れ'}
+                      </span>
+                    )}
+                  </span>
+                  <span className="font-bold text-gray-900 text-sm tabular-nums">
+                    達成率 {data.achievement_rate?.toFixed(1)}%
+                  </span>
                 </div>
               </>
             ) : (
@@ -372,7 +413,8 @@ export default function Dashboard() {
                   { label: 'CPC（クリック単価）', value: formatCurrency(kpis.cpc), wow: changes.cpc_wow, yoy: changes.cpc_yoy, goodWhenDown: true, warn: changes.cpc_wow != null && changes.cpc_wow > 5 },
                   { label: '客単価（Av）', value: formatCurrency(kpis.av), wow: changes.av_wow, yoy: changes.av_yoy, goodWhenDown: false, warn: false },
                   { label: 'GP率（GPR）', value: formatPercent(kpis.gpr), wow: null, yoy: null, goodWhenDown: false, warn: false },
-                  { label: '広告費（AdCost）', value: formatCurrency(kpis.ad_cost), wow: changes.ad_cost_wow, yoy: changes.ad_cost_yoy, goodWhenDown: false, warn: false },
+                  // 広告費は「下がったら良い」指標。goodWhenDown:false だと上昇が緑になっていた（2026-08-04 修正）
+                  { label: '広告費（AdCost）', value: formatCurrency(kpis.ad_cost), wow: changes.ad_cost_wow, yoy: changes.ad_cost_yoy, goodWhenDown: true, warn: false },
                   { label: '注文件数（CV）', value: formatNumber(kpis.cv), wow: changes.cv_wow, yoy: changes.cv_yoy, goodWhenDown: false, warn: false },
                   { label: 'クリック数（CT）', value: formatNumber(kpis.ct), wow: changes.ct_wow, yoy: changes.ct_yoy, goodWhenDown: false, warn: false },
                   { label: '店舗運営経費', value: formatCurrency(kpis.steady_cost), wow: null, yoy: null, goodWhenDown: false, warn: false },
