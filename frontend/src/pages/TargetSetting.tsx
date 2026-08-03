@@ -394,9 +394,17 @@ export default function TargetSetting() {
                         {plan.seasonal_index.period_from && `（${plan.seasonal_index.period_from}〜${plan.seasonal_index.period_to}）`}
                       </span>
                     </div>
-                    <p className="text-[10px] text-gray-400 mb-2 leading-snug">{plan.guide.message}</p>
+                    {/* 注記は1行が長くなりすぎると読みにくいので、表と同じくらいの幅で折り返す */}
+                    <p className="max-w-3xl text-[10px] text-gray-400 mb-2 leading-snug">{plan.guide.message}</p>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
+                      {/* 親を全幅にしたぶん、列数の少ないこの表は放っておくと間延びする。
+                          表そのものに上限幅を持たせて詰めておく（サマリ=5列 / 詳細=9列）。
+                          tabular-nums は数値の桁位置を揃えるため */}
+                      <table
+                        className={`w-full text-xs tabular-nums ${
+                          planView === 'summary' ? 'max-w-2xl' : 'max-w-5xl'
+                        }`}
+                      >
                         <thead className="bg-gray-50 text-[10px] text-gray-500 uppercase">
                           <tr>
                             <th className="px-2 py-1.5 text-left">月</th>
@@ -499,7 +507,7 @@ export default function TargetSetting() {
                       const fb = plan.months.find(m => m.cpc_is_fallback && m.cpc_source_month)
                       if (!plan.months.some(m => m.est_ad_cost != null)) return null
                       return (
-                        <p className="mt-1.5 text-[10px] text-gray-400 leading-snug">
+                        <p className="mt-1.5 max-w-3xl text-[10px] text-gray-400 leading-snug">
                           想定追加広告費は各月のRPP実績CPCに基づく試算です
                           {fb && `（※印の月はRPP実績が無いため、直近実績月 ${fb.cpc_source_month} のCPC ¥${fb.cpc?.toLocaleString()} で代用）`}。
                           CPCの季節変動は考慮していません。実績が無い月の現状アクセスは直近実績月の値を見込みとして使っています。
@@ -511,7 +519,7 @@ export default function TargetSetting() {
                       const total = plan.months.reduce((s, m) => s + (m.sales_budget ?? 0), 0)
                       const diff = total - plan.annual_sales_budget
                       return (
-                        <p className={`mt-1.5 text-[10px] ${Math.abs(diff) >= 1 ? 'text-amber-600' : 'text-gray-400'}`}>
+                        <p className={`mt-1.5 max-w-3xl text-[10px] leading-snug ${Math.abs(diff) >= 1 ? 'text-amber-600' : 'text-gray-400'}`}>
                           12ヶ月合計 ¥{Math.round(total).toLocaleString()}／年間予算 ¥{Math.round(plan.annual_sales_budget).toLocaleString()}
                           {Math.abs(diff) >= 1 && `（差 ${diff > 0 ? '+' : ''}¥${Math.round(diff).toLocaleString()}。手動補正した月は他月へ再配分しないため合計がズレることがあります）`}
                         </p>
