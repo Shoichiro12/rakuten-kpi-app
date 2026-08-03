@@ -11,6 +11,15 @@ import { useTableSort } from '../components/table/useTableSort'
 import SortableTh from '../components/table/SortableTh'
 import type { ProductKPI, TrendPoint, InventoryAlert } from '../types'
 
+/**
+ * 表のセル用。**単位はセルに書かない**（見出しに1回だけ置く。規約 1-2）。
+ * 表は丸めない＝生値のまま（Few「表は正確な値を確認する場所、グラフは傾向を見る場所」）。
+ */
+const num = (v: number | null | undefined) =>
+  v == null || !Number.isFinite(v) ? '—' : Math.round(v).toLocaleString('ja-JP')
+const pct = (v: number | null | undefined, digits = 1) =>
+  v == null || !Number.isFinite(v) ? '—' : v.toFixed(digits)
+
 export default function ProductKPIPage() {
   const { period, dateValue, setPeriod, setDateValue, jumpToLatest } = usePeriodState()
   const sort = useTableSort<ProductKPI>()
@@ -166,18 +175,20 @@ export default function ProductKPIPage() {
               )}
               {products.length > 0 && <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase sticky top-0">
+                  {/* 単位はセルではなく見出しに1回だけ置く（右寄せの邪魔になるため）。規約 1-2
+                      日本語見出しに uppercase は効かないので外した */}
+                  <thead className="bg-gray-50 text-xs text-gray-500 sticky top-0">
                     <tr>
                       <SortableTh label="商品名" sortKey="product_name" sort={sort} align="left" className="pl-1" />
-                      <SortableTh label="RPP売上" sortKey="gross" sort={sort} />
-                      <SortableTh label="GP" sortKey="gp" sort={sort} />
-                      <SortableTh label="GPR" sortKey="gpr" sort={sort} />
-                      <SortableTh label="CV" sortKey="cv" sort={sort} />
-                      <SortableTh label="CVR" sortKey="cvr" sort={sort} />
-                      <SortableTh label="ROAS" sortKey="roas" sort={sort} />
-                      <SortableTh label="CPO" sortKey="cpo" sort={sort} />
-                      <SortableTh label="LimitCPO" sortKey="limit_cpo" sort={sort} />
-                      <SortableTh label="ROI" sortKey="roi" sort={sort} />
+                      <SortableTh label="RPP売上（円）" sortKey="gross" sort={sort} />
+                      <SortableTh label="GP（円）" sortKey="gp" sort={sort} />
+                      <SortableTh label="GPR（%）" sortKey="gpr" sort={sort} />
+                      <SortableTh label="CV（件）" sortKey="cv" sort={sort} />
+                      <SortableTh label="CVR（%）" sortKey="cvr" sort={sort} />
+                      <SortableTh label="ROAS（%）" sortKey="roas" sort={sort} />
+                      <SortableTh label="CPO（円）" sortKey="cpo" sort={sort} />
+                      <SortableTh label="Limit CPO（円）" sortKey="limit_cpo" sort={sort} />
+                      <SortableTh label="ROI（%）" sortKey="roi" sort={sort} />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -208,18 +219,22 @@ export default function ProductKPIPage() {
                             </div>
                           </div>
                         </td>
-                        <td className="px-3 py-2.5 text-right text-gray-900 font-medium">{formatCurrency(p.gross)}</td>
-                        <td className="px-3 py-2.5 text-right">{formatCurrency(p.gp)}</td>
-                        <td className="px-3 py-2.5 text-right">{formatPercent(p.gpr)}</td>
-                        <td className="px-3 py-2.5 text-right">{formatNumber(p.cv)}</td>
-                        <td className="px-3 py-2.5 text-right">{formatPercent(p.cvr, 2)}</td>
-                        <td className="px-3 py-2.5 text-right">{formatPercent(p.roas)}</td>
-                        <td className={`px-3 py-2.5 text-right font-medium ${p.limit_cpo_exceeded ? 'text-red-600' : ''}`}>
-                          {formatCurrency(p.cpo)}
+                        {/* 表は丸めない（生値）。単位は見出しに出したのでセルからは外す。
+                            数値は右寄せ＋等幅（tabular-nums）で桁位置を揃える。規約 1-2 / 4
+                            色を付けるのは「しきい値を跨いだセル」だけ。ROI が100%以上のときに
+                            緑を付けると全行が色付きになり、何も目立たなくなる */}
+                        <td className="px-3 py-2.5 text-right text-gray-900 font-medium tabular-nums">{num(p.gross)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">{num(p.gp)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">{pct(p.gpr)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">{num(p.cv)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">{pct(p.cvr, 2)}</td>
+                        <td className="px-3 py-2.5 text-right tabular-nums">{pct(p.roas)}</td>
+                        <td className={`px-3 py-2.5 text-right font-medium tabular-nums ${p.limit_cpo_exceeded ? 'text-red-600' : ''}`}>
+                          {num(p.cpo)}
                         </td>
-                        <td className="px-3 py-2.5 text-right text-gray-500">{formatCurrency(p.limit_cpo)}</td>
-                        <td className={`px-3 py-2.5 text-right font-medium ${p.roi < 100 ? 'text-red-600' : 'text-green-600'}`}>
-                          {formatPercent(p.roi)}
+                        <td className="px-3 py-2.5 text-right text-gray-500 tabular-nums">{num(p.limit_cpo)}</td>
+                        <td className={`px-3 py-2.5 text-right font-medium tabular-nums ${p.roi < 100 ? 'text-red-600' : ''}`}>
+                          {pct(p.roi)}
                         </td>
                       </tr>
                     ))}
