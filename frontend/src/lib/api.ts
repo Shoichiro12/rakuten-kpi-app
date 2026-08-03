@@ -203,6 +203,12 @@ export const api = {
         .then((d) => d ?? { year_month: yearMonth, count: 0, items: [] }),
     upsert: (data: { management_no: string; year_month: string; target_sales: number }) =>
       request<import('../types').ItemTarget>('/item-targets', { method: 'POST', body: JSON.stringify(data) }),
+    /** 一括保存（対象月共通・編集した行だけを1リクエストで送る） */
+    bulk: (yearMonth: string, items: { management_no: string; target_sales: number }[]) =>
+      request<{ year_month: string; saved_count: number; items: import('../types').ItemTarget[] }>(
+        '/item-targets/bulk',
+        { method: 'POST', body: JSON.stringify({ year_month: yearMonth, items }) },
+      ),
     approve: (data: { management_no: string; year_month: string }) =>
       request<import('../types').ItemTarget>('/item-targets/approve', { method: 'POST', body: JSON.stringify(data) }),
     recalc: (data: { management_no: string; year_month: string }) =>

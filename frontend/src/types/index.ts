@@ -837,6 +837,10 @@ export interface ItemTarget {
 export interface ItemTargetListEntry {
   management_no: string
   product_name: string | null
+  /** ジャンル絞り込み用（実績優先→商品マスタのカテゴリ）。未解決は null */
+  genre_u1: string | null
+  genre_u2: string | null
+  genre_u3: string | null
   target: ItemTarget | null
   /** 直近実績（site_uu軸・参考表示用）。実績が無い商品は null */
   latest_actual: {

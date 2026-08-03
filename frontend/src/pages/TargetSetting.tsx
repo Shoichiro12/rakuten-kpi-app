@@ -40,6 +40,12 @@ export default function TargetSetting() {
   // アイテム別目標（3-B''・第3段階）
   const [itemRows, setItemRows] = useState<ItemTargetListEntry[]>([])
   const [itemMsg, setItemMsg] = useState<string | null>(null)
+  // 一括入力（区切り2）: 編集中の値（management_no→入力文字列）・絞り込み・保存中
+  const [pending, setPending] = useState<Record<string, string>>({})
+  const [itemKw, setItemKw] = useState('')
+  const [itemGenre, setItemGenre] = useState('')     // '' = すべて（genre_u1で絞る）
+  const [itemUnsetOnly, setItemUnsetOnly] = useState(false)
+  const [bulkSaving, setBulkSaving] = useState(false)
 
   // 売上予算プラン（第4段階v2）: 年間売上予算・予算年度起点と按分プレビュー
   const [annualBudget, setAnnualBudget] = useState<number | ''>('')
@@ -93,6 +99,7 @@ export default function TargetSetting() {
     try {
       const res = await api.itemTargets.list(ym)
       setItemRows(res.items)
+      setPending({})   // 再取得したら編集中バッファは破棄（保存済みの値が正）
     } catch (e) {
       console.error('[TargetSetting] アイテム別目標取得エラー:', e)
       setItemRows([])
@@ -104,15 +111,54 @@ export default function TargetSetting() {
     setTimeout(() => setItemMsg(null), 2500)
   }
 
-  const saveItemTarget = async (mno: string, value: number) => {
-    if (!Number.isFinite(value) || value <= 0) return
+  // 入力欄の表示値（編集中があればそれを、無ければ保存済みの目標売上）
+  const displayValue = (r: ItemTargetListEntry): string => {
+    const p = pending[r.management_no]
+    if (p !== undefined) return p
+    return r.target?.target_sales != null ? String(r.target.target_sales) : ''
+  }
+
+  // その行が「未保存の変更」を持つか（数値として有効・0超・保存済みと異なる）
+  const isDirty = (r: ItemTargetListEntry): boolean => {
+    const p = pending[r.management_no]
+    if (p === undefined) return false
+    const v = Number(p)
+    if (!Number.isFinite(v) || v <= 0) return false
+    return v !== (r.target?.target_sales ?? null)
+  }
+
+  const dirtyRows = itemRows.filter(isDirty)
+
+  // ジャンル絞り込みの選択肢（大分類・重複排除）
+  const genreOptions = Array.from(
+    new Set(itemRows.map((r) => r.genre_u1).filter((g): g is string => !!g)),
+  ).sort()
+
+  // 絞り込み結果（キーワード・ジャンル・未設定のみ）
+  const filteredRows = itemRows.filter((r) => {
+    if (itemGenre && r.genre_u1 !== itemGenre) return false
+    if (itemUnsetOnly && r.target != null) return false
+    if (itemKw) {
+      const kw = itemKw.toLowerCase()
+      const name = (r.product_name || '').toLowerCase()
+      if (!name.includes(kw) && !r.management_no.toLowerCase().includes(kw)) return false
+    }
+    return true
+  })
+
+  const bulkSaveItemTargets = async () => {
+    const items = dirtyRows.map((r) => ({ management_no: r.management_no, target_sales: Number(pending[r.management_no]) }))
+    if (items.length === 0) { flashItem('保存対象の変更がありません'); return }
+    setBulkSaving(true)
     try {
-      await api.itemTargets.upsert({ management_no: mno, year_month: yearMonth, target_sales: value })
+      const res = await api.itemTargets.bulk(yearMonth, items)
       await loadItemTargets(yearMonth)
-      flashItem(`${mno} の目標を保存し、目標CVR・客単価・必要アクセスを自動算出しました`)
+      flashItem(`${res?.saved_count ?? items.length}件の目標を保存し、目標CVR・客単価・必要アクセスを自動算出しました`)
     } catch (e) {
-      console.error('[TargetSetting] アイテム別目標保存エラー:', e)
-      flashItem('保存に失敗しました')
+      console.error('[TargetSetting] アイテム別目標の一括保存エラー:', e)
+      flashItem('一括保存に失敗しました')
+    } finally {
+      setBulkSaving(false)
     }
   }
 
@@ -549,15 +595,53 @@ export default function TargetSetting() {
 
           {/* アイテム別目標（3-B''・第3段階） */}
           <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b flex items-center justify-between gap-3 flex-wrap">
-              <div>
-                <h3 className="text-sm font-semibold text-gray-700">アイテム別目標（{yearMonth}）</h3>
-                <p className="text-xs text-gray-400 mt-0.5">
-                  入力するのは目標売上だけ。目標CVR・客単価は「現状値と前年値の低い方」を自動採用し（保守的な確定公式）、必要アクセス数を逆算します。
-                </p>
+            <div className="px-4 py-3 border-b space-y-3">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700">アイテム別目標（{yearMonth}）</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    入力するのは目標売上だけ。目標CVR・客単価は「現状値と前年値の低い方」を自動採用し（保守的な確定公式）、必要アクセス数を逆算します。複数まとめて入力して「一括保存」できます。
+                  </p>
+                </div>
+                {itemMsg && (
+                  <span className="flex items-center gap-1.5 text-xs text-green-600"><CheckCircle size={13} />{itemMsg}</span>
+                )}
               </div>
-              {itemMsg && (
-                <span className="flex items-center gap-1.5 text-xs text-green-600"><CheckCircle size={13} />{itemMsg}</span>
+
+              {itemRows.length > 0 && (
+                <div className="flex items-center gap-2 flex-wrap">
+                  <input
+                    type="text" value={itemKw} onChange={(e) => setItemKw(e.target.value)}
+                    placeholder="商品名・管理番号で検索"
+                    className="w-52 text-sm border border-gray-200 rounded px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                  {genreOptions.length > 0 && (
+                    <select
+                      value={itemGenre} onChange={(e) => setItemGenre(e.target.value)}
+                      className="text-sm border border-gray-200 rounded px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      <option value="">ジャンル（すべて）</option>
+                      {genreOptions.map((g) => <option key={g} value={g}>{g}</option>)}
+                    </select>
+                  )}
+                  <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+                    <input type="checkbox" checked={itemUnsetOnly} onChange={(e) => setItemUnsetOnly(e.target.checked)} className="rounded" />
+                    未設定のみ
+                  </label>
+                  <span className="text-xs text-gray-400">{filteredRows.length}件表示 / 全{itemRows.length}件</span>
+                  <div className="ml-auto flex items-center gap-2">
+                    {dirtyRows.length > 0 && (
+                      <span className="text-xs text-amber-600">未保存 {dirtyRows.length}件</span>
+                    )}
+                    <button
+                      onClick={bulkSaveItemTargets}
+                      disabled={dirtyRows.length === 0 || bulkSaving}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded"
+                    >
+                      <Save size={14} />{bulkSaving ? '保存中…' : '一括保存'}
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
 
@@ -579,10 +663,17 @@ export default function TargetSetting() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {itemRows.map((r) => {
+                    {filteredRows.length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="py-8 text-center text-sm text-gray-400">
+                          絞り込み条件に一致する商品がありません。
+                        </td>
+                      </tr>
+                    ) : filteredRows.map((r) => {
                       const t = r.target
+                      const dirty = isDirty(r)
                       return (
-                        <tr key={r.management_no}>
+                        <tr key={r.management_no} className={dirty ? 'bg-amber-50/60' : undefined}>
                           <td className="px-4 py-2">
                             <p className="text-gray-900 leading-tight">{r.product_name || r.management_no}</p>
                             <p className="text-[10px] text-gray-400 font-mono">{r.management_no}</p>
@@ -599,14 +690,12 @@ export default function TargetSetting() {
                               <span className="text-gray-400 text-xs">¥</span>
                               <input
                                 type="number" min={0} step={10000}
-                                defaultValue={t?.target_sales ?? ''}
+                                value={displayValue(r)}
                                 placeholder="未設定"
-                                onBlur={(e) => {
-                                  const v = Number(e.target.value)
-                                  if (e.target.value !== '' && v > 0 && v !== (t?.target_sales ?? null)) saveItemTarget(r.management_no, v)
-                                }}
-                                className="w-28 text-right border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                onChange={(e) => setPending((p) => ({ ...p, [r.management_no]: e.target.value }))}
+                                className={`w-28 text-right border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 ${dirty ? 'border-amber-400 bg-white' : 'border-gray-200'}`}
                               />
+                              {dirty && <span className="text-[10px] text-amber-600">未保存</span>}
                             </span>
                           </td>
                           <td className="px-3 py-2 text-right text-gray-700">{t?.target_cvr != null ? `${t.target_cvr}%` : '—'}</td>
