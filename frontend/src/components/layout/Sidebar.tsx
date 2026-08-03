@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { maskEmail } from '../../lib/utils'
 import { HELP_URL, EXTERNAL_LINK_PROPS } from '../../lib/links'
@@ -17,7 +18,10 @@ import {
   LogOut,
   UserCircle,
   ExternalLink,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 
 const nav = [
   { to: '/', icon: LayoutDashboard, label: 'ダッシュボード' },
@@ -31,6 +35,111 @@ const nav = [
   { to: '/billing', icon: CreditCard, label: '請求・プラン' },
 ]
 
+/** 折りたたみ状態の永続化キー（ブラウザごとに保持） */
+const STORAGE_KEY = 'ureshiru:sidebar-collapsed'
+
+/** localStorage はプライベートモード等で例外を投げることがあるので必ず握りつぶす */
+function readCollapsed(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeCollapsed(value: boolean) {
+  try {
+    localStorage.setItem(STORAGE_KEY, value ? '1' : '0')
+  } catch {
+    /* 保存できなくても動作に影響させない */
+  }
+}
+
+/**
+ * 折りたたみ時にアイコンの意味を補うツールチップ。
+ * - `title` 属性は表示が遅く、キーボードフォーカスでは出ないため使わない
+ * - これはあくまで見た目の補助なので aria-hidden。読み上げ用の名前は各要素の aria-label が担う
+ * - トランジションは opacity のみ（transition-all は使わない）＋ prefers-reduced-motion 対応
+ */
+function Tooltip({ label }: { label: string }) {
+  return (
+    <span
+      aria-hidden="true"
+      className="pointer-events-none absolute left-full top-1/2 z-50 ml-2 -translate-y-1/2 whitespace-nowrap rounded-md bg-gray-800 px-2 py-1 text-xs font-medium text-white opacity-0 shadow-lg ring-1 ring-white/10 transition-opacity duration-100 group-hover:opacity-100 group-focus-visible:opacity-100 motion-reduce:transition-none"
+    >
+      {label}
+    </span>
+  )
+}
+
+/** outline は必ず focus-visible のリングで置き換える（見えないフォーカスを作らない）。タブレットの二度押し遅延も潰す */
+const FOCUS_RING =
+  'touch-manipulation outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70'
+
+/** ナビ行（上段）のクラス。折りたたみ時はアイコンを中央寄せにする */
+function navRowClass(collapsed: boolean, isActive: boolean) {
+  const base = `group relative flex items-center text-sm transition-colors ${FOCUS_RING}`
+  if (collapsed) {
+    return `${base} justify-center py-0.5 ${isActive ? 'text-white' : 'text-gray-400'}`
+  }
+  return `${base} gap-3 px-4 py-3 ${
+    isActive ? 'bg-rakuten-red text-white font-medium' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+  }`
+}
+
+/** 下段（アカウント・ヘルプ等）のクラス */
+function subRowClass(collapsed: boolean, isActive = false) {
+  const base = `group relative flex items-center text-sm transition-colors ${FOCUS_RING}`
+  if (collapsed) {
+    return `${base} w-full justify-center py-0.5 rounded-lg ${isActive ? 'text-white' : 'text-gray-400'}`
+  }
+  return `${base} w-full gap-2.5 px-3 py-2.5 rounded-lg ${
+    isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
+  }`
+}
+
+interface RowContentProps {
+  collapsed: boolean
+  icon: LucideIcon
+  label: string
+  isActive?: boolean
+  iconSize?: number
+  /** 展開時のみラベル右に出す要素（外部リンクアイコンなど） */
+  trailing?: React.ReactNode
+}
+
+/**
+ * 行の中身。折りたたみ時は
+ *  - アイコンを角丸ボックスで囲み、アクティブなら赤で塗る
+ *  - さらに行の左端に縦バーを出す（幅64pxだと塗りだけでは現在地を見落としやすいため）
+ */
+function RowContent({ collapsed, icon: Icon, label, isActive = false, iconSize = 18, trailing }: RowContentProps) {
+  if (collapsed) {
+    return (
+      <>
+        {isActive && (
+          <span aria-hidden="true" className="absolute inset-y-1 left-0 w-[3px] rounded-r-full bg-rakuten-red" />
+        )}
+        <span
+          className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
+            isActive ? 'bg-rakuten-red text-white' : 'group-hover:bg-gray-800 group-hover:text-white'
+          }`}
+        >
+          <Icon size={iconSize} aria-hidden="true" />
+        </span>
+        <Tooltip label={label} />
+      </>
+    )
+  }
+  return (
+    <>
+      <Icon size={iconSize} aria-hidden="true" className="shrink-0" />
+      <span className="min-w-0 flex-1 truncate text-left">{label}</span>
+      {trailing}
+    </>
+  )
+}
+
 interface SidebarProps {
   onOpenHelp: () => void
   /** フィードバック窓口（不具合報告・要望）を開く */
@@ -40,81 +149,119 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ onOpenHelp, onOpenFeedback, userEmail, onSignOut }: SidebarProps) {
+  // lazy initializer で初回描画から確定値にする（展開→折りたたみのちらつき防止）
+  const [collapsed, setCollapsed] = useState<boolean>(readCollapsed)
+
+  useEffect(() => {
+    writeCollapsed(collapsed)
+  }, [collapsed])
+
   return (
-    <aside className="w-56 min-h-screen bg-gray-900 text-white flex flex-col shrink-0">
-      <div className="px-4 py-5 border-b border-gray-700">
-        <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">楽天EC</p>
-        <h1 className="text-lg font-bold text-white leading-tight">KPI管理</h1>
+    <aside
+      className={`${collapsed ? 'w-16' : 'w-56'} min-h-screen bg-gray-900 text-white flex flex-col shrink-0`}
+    >
+      <div
+        className={`flex items-center border-b border-gray-700 ${
+          collapsed ? 'justify-center px-2 py-4' : 'justify-between gap-2 px-4 py-5'
+        }`}
+      >
+        {!collapsed && (
+          <div className="min-w-0">
+            <p className="text-xs text-gray-400 font-medium uppercase tracking-wider">楽天EC</p>
+            <h1 className="text-lg font-bold text-white leading-tight">KPI管理</h1>
+          </div>
+        )}
+        <button
+          type="button"
+          onClick={() => setCollapsed((v) => !v)}
+          aria-label={collapsed ? 'サイドバーを展開する' : 'サイドバーを折りたたむ'}
+          aria-expanded={!collapsed}
+          className={`group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-gray-400 transition-colors hover:bg-gray-800 hover:text-white focus-visible:ring-offset-0 ${FOCUS_RING}`}
+        >
+          {collapsed ? <PanelLeftOpen size={18} aria-hidden="true" /> : <PanelLeftClose size={18} aria-hidden="true" />}
+          {collapsed && <Tooltip label="サイドバーを展開する" />}
+        </button>
       </div>
+
       <nav className="flex-1 py-4">
         {nav.map(({ to, icon: Icon, label }) => (
           <NavLink
             key={to}
             to={to}
             end={to === '/'}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 text-sm transition-colors ${
-                isActive
-                  ? 'bg-rakuten-red text-white font-medium'
-                  : 'text-gray-300 hover:bg-gray-800 hover:text-white'
-              }`
-            }
+            aria-label={collapsed ? label : undefined}
+            className={({ isActive }) => navRowClass(collapsed, isActive)}
           >
-            <Icon size={18} />
-            {label}
+            {({ isActive }) => <RowContent collapsed={collapsed} icon={Icon} label={label} isActive={isActive} />}
           </NavLink>
         ))}
       </nav>
-      <div className="px-3 pb-4 space-y-1 border-t border-gray-700 pt-3">
+
+      <div className={`pb-4 space-y-1 border-t border-gray-700 pt-3 ${collapsed ? 'px-2' : 'px-3'}`}>
         {userEmail && (
           <NavLink
             to="/account"
-            className={({ isActive }) =>
-              `flex items-center gap-2.5 px-3 py-2.5 text-sm rounded-lg transition-colors ${
-                isActive ? 'bg-gray-800 text-white' : 'text-gray-400 hover:text-white hover:bg-gray-800'
-              }`
-            }
+            aria-label={collapsed ? 'アカウント設定' : undefined}
+            className={({ isActive }) => subRowClass(collapsed, isActive)}
           >
-            <UserCircle size={16} />
-            アカウント設定
+            {({ isActive }) => (
+              <RowContent
+                collapsed={collapsed}
+                icon={UserCircle}
+                label="アカウント設定"
+                isActive={isActive}
+                iconSize={16}
+              />
+            )}
           </NavLink>
         )}
         <button
+          type="button"
           onClick={onOpenHelp}
-          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+          aria-label={collapsed ? '使い方ガイド' : undefined}
+          className={subRowClass(collapsed)}
         >
-          <HelpCircle size={16} />
-          使い方ガイド
+          <RowContent collapsed={collapsed} icon={HelpCircle} label="使い方ガイド" iconSize={16} />
         </button>
         {/* 詳細マニュアルはLP側のヘルプページが正（lib/links.ts 参照） */}
         <a
           href={HELP_URL}
           {...EXTERNAL_LINK_PROPS}
-          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+          aria-label={collapsed ? 'ヘルプページ' : undefined}
+          className={subRowClass(collapsed)}
         >
-          <BookOpen size={16} />
-          <span className="flex-1">ヘルプページ</span>
-          <ExternalLink size={12} className="text-gray-600" />
+          <RowContent
+            collapsed={collapsed}
+            icon={BookOpen}
+            label="ヘルプページ"
+            iconSize={16}
+            trailing={<ExternalLink size={12} aria-hidden="true" className="text-gray-600" />}
+          />
         </a>
         <button
+          type="button"
           onClick={onOpenFeedback}
-          className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
+          aria-label={collapsed ? '不具合・要望を送る' : undefined}
+          className={subRowClass(collapsed)}
         >
-          <MessageSquarePlus size={16} />
-          不具合・要望を送る
+          <RowContent collapsed={collapsed} icon={MessageSquarePlus} label="不具合・要望を送る" iconSize={16} />
         </button>
         {userEmail && (
           <button
+            type="button"
             onClick={onSignOut}
-            className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-            title={maskEmail(userEmail)}
+            aria-label={collapsed ? 'ログアウト' : undefined}
+            className={subRowClass(collapsed)}
           >
-            <LogOut size={16} />
-            <span className="truncate">ログアウト</span>
+            <RowContent collapsed={collapsed} icon={LogOut} label="ログアウト" iconSize={16} />
           </button>
         )}
-        {userEmail && <p className="text-[11px] text-gray-600 px-3 truncate" title={maskEmail(userEmail)}>{maskEmail(userEmail)}</p>}
-        <p className="text-xs text-gray-600 px-3">v1.0.0</p>
+        {!collapsed && userEmail && (
+          <p className="text-[11px] text-gray-600 px-3 truncate" title={maskEmail(userEmail)}>
+            {maskEmail(userEmail)}
+          </p>
+        )}
+        {!collapsed && <p className="text-xs text-gray-600 px-3">v1.0.0</p>}
       </div>
     </aside>
   )
