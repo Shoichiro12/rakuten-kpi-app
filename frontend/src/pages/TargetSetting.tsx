@@ -1,9 +1,20 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Save, CheckCircle, Check, RefreshCw } from 'lucide-react'
 import Header from '../components/layout/Header'
+import { useTableSort } from '../components/table/useTableSort'
+import SortableTh from '../components/table/SortableTh'
 import { api } from '../lib/api'
 import { getCurrentYearMonth } from '../lib/utils'
 import type { Target, ItemTargetListEntry, RevenuePlanResponse } from '../types'
+
+// アイテム別目標テーブルのソート用アクセサ（target配下・直近実績のネスト値）
+const ITEM_SORT_ACCESSORS = {
+  product_name: (r: ItemTargetListEntry) => r.product_name ?? r.management_no,
+  target_sales: (r: ItemTargetListEntry) => r.target?.target_sales ?? null,
+  target_cvr: (r: ItemTargetListEntry) => r.target?.target_cvr ?? null,
+  target_av: (r: ItemTargetListEntry) => r.target?.target_av ?? null,
+  required_access: (r: ItemTargetListEntry) => r.target?.required_access ?? null,
+}
 
 const CONFIDENCE_LABELS: Record<string, { label: string; cls: string }> = {
   high: { label: '精度: 高（2年分以上の実績）', cls: 'bg-green-100 text-green-700' },
@@ -46,6 +57,7 @@ export default function TargetSetting() {
   const [itemGenre, setItemGenre] = useState('')     // '' = すべて（genre_u1で絞る）
   const [itemUnsetOnly, setItemUnsetOnly] = useState(false)
   const [bulkSaving, setBulkSaving] = useState(false)
+  const itemSort = useTableSort<ItemTargetListEntry>(ITEM_SORT_ACCESSORS)
 
   // 売上予算プラン（第4段階v2）: 年間売上予算・予算年度起点と按分プレビュー
   const [annualBudget, setAnnualBudget] = useState<number | ''>('')
@@ -654,11 +666,11 @@ export default function TargetSetting() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
                     <tr>
-                      <th className="px-4 py-2.5 text-left">商品</th>
-                      <th className="px-3 py-2.5 text-right">目標売上（入力）</th>
-                      <th className="px-3 py-2.5 text-right">目標CVR</th>
-                      <th className="px-3 py-2.5 text-right">目標客単価</th>
-                      <th className="px-3 py-2.5 text-right">必要アクセス</th>
+                      <SortableTh label="商品" sortKey="product_name" sort={itemSort} align="left" className="pl-1" />
+                      <SortableTh label="目標売上（入力）" sortKey="target_sales" sort={itemSort} />
+                      <SortableTh label="目標CVR" sortKey="target_cvr" sort={itemSort} />
+                      <SortableTh label="目標客単価" sortKey="target_av" sort={itemSort} />
+                      <SortableTh label="必要アクセス" sortKey="required_access" sort={itemSort} />
                       <th className="px-3 py-2.5 text-left">根拠</th>
                     </tr>
                   </thead>
@@ -669,7 +681,7 @@ export default function TargetSetting() {
                           絞り込み条件に一致する商品がありません。
                         </td>
                       </tr>
-                    ) : filteredRows.map((r) => {
+                    ) : itemSort.apply(filteredRows).map((r) => {
                       const t = r.target
                       const dirty = isDirty(r)
                       return (

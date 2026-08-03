@@ -111,6 +111,8 @@ npm run build    # tsc 型チェック + vite build（CIの代わり。型エラ
 
 依存導入: backend は `pip install -r backend/requirements.txt`。
 
+**AIエージェント用スキル（UI作業時）**: skills.sh のデザインスキルを利用する。`.agents/` `.claude/skills/` `skills-lock.json` は第三者コンテンツのため**gitignore済み・コミットしない**（2026-08-03決定）。新しい環境では `npx skills add vercel-labs/agent-skills` で再導入し、使うのは `web-design-guidelines`（UIレビュー）・`vercel-react-best-practices`・`vercel-composition-patterns` の3つ（他は削除してよい）。shadcnスキルは**このリポジトリがshadcn/ui未使用のため対象外**。
+
 **テストフレームワークは未導入**（pytest等なし）。検証は (1) `cd backend && py -3 -c "from main import app"` のimport確認、(2) `cd frontend && npm run build` の型チェック、(3) uvicorn起動して `curl` でエンドポイントを叩く、で行う。ロジック単体検証は対象関数をその場で `py -3 -c "..."` 呼び出しする。
 
 ## Windows固有の注意

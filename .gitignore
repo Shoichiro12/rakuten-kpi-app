@@ -13,3 +13,8 @@ frontend/dist/
 Thumbs.db
 .env
 .env.*
+
+# AIエージェント用スキル（npx skills add で導入・第三者コンテンツのためコミットしない）
+.agents/
+.claude/skills/
+skills-lock.json

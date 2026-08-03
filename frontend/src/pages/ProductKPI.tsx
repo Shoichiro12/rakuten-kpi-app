@@ -7,10 +7,13 @@ import ReliabilityNote from '../components/ReliabilityNote'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
 import { usePeriodState } from '../lib/usePeriodState'
+import { useTableSort } from '../components/table/useTableSort'
+import SortableTh from '../components/table/SortableTh'
 import type { ProductKPI, TrendPoint, InventoryAlert } from '../types'
 
 export default function ProductKPIPage() {
   const { period, dateValue, setPeriod, setDateValue } = usePeriodState()
+  const sort = useTableSort<ProductKPI>()
   const [products, setProducts] = useState<ProductKPI[]>([])
   const [genres, setGenres] = useState<string[]>([])
   const [selectedGenre, setSelectedGenre] = useState<string>('')
@@ -161,20 +164,20 @@ export default function ProductKPIPage() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-xs text-gray-500 uppercase sticky top-0">
                     <tr>
-                      <th className="px-4 py-2.5 text-left">商品名</th>
-                      <th className="px-3 py-2.5 text-right">RPP売上</th>
-                      <th className="px-3 py-2.5 text-right">GP</th>
-                      <th className="px-3 py-2.5 text-right">GPR</th>
-                      <th className="px-3 py-2.5 text-right">CV</th>
-                      <th className="px-3 py-2.5 text-right">CVR</th>
-                      <th className="px-3 py-2.5 text-right">ROAS</th>
-                      <th className="px-3 py-2.5 text-right">CPO</th>
-                      <th className="px-3 py-2.5 text-right">LimitCPO</th>
-                      <th className="px-3 py-2.5 text-right">ROI</th>
+                      <SortableTh label="商品名" sortKey="product_name" sort={sort} align="left" className="pl-1" />
+                      <SortableTh label="RPP売上" sortKey="gross" sort={sort} />
+                      <SortableTh label="GP" sortKey="gp" sort={sort} />
+                      <SortableTh label="GPR" sortKey="gpr" sort={sort} />
+                      <SortableTh label="CV" sortKey="cv" sort={sort} />
+                      <SortableTh label="CVR" sortKey="cvr" sort={sort} />
+                      <SortableTh label="ROAS" sortKey="roas" sort={sort} />
+                      <SortableTh label="CPO" sortKey="cpo" sort={sort} />
+                      <SortableTh label="LimitCPO" sortKey="limit_cpo" sort={sort} />
+                      <SortableTh label="ROI" sortKey="roi" sort={sort} />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {products.map((p) => (
+                    {sort.apply(products).map((p) => (
                       <tr
                         key={p.product_url}
                         onClick={() => handleSelectProduct(p)}

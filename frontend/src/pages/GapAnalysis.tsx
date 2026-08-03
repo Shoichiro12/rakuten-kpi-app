@@ -9,6 +9,8 @@ import ActionSummary from '../components/gap/ActionSummary'
 import ActionPanel from '../components/gap/ActionPanel'
 import EvaluationMatrix from '../components/EvaluationMatrix'
 import ReliabilityNote from '../components/ReliabilityNote'
+import { useTableSort } from '../components/table/useTableSort'
+import SortableTh from '../components/table/SortableTh'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
 import { usePeriodState } from '../lib/usePeriodState'
@@ -28,8 +30,22 @@ function ChangeCell({ value }: { value: number | null | undefined }) {
   return <span className={`font-medium ${up ? 'text-green-600' : 'text-red-500'}`}>{up ? '+' : ''}{value.toFixed(1)}%</span>
 }
 
+// 商品別テーブルのソート用アクセサ（ネストした current/changes の値を読む）
+const PRODUCT_SORT_ACCESSORS = {
+  product_name: (p: ProductItem) => p.product_name,
+  gross: (p: ProductItem) => p.current.gross,
+  gross_change: (p: ProductItem) => p.changes.gross,
+  gp: (p: ProductItem) => p.current.gp,
+  ct: (p: ProductItem) => p.current.ct,
+  cv: (p: ProductItem) => p.current.cv,
+  cvr: (p: ProductItem) => p.current.cvr,
+  roas: (p: ProductItem) => p.current.roas,
+  cpo: (p: ProductItem) => p.current.cpo,
+}
+
 export default function GapAnalysis() {
   const { period, dateValue, setPeriod, setDateValue } = usePeriodState()
+  const productSort = useTableSort<ProductItem>(PRODUCT_SORT_ACCESSORS)
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [selectedKPI, setSelectedKPI] = useState<'access' | 'cvr' | 'av' | null>(null)
   const [selectedGenre, setSelectedGenre] = useState<string | null>(null)
@@ -237,22 +253,23 @@ export default function GapAnalysis() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
                     <tr>
-                      <th className="px-4 py-2.5 text-left">商品名</th>
-                      <th className="px-3 py-2.5 text-right">売上</th>
-                      <th className="px-3 py-2.5 text-right">前期比</th>
-                      <th className="px-3 py-2.5 text-right">GP</th>
-                      <th className="px-3 py-2.5 text-right">
-                        {productAxis ? ACCESS_AXIS_LABEL[productAxis] : 'アクセス'}
-                      </th>
-                      <th className="px-3 py-2.5 text-right">CV</th>
-                      <th className="px-3 py-2.5 text-right">CVR</th>
-                      <th className="px-3 py-2.5 text-right">ROAS</th>
-                      <th className="px-3 py-2.5 text-right">CPO</th>
+                      <SortableTh label="商品名" sortKey="product_name" sort={productSort} align="left" className="pl-1" />
+                      <SortableTh label="売上" sortKey="gross" sort={productSort} />
+                      <SortableTh label="前期比" sortKey="gross_change" sort={productSort} />
+                      <SortableTh label="GP" sortKey="gp" sort={productSort} />
+                      <SortableTh
+                        label={productAxis ? ACCESS_AXIS_LABEL[productAxis] : 'アクセス'}
+                        sortKey="ct" sort={productSort}
+                      />
+                      <SortableTh label="CV" sortKey="cv" sort={productSort} />
+                      <SortableTh label="CVR" sortKey="cvr" sort={productSort} />
+                      <SortableTh label="ROAS" sortKey="roas" sort={productSort} />
+                      <SortableTh label="CPO" sortKey="cpo" sort={productSort} />
                       <th className="px-3 py-2.5 text-center">アクション</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {productData.map((p) => {
+                    {productSort.apply(productData).map((p) => {
                       const isSelected = selectedProduct?.product_url === p.product_url
                       // 優先度: 在庫 > アクセス > 客単価 = CVR（講座ロジック準拠）
                       // shopData.current は「対象期間にショップ全体の実績が無い」場合 null になる。

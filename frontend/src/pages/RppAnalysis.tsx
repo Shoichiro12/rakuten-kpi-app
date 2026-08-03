@@ -6,6 +6,8 @@ import {
 } from 'recharts'
 import Header from '../components/layout/Header'
 import RppDiagnosisPanel from '../components/rpp/RppDiagnosisPanel'
+import { useTableSort } from '../components/table/useTableSort'
+import SortableTh from '../components/table/SortableTh'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent } from '../lib/utils'
 import type {
@@ -179,6 +181,7 @@ export default function RppAnalysis() {
 
   const [summary, setSummary] = useState<RppSummaryResponse | null>(null)
   const [salesItems, setSalesItems] = useState<RppSalesItem[]>([])
+  const sort = useTableSort<RppSalesItem>()
   const [salesTotal, setSalesTotal] = useState(0)
   const [diagnosis, setDiagnosis] = useState<RppDiagnosisResponse | null>(null)
   const [selectedCode, setSelectedCode] = useState<string | null>(null)
@@ -465,41 +468,21 @@ export default function RppAnalysis() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
-                      <tr className="bg-gray-50 text-left">
-                        <th className="px-4 py-2.5 text-gray-500 font-medium whitespace-nowrap">
-                          商品名
-                        </th>
-                        <th className="px-4 py-2.5 text-gray-500 font-medium whitespace-nowrap">
-                          診断
-                        </th>
-                        <th className="px-4 py-2.5 text-gray-500 font-medium text-right whitespace-nowrap">
-                          広告費
-                        </th>
-                        <th className="px-4 py-2.5 text-gray-500 font-medium text-right whitespace-nowrap">
-                          売上(720h)
-                        </th>
-                        <th className="px-4 py-2.5 text-gray-500 font-medium text-right whitespace-nowrap">
-                          ROAS(720h)
-                        </th>
-                        <th className="px-4 py-2.5 text-gray-500 font-medium text-right whitespace-nowrap">
-                          CPO(720h)
-                        </th>
-                        <th className="px-4 py-2.5 text-gray-500 font-medium text-right whitespace-nowrap">
-                          CVR(720h)
-                        </th>
-                        <th className="px-4 py-2.5 text-gray-500 font-medium text-right whitespace-nowrap">
-                          CV(720h)
-                        </th>
-                        <th className="px-4 py-2.5 text-gray-500 font-medium text-right whitespace-nowrap">
-                          売上(12h)
-                        </th>
-                        <th className="px-4 py-2.5 text-gray-500 font-medium text-right whitespace-nowrap">
-                          ROAS(12h)
-                        </th>
+                      <tr className="bg-gray-50 text-left text-gray-500 font-medium">
+                        <SortableTh label="商品名" sortKey="product_name" sort={sort} align="left" className="px-1" />
+                        <th className="px-4 py-2.5 whitespace-nowrap">診断</th>
+                        <SortableTh label="広告費" sortKey="ad_cost" sort={sort} className="px-1" />
+                        <SortableTh label="売上(720h)" sortKey="gross_720" sort={sort} className="px-1" />
+                        <SortableTh label="ROAS(720h)" sortKey="roas_720" sort={sort} className="px-1" />
+                        <SortableTh label="CPO(720h)" sortKey="cpo_720" sort={sort} className="px-1" />
+                        <SortableTh label="CVR(720h)" sortKey="cvr_720" sort={sort} className="px-1" />
+                        <SortableTh label="CV(720h)" sortKey="cv_720" sort={sort} className="px-1" />
+                        <SortableTh label="売上(12h)" sortKey="gross_12" sort={sort} className="px-1" />
+                        <SortableTh label="ROAS(12h)" sortKey="roas_12" sort={sort} className="px-1" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {salesItems.map((item) => {
+                      {sort.apply(salesItems).map((item) => {
                         const diag = item.item_code ? diagByCode.get(item.item_code) : undefined
                         const isSelected = item.item_code != null && item.item_code === selectedCode
                         return (

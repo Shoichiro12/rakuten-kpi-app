@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react'
 import { Save, CheckCircle, RefreshCw, Plus, Trash2, Pencil, Check, X, Download, Upload, Sparkles, ChevronDown, ChevronUp } from 'lucide-react'
 import Header from '../components/layout/Header'
 import GenrePicker from '../components/GenrePicker'
+import { useTableSort } from '../components/table/useTableSort'
+import SortableTh from '../components/table/SortableTh'
 import { api } from '../lib/api'
 import type { MasterProduct, CostItem, Category, SuggestionItem, GenreTree, GenreValue, GenreBenchmarkItem } from '../types'
 
@@ -17,6 +19,7 @@ function categoryPath(c: Category): string {
 
 export default function MasterSettings() {
   const [rows, setRows] = useState<Row[]>([])
+  const masterSort = useTableSort<Row>()
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
@@ -574,16 +577,16 @@ export default function MasterSettings() {
                 <table className="w-full text-sm">
                   <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
                     <tr>
-                      <th className="px-4 py-2.5 text-left">管理番号</th>
-                      <th className="px-3 py-2.5 text-left">商品名</th>
-                      <th className="px-3 py-2.5 text-left">ジャンル</th>
-                      <th className="px-3 py-2.5 text-right">原価率</th>
+                      <SortableTh label="管理番号" sortKey="management_no" sort={masterSort} align="left" className="pl-1" />
+                      <SortableTh label="商品名" sortKey="product_name" sort={masterSort} align="left" />
+                      <SortableTh label="ジャンル" sortKey="genre_u1" sort={masterSort} align="left" />
+                      <SortableTh label="原価率" sortKey="cost_rate" sort={masterSort} />
                       <th className="px-3 py-2.5 text-left">広告提案の状態</th>
                       <th className="px-3 py-2.5 text-center">状態</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {visibleRows.map((r) => (
+                    {masterSort.apply(visibleRows).map((r) => (
                       <tr key={r.management_no} className={r.is_active ? '' : 'bg-gray-50/60'}>
                         <td className="px-4 py-2 text-gray-500 font-mono text-xs whitespace-nowrap">{r.management_no}</td>
                         <td className="px-3 py-2">
