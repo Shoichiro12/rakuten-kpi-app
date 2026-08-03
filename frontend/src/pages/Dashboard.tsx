@@ -29,6 +29,9 @@ export default function Dashboard() {
   const [outcomes, setOutcomes] = useState<OutcomesResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [activeChart, setActiveChart] = useState<'gross' | 'gp' | 'roi' | 'cvr' | 'roas' | 'ct' | 'cpc'>('gross')
+  // 売上3分解（1層ヒーロー用）。月次・年次はgap/shop（商品分析=店舗全体軸）から取得し、
+  // 週次はdashboard本体のRPP軸KPI・前期比をそのまま使う（軸を混ぜない）。
+  const [decomp, setDecomp] = useState<{ current: Record<string, number | null>; changes: Record<string, number | null> } | null>(null)
 
   const isYearly = period === 'yearly'
 
@@ -42,7 +45,7 @@ export default function Dashboard() {
       // 年次は表示系のみ対応。診断・アラート・提案系は月次前提の設計のため呼ばない
       // （UIバックログ2026-08-03 区切りB。画面には注記を出す）。
       const yearly = period === 'yearly'
-      const [dash, als, tr, evalRes, planRes, recoRes, outcomeRes] = await Promise.all([
+      const [dash, als, tr, evalRes, planRes, recoRes, outcomeRes, shopGap] = await Promise.all([
         api.dashboard.get(period, dateParam) as Promise<DashboardData | null>,
         yearly ? Promise.resolve(null) : api.dashboard.alerts(period, dateParam) as Promise<{ alerts?: Alert[] } | null>,
         api.dashboard.trend(8) as Promise<{ trend?: TrendPoint[] } | null>,
@@ -50,8 +53,20 @@ export default function Dashboard() {
         yearly ? Promise.resolve(null) : api.evaluation.accessPlan(period, dateParam).catch(() => null),
         yearly ? Promise.resolve(null) : api.recommendations.get(period, dateParam).catch(() => null) as Promise<RecommendationsResponse | null>,
         api.recommendations.outcomes().catch(() => null) as Promise<OutcomesResponse | null>,
+        // 3分解の前期比（月次・年次のみ。週次はdashboard本体のRPP軸changesを使う）
+        period === 'weekly'
+          ? Promise.resolve(null)
+          : api.gap.shop(period, dateParam, true).catch(() => null) as Promise<{ current?: Record<string, number | null>; changes?: Record<string, number | null> } | null>,
       ])
       setData(dash ?? null)
+      setDecomp(
+        shopGap && (shopGap as { current?: Record<string, number | null> }).current
+          ? {
+              current: (shopGap as { current: Record<string, number | null> }).current,
+              changes: (shopGap as { changes?: Record<string, number | null> }).changes ?? {},
+            }
+          : null,
+      )
       setAlerts((als as { alerts?: Alert[] } | null)?.alerts ?? [])
       setTrend(tr?.trend ?? [])
       setEvaluation((evalRes as { evaluation?: EvaluationResult } | null)?.evaluation ?? null)
@@ -67,6 +82,7 @@ export default function Dashboard() {
       setAccessPlan(null)
       setRecos(null)
       setOutcomes(null)
+      setDecomp(null)
     } finally {
       setLoading(false)
     }
@@ -83,6 +99,58 @@ export default function Dashboard() {
   // 取り込んである月が「データがありません」になっていた。
   const hasAnyData = Boolean(kpis || shop)
   const changes = data?.changes ?? {}
+
+  // ── 着地見込み（1層ヒーロー用）───────────────────────────────
+  // 対象期間が「現在進行中」のときだけ、実績 ÷ 経過割合 で単純予測する。
+  // 過去期間は実績＝確定なので出さない。経過1割未満は振れが大きすぎるため出さない。
+  const forecast = (() => {
+    const actual = shop ? shop.sales : kpis?.gross
+    if (actual == null) return null
+    const today = new Date()
+    let ratio: number | null = null
+    if (period === 'weekly') {
+      const start = new Date(dateValue)
+      start.setDate(start.getDate() - (start.getDay() % 7))
+      const diff = Math.floor((today.getTime() - start.getTime()) / 86400000)
+      if (diff >= 0 && diff < 7) ratio = (diff + 1) / 7
+    } else if (period === 'monthly') {
+      if (dateValue.slice(0, 7) === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`) {
+        const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+        ratio = today.getDate() / daysInMonth
+      }
+    } else {
+      if (dateValue.slice(0, 4) === String(today.getFullYear())) {
+        const startOfYear = new Date(today.getFullYear(), 0, 1)
+        const dayOfYear = Math.floor((today.getTime() - startOfYear.getTime()) / 86400000) + 1
+        const daysInYear = (today.getFullYear() % 4 === 0 && today.getFullYear() % 100 !== 0) || today.getFullYear() % 400 === 0 ? 366 : 365
+        ratio = dayOfYear / daysInYear
+      }
+    }
+    if (ratio == null || ratio < 0.1) return null
+    return Math.round(actual / ratio)
+  })()
+
+  // ── 売上3分解（1層ヒーロー用）。軸を混ぜない ─────────────────
+  // 週次: dashboard本体（RPP軸: ct/cvr/av + changes）
+  // 月次・年次: gap/shop（商品分析=店舗全体軸: access/cvr/av + changes）
+  const decompCards = (() => {
+    if (period === 'weekly') {
+      if (!kpis) return null
+      return [
+        { label: 'アクセス（RPPクリック）', value: formatNumber(kpis.ct), change: changes.ct_wow ?? null },
+        { label: '転換率（CVR）', value: formatPercent(kpis.cvr, 2), change: changes.cvr_wow ?? null },
+        { label: '客単価（Av）', value: formatCurrency(kpis.av), change: changes.av_wow ?? null },
+      ]
+    }
+    if (!decomp) return null
+    const c = decomp.current
+    const ch = decomp.changes
+    return [
+      { label: 'アクセス人数（UU）', value: formatNumber(c.access ?? c.ct), change: ch.access ?? null },
+      { label: '転換率（CVR）', value: formatPercent(c.cvr, 2), change: ch.cvr ?? null },
+      { label: '客単価（Av）', value: formatCurrency(c.av), change: ch.av ?? null },
+    ]
+  })()
 
   const chartConfigs = {
     gross: { metric: 'gross' as const, label: 'RPP売上', color: '#2563eb', formatter: (v: number) => `¥${v.toLocaleString()}` },
@@ -135,47 +203,76 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* 今日やるべきこと（Phase 1）。数値より先に「次の行動」を見せるため最上部に置く。 */}
+        {/* ═══ 1層: KGIヒーロー（売上 vs 目標・達成率・着地見込み ＋ 売上3分解）═══
+            「売上目標に対して今どうか」をファーストビューで完結させる（区切りC・案A）。 */}
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+          {/* KGIブロック */}
+          <div className="lg:col-span-2 bg-white rounded-xl border shadow-sm p-4 flex flex-col">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-medium text-gray-600">売上{data?.target_sales ? ' vs 目標' : ''}</p>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                shop ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
+              }`}>
+                {shop ? '商品分析（店舗全体）' : 'RPP経由売上'}
+              </span>
+            </div>
+            <p className="text-3xl font-bold text-gray-900 mt-1.5 tabular-nums">
+              {formatCurrency(shop ? shop.sales : kpis?.gross)}
+            </p>
+            {data?.target_sales != null && data.target_sales > 0 ? (
+              <>
+                <div className="w-full bg-gray-100 rounded-full h-2.5 mt-3">
+                  <div
+                    className={`h-2.5 rounded-full transition-all ${
+                      (data.achievement_rate ?? 0) >= 100 ? 'bg-green-500'
+                      : (data.achievement_rate ?? 0) >= 70 ? 'bg-blue-500' : 'bg-amber-500'
+                    }`}
+                    style={{ width: `${Math.min(data.achievement_rate ?? 0, 100)}%` }}
+                  />
+                </div>
+                <div className="flex items-center justify-between text-xs text-gray-500 mt-1.5">
+                  <span>目標 {formatCurrency(data.target_sales)}</span>
+                  <span className="font-bold text-gray-900 text-sm">達成率 {data.achievement_rate?.toFixed(1)}%</span>
+                </div>
+              </>
+            ) : (
+              <p className="text-xs text-gray-400 mt-3">目標未設定（目標設定画面で売上目標を入力すると達成率が出ます）</p>
+            )}
+            <div className="flex items-center justify-between text-xs mt-auto pt-2 border-t border-gray-100">
+              <span className="text-gray-500">
+                {forecast != null ? 'このペースの着地見込み' : shop && kpis ? 'RPP経由' : ''}
+              </span>
+              <span className="font-medium text-gray-700 tabular-nums">
+                {forecast != null
+                  ? `${formatCurrency(forecast)}${data?.target_sales ? `（目標比 ${Math.round(forecast / data.target_sales * 100)}%）` : ''}`
+                  : shop && kpis ? formatCurrency(kpis.gross) : '—'}
+              </span>
+            </div>
+          </div>
+
+          {/* 売上3分解: 売上 = アクセス × CVR × 客単価 */}
+          {decompCards?.map((c) => (
+            <div key={c.label} className="bg-white rounded-xl border shadow-sm p-4 flex flex-col justify-between">
+              <p className="text-xs font-medium text-gray-500">{c.label}</p>
+              <div>
+                <p className="text-2xl font-bold text-gray-900 tabular-nums">{c.value}</p>
+                <p className={`text-xs mt-1 ${
+                  c.change == null ? 'text-gray-300' : c.change >= 0 ? 'text-green-600' : 'text-red-500'
+                }`}>
+                  {c.change == null ? '— 前期比' : `${c.change >= 0 ? '+' : ''}${c.change.toFixed(1)}% 前期比`}
+                </p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ═══ 2層: アクション帯（今日やること・アラート・評価マトリクス）═══ */}
         {!isYearly && <TodayActions data={recos} onChanged={load} />}
 
-        {/* 実施した施策のその後（Phase 2 の学習ループ） */}
-        {!isYearly && <ActionOutcomes data={outcomes} />}
-
-        {/* KGI達成率（月次は商品分析レポート＝店舗全体売上を正とする） */}
-        {data?.target_sales != null && data.target_sales > 0 && (
-          <div className="bg-white rounded-xl border p-4 shadow-sm">
-            <div className="flex items-center justify-between mb-2">
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-gray-600">KGI 売上目標達成率</p>
-                <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
-                  data.shop ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
-                }`}>
-                  {data.shop ? '商品分析ベース（店舗全体）' : 'RPP経由売上ベース'}
-                </span>
-              </div>
-              <span className="text-lg font-bold text-gray-900">
-                {data.achievement_rate?.toFixed(1)}%
-              </span>
-            </div>
-            <div className="w-full bg-gray-100 rounded-full h-3">
-              <div
-                className={`h-3 rounded-full transition-all ${
-                  (data.achievement_rate ?? 0) >= 100
-                    ? 'bg-green-500'
-                    : (data.achievement_rate ?? 0) >= 70
-                    ? 'bg-blue-500'
-                    : 'bg-amber-500'
-                }`}
-                style={{ width: `${Math.min(data.achievement_rate ?? 0, 100)}%` }}
-              />
-            </div>
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>
-                実績: {formatCurrency(data.shop ? data.shop.sales : kpis?.gross)}
-                {data.shop && kpis && <span className="text-gray-400">（RPP経由: {formatCurrency(kpis.gross)}）</span>}
-              </span>
-              <span>目標: {formatCurrency(data.target_sales)}</span>
-            </div>
+        {alerts.length > 0 && (
+          <div>
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">改善重要アラート</h3>
+            <AlertPanel alerts={alerts} />
           </div>
         )}
 
@@ -184,22 +281,8 @@ export default function Dashboard() {
           <EvaluationMatrix evaluation={evaluation} />
         )}
 
-        {/* 売上予算プラン（年間予算の按分 → 必要アクセス → 想定広告費。第4段階v2）
-            月次予算の按分パネルのため年次表示では出さない（年間予算そのものはKGIに反映済み） */}
-        {!isYearly && <RevenuePlanPanel yearMonth={dateValue.slice(0, 7)} />}
-
-        {/* アクセス逆算パネル（月次目標売上ベース。売上予算プランとは別軸の試算） */}
-        {accessPlan && (
-          <AccessPlanner plan={accessPlan} />
-        )}
-
-        {/* アラート */}
-        {alerts.length > 0 && (
-          <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">改善重要アラート</h3>
-            <AlertPanel alerts={alerts} />
-          </div>
-        )}
+        {/* 実施した施策のその後（Phase 2 の学習ループ） */}
+        {!isYearly && <ActionOutcomes data={outcomes} />}
 
         {/* RPP広告データが無い期間：商品分析（店舗全体）の実績だけで表示する。
             以前はここで「データがありません」になり、店舗全体の実績まで隠れていた。 */}
@@ -214,25 +297,15 @@ export default function Dashboard() {
               </p>
             </div>
 
-            <div>
-              <h3 className="text-base font-bold text-gray-900 mb-3">店舗全体の実績（商品分析）</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-                <KPICard size="hero" label="売上" value={formatCurrency(shop.sales)} variant="primary" />
-                <KPICard size="hero" label="アクセス人数（UU）" value={formatNumber(shop.access)} />
-                <KPICard size="hero" label="転換率（CVR）" value={formatPercent(shop.cvr, 2)} />
-                <KPICard size="hero" label="客単価（Av）" value={formatCurrency(shop.av)} />
-              </div>
-            </div>
           </>
         )}
 
         {kpis && (<>
-        {/* ===== 主要KPI（ヒーローカード：利益・売上の最重要4指標） ===== */}
+        {/* ═══ 3層(a): 利益・広告投資（RPP軸の最重要4指標。ヒーローより一段弱く）═══ */}
         <div>
-          <h3 className="text-base font-bold text-gray-900 mb-3">主要KPI</h3>
-          <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+          <h3 className="text-sm font-semibold text-gray-600 mb-3">利益・広告投資（RPP軸）</h3>
+          <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
             <KPICard
-              size="hero"
               label="Rev（営業利益）"
               value={formatCurrency(kpis?.rev)}
               change={changes.rev_wow}
@@ -242,7 +315,6 @@ export default function Dashboard() {
               helpMetric="Rev"
             />
             <KPICard
-              size="hero"
               label="ROI（投資利益率）"
               value={formatPercent(kpis?.roi)}
               change={changes.roi_wow}
@@ -253,7 +325,6 @@ export default function Dashboard() {
               helpMetric="ROI"
             />
             <KPICard
-              size="hero"
               label="RPP売上（Gross）"
               value={formatCurrency(kpis?.gross)}
               change={changes.gross_wow}
@@ -263,7 +334,6 @@ export default function Dashboard() {
               helpMetric="Gross"
             />
             <KPICard
-              size="hero"
               label="売上総利益（GP）"
               value={formatCurrency(kpis?.gp)}
               change={changes.gp_wow}
@@ -274,84 +344,64 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ===== 効率指標（標準カード：広告効率・転換系） ===== */}
-        <div>
-          <h3 className="text-sm font-semibold text-gray-600 mb-3">効率指標</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <KPICard
-              label="ROAS（売上回収率）"
-              value={formatPercent(kpis?.roas)}
-              change={changes.roas_wow}
-              yoy={changes.roas_yoy}
-              changeLabel="前期比"
-              helpMetric="ROAS"
-            />
-            <KPICard
-              label="CVR（注文率）"
-              value={formatPercent(kpis?.cvr, 2)}
-              change={changes.cvr_wow}
-              yoy={changes.cvr_yoy}
-              changeLabel="前期比"
-              alert={kpis != null && changes.cvr_wow != null && changes.cvr_wow < -5}
-              helpMetric="CVR"
-            />
-            <KPICard
-              label="CPO（注文獲得単価）"
-              value={formatCurrency(kpis?.cpo)}
-              change={changes.cpo_wow ? -changes.cpo_wow : null}
-              yoy={changes.cpo_yoy ? -changes.cpo_yoy : null}
-              changeLabel="前期比"
-              alert={kpis != null && kpis.limit_cpo != null && kpis.cpo > kpis.limit_cpo}
-              helpMetric="CPO"
-            />
-            <KPICard
-              label="Limit CPO（限界CPO）"
-              value={formatCurrency(kpis?.limit_cpo)}
-              helpMetric="Limit CPO"
-            />
-            <KPICard
-              label="CTR（クリック率）"
-              value={formatPercent(kpis?.ctr, 2)}
-              alert={kpis != null && kpis.ctr < 1}
-              helpMetric="CTR"
-            />
-            <KPICard
-              label="CPC（クリック単価）"
-              value={formatCurrency(kpis?.cpc)}
-              change={changes.cpc_wow ? -changes.cpc_wow : null}
-              yoy={changes.cpc_yoy ? -changes.cpc_yoy : null}
-              changeLabel="前期比"
-              alert={kpis != null && changes.cpc_wow != null && changes.cpc_wow > 5}
-              helpMetric="CPC"
-            />
-            <KPICard
-              label="客単価（Av）"
-              value={formatCurrency(kpis?.av)}
-              helpMetric="Av"
-            />
-            <KPICard
-              label="GP率（GPR）"
-              value={formatPercent(kpis?.gpr)}
-              helpMetric="GPR"
-            />
+        {/* ═══ 3層(b): 詳細指標（効率・参考をコンパクトな表1ブロックに圧縮。既定で畳む）═══ */}
+        <details className="bg-white rounded-xl border shadow-sm group">
+          <summary className="px-4 py-3 text-sm font-semibold text-gray-600 cursor-pointer select-none list-none flex items-center justify-between hover:bg-gray-50 rounded-xl group-open:rounded-b-none">
+            <span>詳細指標（効率・参考: ROAS / CVR / CPO / CTR / CPC など12指標）</span>
+            <span className="text-xs text-gray-400 group-open:hidden">クリックで展開</span>
+            <span className="text-xs text-gray-400 hidden group-open:inline">閉じる</span>
+          </summary>
+          <div className="overflow-x-auto border-t">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                <tr>
+                  <th className="px-4 py-2 text-left">指標</th>
+                  <th className="px-3 py-2 text-right">実績</th>
+                  <th className="px-3 py-2 text-right">前期比</th>
+                  <th className="px-3 py-2 text-right">YoY</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {([
+                  // goodWhenDown: 下がる方が良い指標（CPO/CPC）は変化の色を反転する
+                  { label: 'ROAS（売上回収率）', value: formatPercent(kpis.roas), wow: changes.roas_wow, yoy: changes.roas_yoy, goodWhenDown: false, warn: false },
+                  { label: 'CVR（注文率）', value: formatPercent(kpis.cvr, 2), wow: changes.cvr_wow, yoy: changes.cvr_yoy, goodWhenDown: false, warn: changes.cvr_wow != null && changes.cvr_wow < -5 },
+                  { label: 'CPO（注文獲得単価）', value: formatCurrency(kpis.cpo), wow: changes.cpo_wow, yoy: changes.cpo_yoy, goodWhenDown: true, warn: kpis.limit_cpo != null && kpis.limit_cpo > 0 && kpis.cpo > kpis.limit_cpo },
+                  { label: 'Limit CPO（限界CPO）', value: formatCurrency(kpis.limit_cpo), wow: null, yoy: null, goodWhenDown: false, warn: false },
+                  { label: 'CTR（クリック率）', value: formatPercent(kpis.ctr, 2), wow: changes.ctr_wow, yoy: changes.ctr_yoy, goodWhenDown: false, warn: kpis.ctr < 1 },
+                  { label: 'CPC（クリック単価）', value: formatCurrency(kpis.cpc), wow: changes.cpc_wow, yoy: changes.cpc_yoy, goodWhenDown: true, warn: changes.cpc_wow != null && changes.cpc_wow > 5 },
+                  { label: '客単価（Av）', value: formatCurrency(kpis.av), wow: changes.av_wow, yoy: changes.av_yoy, goodWhenDown: false, warn: false },
+                  { label: 'GP率（GPR）', value: formatPercent(kpis.gpr), wow: null, yoy: null, goodWhenDown: false, warn: false },
+                  { label: '広告費（AdCost）', value: formatCurrency(kpis.ad_cost), wow: changes.ad_cost_wow, yoy: changes.ad_cost_yoy, goodWhenDown: false, warn: false },
+                  { label: '注文件数（CV）', value: formatNumber(kpis.cv), wow: changes.cv_wow, yoy: changes.cv_yoy, goodWhenDown: false, warn: false },
+                  { label: 'クリック数（CT）', value: formatNumber(kpis.ct), wow: changes.ct_wow, yoy: changes.ct_yoy, goodWhenDown: false, warn: false },
+                  { label: '店舗運営経費', value: formatCurrency(kpis.steady_cost), wow: null, yoy: null, goodWhenDown: false, warn: false },
+                ]).map((row) => {
+                  const cell = (v: number | null | undefined) => {
+                    if (v == null) return <span className="text-gray-300">—</span>
+                    const improved = row.goodWhenDown ? v < 0 : v > 0
+                    return (
+                      <span className={improved ? 'text-green-600' : 'text-red-500'}>
+                        {v > 0 ? '+' : ''}{v.toFixed(1)}%
+                      </span>
+                    )
+                  }
+                  return (
+                    <tr key={row.label} className={row.warn ? 'bg-red-50/60' : undefined}>
+                      <td className="px-4 py-2 text-gray-700">
+                        {row.label}
+                        {row.warn && <span className="ml-1.5 text-[10px] text-red-600 font-medium">⚠️ 要確認</span>}
+                      </td>
+                      <td className="px-3 py-2 text-right font-medium text-gray-900 tabular-nums">{row.value}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{cell(row.wow)}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{cell(row.yoy)}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
-        </div>
-
-        {/* ===== 参考指標（コンパクトカード：ボリューム・コスト系） ===== */}
-        <div>
-          <h3 className="text-xs font-semibold text-gray-400 mb-2">参考指標</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-            <KPICard
-              size="compact"
-              label="広告費（AdCost）"
-              value={formatCurrency(kpis?.ad_cost)}
-              change={changes.ad_cost_wow}
-            />
-            <KPICard size="compact" label="注文件数（CV）" value={formatNumber(kpis?.cv)} change={changes.cv_wow} />
-            <KPICard size="compact" label="クリック数（CT）" value={formatNumber(kpis?.ct)} />
-            <KPICard size="compact" label="店舗運営経費" value={formatCurrency(kpis?.steady_cost)} />
-          </div>
-        </div>
+        </details>
         </>)}
 
         {/* トレンドチャート */}
@@ -396,6 +446,11 @@ export default function Dashboard() {
             formatter={(v) => `¥${v.toLocaleString()}`}
           />
         </div>
+
+        {/* ═══ 3層(c): 計画系パネル（売上予算プラン・アクセス逆算）═══
+            月次予算の按分パネルのため年次表示では出さない（年間予算そのものはKGIに反映済み） */}
+        {!isYearly && <RevenuePlanPanel yearMonth={dateValue.slice(0, 7)} />}
+        {accessPlan && <AccessPlanner plan={accessPlan} />}
         </div>} {/* kpis && ... */}
       </div>
     </div>
