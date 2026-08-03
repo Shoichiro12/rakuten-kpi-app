@@ -2,12 +2,14 @@ import { useState, useEffect, useCallback } from 'react'
 import { BarChart2, RefreshCw, ChevronDown } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, Cell,
+  ResponsiveContainer,
 } from 'recharts'
 import Header from '../components/layout/Header'
 import RppDiagnosisPanel from '../components/rpp/RppDiagnosisPanel'
 import { useTableSort } from '../components/table/useTableSort'
 import SortableTh from '../components/table/SortableTh'
+import { GRID, SERIES } from '../components/chart/defaults'
+import { formatYenAxis } from '../lib/format'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent } from '../lib/utils'
 import type {
@@ -16,6 +18,15 @@ import type {
 } from '../types'
 
 type PeriodType = 'weekly' | 'monthly'
+
+/**
+ * 表のセル用。**単位はセルに書かない**（見出しに1回だけ置く。規約 1-2）。
+ * 表は丸めない＝生値のまま。
+ */
+const rppNum = (v: number | null | undefined) =>
+  v == null || !Number.isFinite(v) ? '—' : Math.round(v).toLocaleString('ja-JP')
+const rppPct = (v: number | null | undefined, digits = 1) =>
+  v == null || !Number.isFinite(v) ? '—' : v.toFixed(digits)
 
 /* ─── KPIミニカード（720h / 12h 併記） ─────────────────────── */
 function MiniKpiCard({
@@ -413,7 +424,8 @@ export default function RppAnalysis() {
                     data={chartData}
                     margin={{ top: 5, right: 10, left: 10, bottom: 60 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                    {/* 破線は「しきい値」「予測」に読まれるので実線の極薄にする（規約 3-5） */}
+                    <CartesianGrid {...GRID} />
                     <XAxis
                       dataKey="name"
                       tick={{ fontSize: 10 }}
@@ -423,21 +435,19 @@ export default function RppAnalysis() {
                     />
                     <YAxis
                       tick={{ fontSize: 10 }}
-                      tickFormatter={(v: number) => `￥${(v / 1000).toFixed(0)}k`}
+                      tickFormatter={(v: number) => formatYenAxis(v)}
                     />
                     <Tooltip
                       formatter={(value: number, name: string) => [formatCurrency(value), name]}
                       contentStyle={{ fontSize: 12 }}
                     />
-                    <Bar dataKey="adCost" name="広告費" radius={[4, 4, 0, 0]}>
-                      {chartData.map((_, i) => (
-                        <Cell key={i} fill={`hsl(${210 + i * 8}, 75%, ${52 + i * 2}%)`} />
-                      ))}
-                    </Bar>
+                    {/* 1系列＝1色。棒ごとに色相をずらすと「長さ」と「色」で同じ情報を二重に
+                        エンコードすることになり、色という自由なチャンネルを無駄に使う（規約 3-1） */}
+                    <Bar dataKey="adCost" name="広告費" fill={SERIES[0]} radius={[3, 3, 0, 0]} />
                     <Bar
                       dataKey="gross720"
                       name="売上(720h)"
-                      fill="#10b981"
+                      fill={SERIES[2]}
                       radius={[4, 4, 0, 0]}
                       opacity={0.75}
                     />
@@ -471,14 +481,14 @@ export default function RppAnalysis() {
                       <tr className="bg-gray-50 text-left text-gray-500 font-medium">
                         <SortableTh label="商品名" sortKey="product_name" sort={sort} align="left" className="px-1" />
                         <th className="px-4 py-2.5 whitespace-nowrap">診断</th>
-                        <SortableTh label="広告費" sortKey="ad_cost" sort={sort} className="px-1" />
-                        <SortableTh label="売上(720h)" sortKey="gross_720" sort={sort} className="px-1" />
-                        <SortableTh label="ROAS(720h)" sortKey="roas_720" sort={sort} className="px-1" />
-                        <SortableTh label="CPO(720h)" sortKey="cpo_720" sort={sort} className="px-1" />
-                        <SortableTh label="CVR(720h)" sortKey="cvr_720" sort={sort} className="px-1" />
-                        <SortableTh label="CV(720h)" sortKey="cv_720" sort={sort} className="px-1" />
-                        <SortableTh label="売上(12h)" sortKey="gross_12" sort={sort} className="px-1" />
-                        <SortableTh label="ROAS(12h)" sortKey="roas_12" sort={sort} className="px-1" />
+                        <SortableTh label="広告費（円）" sortKey="ad_cost" sort={sort} className="px-1" />
+                        <SortableTh label="売上 720h（円）" sortKey="gross_720" sort={sort} className="px-1" />
+                        <SortableTh label="ROAS 720h（%）" sortKey="roas_720" sort={sort} className="px-1" />
+                        <SortableTh label="CPO 720h（円）" sortKey="cpo_720" sort={sort} className="px-1" />
+                        <SortableTh label="CVR 720h（%）" sortKey="cvr_720" sort={sort} className="px-1" />
+                        <SortableTh label="CV 720h（件）" sortKey="cv_720" sort={sort} className="px-1" />
+                        <SortableTh label="売上 12h（円）" sortKey="gross_12" sort={sort} className="px-1" />
+                        <SortableTh label="ROAS 12h（%）" sortKey="roas_12" sort={sort} className="px-1" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -504,51 +514,45 @@ export default function RppAnalysis() {
                           <td className="px-4 py-2.5 whitespace-nowrap">
                             <DiagnosisBadges diag={diag} />
                           </td>
-                          <td className="px-4 py-2.5 text-right font-medium text-gray-900 whitespace-nowrap">
-                            {item.ad_cost != null ? formatCurrency(item.ad_cost) : '—'}
+                          <td className="px-4 py-2.5 text-right font-medium text-gray-900 whitespace-nowrap tabular-nums">
+                            {rppNum(item.ad_cost)}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap">
-                            {item.gross_720 != null ? formatCurrency(item.gross_720) : '—'}
+                          <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap tabular-nums">
+                            {rppNum(item.gross_720)}
                           </td>
-                          <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                          <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums">
                             {item.roas_720 != null ? (
                               <span
                                 className={
-                                  item.roas_720 >= 300
-                                    ? 'text-green-600 font-medium'
-                                    : item.roas_720 < 100
-                                    ? 'text-red-500'
-                                    : 'text-gray-700'
+                                  // 色を付けるのはしきい値を割った行だけ。300%以上を緑にすると
+                                  // 全行が色付きになり、何も目立たなくなる（規約 4）
+                                  item.roas_720 < 100 ? 'text-red-500' : 'text-gray-700'
                                 }
                               >
-                                {item.roas_720.toFixed(1)}%
+                                {item.roas_720.toFixed(1)}
                               </span>
                             ) : '—'}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap">
-                            {item.cpo_720 != null ? formatCurrency(item.cpo_720) : '—'}
+                          <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap tabular-nums">
+                            {rppNum(item.cpo_720)}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap">
-                            {item.cvr_720 != null ? formatPercent(item.cvr_720, 2) : '—'}
+                          <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap tabular-nums">
+                            {rppPct(item.cvr_720, 2)}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap">
-                            {item.cv_720 != null ? item.cv_720.toLocaleString() : '—'}
+                          <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap tabular-nums">
+                            {rppNum(item.cv_720)}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-gray-600 whitespace-nowrap">
-                            {item.gross_12 != null ? formatCurrency(item.gross_12) : '—'}
+                          <td className="px-4 py-2.5 text-right text-gray-600 whitespace-nowrap tabular-nums">
+                            {rppNum(item.gross_12)}
                           </td>
-                          <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                          <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums">
                             {item.roas_12 != null ? (
                               <span
                                 className={
-                                  item.roas_12 >= 300
-                                    ? 'text-green-600'
-                                    : item.roas_12 < 100
-                                    ? 'text-red-500'
-                                    : 'text-gray-600'
+                                  item.roas_12 < 100 ? 'text-red-500' : 'text-gray-600'
                                 }
                               >
-                                {item.roas_12.toFixed(1)}%
+                                {item.roas_12.toFixed(1)}
                               </span>
                             ) : '—'}
                           </td>
