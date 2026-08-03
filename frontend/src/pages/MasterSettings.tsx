@@ -380,7 +380,9 @@ export default function MasterSettings() {
       />
 
       <div className="flex-1 overflow-auto p-6 bg-gray-50">
-        <div className="max-w-4xl mx-auto space-y-6">
+        {/* 幅の上限は付けない（ダッシュボード・GAP・商品別KPI・RPPと同じ全幅）。
+            列数の多いテーブルが画面幅を使い切れるようにするため。max-w-* を戻さないこと */}
+        <div className="space-y-6">
           {/* 未確認の提案（マスタ入力支援） */}
           {suggestions.length > 0 && (
             <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">

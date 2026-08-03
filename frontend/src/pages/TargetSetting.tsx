@@ -279,7 +279,9 @@ export default function TargetSetting() {
       />
 
       <div className="flex-1 overflow-auto p-6 bg-gray-50">
-        <div className="max-w-4xl mx-auto space-y-6">
+        {/* 幅の上限は付けない（他の表示系画面と同じ全幅）。
+            アイテム別目標・年間目標プランナーの表が画面幅を使い切れるようにするため。max-w-* を戻さないこと */}
+        <div className="space-y-6">
           {/* 対象月 */}
           <div className="bg-white rounded-xl border shadow-sm p-6">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">対象月</h3>
