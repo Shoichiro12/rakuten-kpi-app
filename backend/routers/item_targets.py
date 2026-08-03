@@ -5,14 +5,14 @@
 - 目標CVR・客単価・必要アクセス数は target_calc.py の確定公式で自動算出
 - 実績が無い商品は推定値（参考値）＋承認フロー。承認まで診断・逆算には使わない
 """
-from typing import Optional
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import ItemTarget, MonthlyItemSales, Product
+from models import ItemTarget, MonthlyItemSales, Product, ProductCategory
 from masters import inactive_management_nos
 from target_calc import apply_calc, calc_item_target
 
@@ -23,6 +23,16 @@ class ItemTargetIn(BaseModel):
     management_no: str
     year_month: str      # YYYY-MM
     target_sales: float
+
+
+class ItemTargetBulkItem(BaseModel):
+    management_no: str
+    target_sales: float
+
+
+class ItemTargetBulkIn(BaseModel):
+    year_month: str                       # YYYY-MM（対象月は一括で共通）
+    items: List[ItemTargetBulkItem]
 
 
 class ItemTargetKey(BaseModel):
@@ -75,6 +85,18 @@ def list_item_targets(
         if r.management_no:
             latest_by_mno[r.management_no] = r  # 昇順で回して最後に残るのが最新月
 
+    # 商品マスタのカテゴリ（ジャンル絞り込みのフォールバック用）
+    categories = {c.id: c for c in db.query(ProductCategory).all()}
+
+    def _resolve_genre(latest: Optional[MonthlyItemSales], p: Optional[Product]) -> dict:
+        """ジャンル絞り込み用。直近実績（商品分析）優先、無ければ商品マスタのカテゴリ。"""
+        if latest is not None and (latest.genre_u1 or latest.genre_u2 or latest.genre_u3):
+            return {"genre_u1": latest.genre_u1, "genre_u2": latest.genre_u2, "genre_u3": latest.genre_u3}
+        if p is not None and p.category_id and p.category_id in categories:
+            c = categories[p.category_id]
+            return {"genre_u1": c.genre_u1, "genre_u2": c.genre_u2, "genre_u3": c.genre_u3}
+        return {"genre_u1": None, "genre_u2": None, "genre_u3": None}
+
     mnos = (set(products) | set(latest_by_mno) | set(targets)) - inactive
     items = []
     for mno in sorted(mnos):
@@ -87,6 +109,7 @@ def list_item_targets(
                 (p.product_name if p else None)
                 or (latest.product_name if latest is not None else None)
             ),
+            **_resolve_genre(latest, p),
             "target": _to_dict(t) if t else None,
             # 参考表示: 直近実績（site_uu軸）。実績が無い商品は null（推定＋承認フロー対象）
             "latest_actual": {
@@ -100,37 +123,80 @@ def list_item_targets(
     return {"year_month": ym, "count": len(items), "items": items}
 
 
-@router.post("")
-def upsert_item_target(payload: ItemTargetIn, db: Session = Depends(get_db)):
-    """アイテム別目標売上の保存。目標CVR・客単価・必要アクセスは自動算出される。"""
-    ym = _validate_ym(payload.year_month)
-    mno = (payload.management_no or "").strip()
+def _upsert_one(db: Session, management_no: str, year_month: str, target_sales: float) -> ItemTarget:
+    """アイテム別目標1件のupsert＋自動算出（commitは呼び出し側）。
+
+    単発保存(POST "")と一括保存(POST "/bulk")で確定公式のコードパスを共有し、
+    算出式が二重実装で食い違わないようにするための共通関数。入力検証もここで行う。
+    """
+    mno = (management_no or "").strip()
     if not mno:
         raise HTTPException(status_code=400, detail="management_no は必須です")
-    if payload.target_sales <= 0:
-        raise HTTPException(status_code=400, detail="target_sales は 0 より大きい値を指定してください")
+    if target_sales <= 0:
+        raise HTTPException(status_code=400, detail=f"target_sales は 0 より大きい値を指定してください（{mno}）")
 
     row = db.query(ItemTarget).filter(
-        ItemTarget.management_no == mno, ItemTarget.year_month == ym,
+        ItemTarget.management_no == mno, ItemTarget.year_month == year_month,
     ).first()
     if row is None:
-        row = ItemTarget(management_no=mno, year_month=ym, target_sales=payload.target_sales)
+        row = ItemTarget(management_no=mno, year_month=year_month, target_sales=target_sales)
         db.add(row)
     else:
-        row.target_sales = payload.target_sales
+        row.target_sales = target_sales
         # 目標売上を入れ直したら承認状態はリセット（推定値の前提が変わるため再承認）
         row.estimated_approved = False
 
-    # 自動算出（保存時に導出して保存する。バッチは使わない）
-    calc = calc_item_target(db, mno, ym, payload.target_sales)
+    # 自動算出（保存時に導出して保存する）
+    calc = calc_item_target(db, mno, year_month, target_sales)
     row.target_cvr = calc["target_cvr"]
     row.target_av = calc["target_av"]
     row.required_access = calc["required_access"]
     row.calc_basis = calc["calc_basis"]
     row.basis_detail = calc["basis_detail"]
+    return row
 
+
+@router.post("")
+def upsert_item_target(payload: ItemTargetIn, db: Session = Depends(get_db)):
+    """アイテム別目標売上の保存（1件）。目標CVR・客単価・必要アクセスは自動算出される。"""
+    ym = _validate_ym(payload.year_month)
+    row = _upsert_one(db, payload.management_no, ym, payload.target_sales)
     db.commit()
     return _to_dict(row)
+
+
+@router.post("/bulk")
+def bulk_upsert_item_targets(payload: ItemTargetBulkIn, db: Session = Depends(get_db)):
+    """アイテム別目標売上の一括保存（対象月は共通・複数件を1トランザクションで保存）。
+
+    編集した行だけをまとめて送る前提。各件は単発保存と同じ確定公式で自動算出する。
+    1件でも検証エラー（management_no空・target_sales<=0）があれば全体をロールバックして
+    400を返す（部分保存で画面と実データが食い違わないようにする）。
+    """
+    ym = _validate_ym(payload.year_month)
+    if not payload.items:
+        raise HTTPException(status_code=400, detail="items が空です")
+
+    # 同一management_noが複数回来たら最後の値を採用（画面の重複送信対策）
+    dedup: dict[str, float] = {}
+    for it in payload.items:
+        mno = (it.management_no or "").strip()
+        if not mno:
+            raise HTTPException(status_code=400, detail="management_no は必須です")
+        dedup[mno] = it.target_sales
+
+    saved = []
+    try:
+        for mno, target_sales in dedup.items():
+            row = _upsert_one(db, mno, ym, target_sales)
+            db.flush()  # 各件をここでINSERT/UPDATE確定（採番・DB制約エラーを件ごとに検知）
+            saved.append(row)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+
+    return {"year_month": ym, "saved_count": len(saved), "items": [_to_dict(r) for r in saved]}
 
 
 @router.post("/approve")
