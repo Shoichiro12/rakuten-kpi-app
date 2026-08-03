@@ -6,11 +6,43 @@ interface LogicTreeProps {
   onKPIClick: (key: 'access' | 'cvr' | 'av') => void
 }
 
+/**
+ * ノードの色。
+ *
+ * 以前は達成率を緑・黄・赤の3段で塗り分けていたが、**色の濃さで量を表すのは
+ * 知覚の正確さで最下位**（Cleveland & McGill）。量は各ノードの中に入れた
+ * 弾丸グラフ（長さ）が担い、色はしきい値を割ったときの警告だけに使う。
+ * 規約: docs/ui_number_and_chart_rules_2026-08-04.md 3-1 / 3-3
+ */
 function nodeColor(achieve: number, hasTarget: boolean) {
-  if (!hasTarget || achieve === 0) return { stroke: '#94a3b8', fill: '#f8fafc', text: '#64748b' }
-  if (achieve >= 100) return { stroke: '#16a34a', fill: '#f0fdf4', text: '#15803d' }
-  if (achieve >= 80) return { stroke: '#d97706', fill: '#fffbeb', text: '#b45309' }
-  return { stroke: '#dc2626', fill: '#fef2f2', text: '#b91c1c' }
+  if (!hasTarget || achieve === 0) return { stroke: '#e6e5e2', fill: '#ffffff', text: '#86837d' }
+  if (achieve < 80) return { stroke: '#f0cfcf', fill: '#fdf4f4', text: '#b2312f' }
+  return { stroke: '#e6e5e2', fill: '#ffffff', text: '#55534f' }
+}
+
+const INK = '#1a1a19'
+const SUB = '#55534f'
+const MUTED = '#86837d'
+
+/**
+ * ノードの中に描く弾丸グラフ（Few の設計仕様に沿った簡易版）。
+ * 実績＝濃い棒、目標＝濃い縦線、背景＝1色の濃淡3段。
+ * 幅は px 指定で、親SVGの座標系にそのまま乗せる。
+ */
+function NodeBullet({ x, y, w, actual, target }: { x: number; y: number; w: number; actual: number; target: number }) {
+  const hi = Math.max(actual, target) * 1.25 || 1
+  const px = (v: number) => Math.max(0, Math.min(w, (v / hi) * w))
+  const b1 = px(target * 0.8)
+  const b2 = px(target)
+  return (
+    <g>
+      <rect x={x} y={y} width={b1} height="12" fill={INK} opacity="0.10" />
+      <rect x={x + b1} y={y} width={Math.max(0, b2 - b1)} height="12" fill={INK} opacity="0.06" />
+      <rect x={x + b2} y={y} width={Math.max(0, w - b2)} height="12" fill={INK} opacity="0.03" />
+      <rect x={x} y={y + 3} width={px(actual)} height="6" fill={INK} />
+      <rect x={x + px(target) - 1} y={y - 2} width="2" height="16" fill={INK} />
+    </g>
+  )
 }
 
 function formatVal(node: KPITreeNode): string {
@@ -55,9 +87,9 @@ function NodeBox({ x, y, w, h, node, hasTarget, isRoot, isSelected, onClick }: N
       <rect
         x={x} y={y} width={w} height={h} rx={12}
         fill={fill}
-        stroke={isSelected ? '#2563eb' : stroke}
+        stroke={isSelected ? INK : stroke}
         strokeWidth={strokeW}
-        filter={isSelected ? 'drop-shadow(0 0 6px rgba(37,99,235,0.4))' : undefined}
+        
       />
 
       {/* ラベル */}
@@ -66,32 +98,35 @@ function NodeBox({ x, y, w, h, node, hasTarget, isRoot, isSelected, onClick }: N
         textAnchor="middle"
         fontSize={isRoot ? 13 : 12}
         fontWeight="bold"
-        fill="#1e293b"
+        fill={SUB}
       >
         {isRoot ? 'KGI：' : 'KPI：'}{node.label}
       </text>
 
       {hasTarget && node.target > 0 ? (
         <>
-          {/* 実績 */}
-          <text x={cx} y={y + 44} textAnchor="middle" fontSize={13} fontWeight="600" fill="#0f172a">
-            実績: {formatVal(node)}
+          {/* 実績（このノードの主役。左寄せ）と達成率（右） */}
+          <text x={x + 14} y={y + 44} fontSize={14} fontWeight="700" fill={INK}>
+            {formatVal(node)}
           </text>
-          {/* 目標 */}
-          <text x={cx} y={y + 61} textAnchor="middle" fontSize={11} fill="#64748b">
-            目標: {formatTarget(node)}  達成率{node.achieve_rate.toFixed(0)}%
+          <text x={x + w - 14} y={y + 44} textAnchor="end" fontSize={12} fontWeight="600" fill={text}>
+            達成率 {node.achieve_rate.toFixed(0)}%
           </text>
-          {/* GAP */}
-          <text x={cx} y={y + 77} textAnchor="middle" fontSize={11} fontWeight="600" fill={text}>
-            GAP: {formatGap(node)} ({node.gap_rate > 0 ? '+' : ''}{node.gap_rate.toFixed(1)}%)
+          {/* 弾丸グラフ: 実績を「長さ」で、目標を縦線で示す。色ではなく長さで量を伝える */}
+          <NodeBullet x={x + 14} y={y + 52} w={w - 28} actual={node.actual} target={node.target} />
+          <text x={x + 14} y={y + 80} fontSize={10.5} fill={MUTED}>
+            目標 {formatTarget(node)}
+          </text>
+          <text x={x + w - 14} y={y + 80} textAnchor="end" fontSize={10.5} fontWeight="600" fill={text}>
+            {formatGap(node)}
           </text>
         </>
       ) : (
         <>
-          <text x={cx} y={y + 50} textAnchor="middle" fontSize={13} fontWeight="600" fill="#0f172a">
+          <text x={cx} y={y + 52} textAnchor="middle" fontSize={14} fontWeight="700" fill={INK}>
             {formatVal(node)}
           </text>
-          <text x={cx} y={y + 68} textAnchor="middle" fontSize={11} fill="#94a3b8">
+          <text x={cx} y={y + 72} textAnchor="middle" fontSize={11} fill={MUTED}>
             目標未設定
           </text>
         </>
@@ -147,9 +182,9 @@ export default function LogicTree({ data, selectedKPI, onKPIClick }: LogicTreePr
             key={kpi}
             d={`M ${rootCX} ${lineY1} C ${rootCX} ${(lineY1 + lineY2) / 2}, ${cx} ${(lineY1 + lineY2) / 2}, ${cx} ${lineY2}`}
             fill="none"
-            stroke={isSelected ? '#2563eb' : '#cbd5e1'}
+            stroke={isSelected ? INK : '#d8d6d1'}
             strokeWidth={isSelected ? 2.5 : 1.5}
-            strokeDasharray={isSelected ? undefined : '5 3'}
+            
           />
         )
       })}
