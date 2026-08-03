@@ -59,6 +59,46 @@ def get_shop_monthly(
     }
 
 
+def get_shop_yearly(
+    db: Session,
+    year: int,
+    exclude_management_nos: Optional[set] = None,
+) -> Optional[dict]:
+    """指定暦年の店舗全体実績（商品分析レポートを12ヶ月合算）を返す。
+
+    率系（CVR・客単価）は月次値の平均ではなく、分子分母を年で合算してから再計算する
+    （UIバックログ2026-08-03 区切りB。月次の get_shop_monthly と同じ形のdictを返す）。
+    データが1ヶ月分も無い年は None。
+    """
+    ym_from, ym_to = f"{year}-01", f"{year}-12"
+    q = db.query(
+        MonthlyItemSales.sales,
+        MonthlyItemSales.access_uu,
+        MonthlyItemSales.cv,
+    ).filter(
+        MonthlyItemSales.year_month >= ym_from,
+        MonthlyItemSales.year_month <= ym_to,
+    )
+    if exclude_management_nos:
+        q = q.filter(MonthlyItemSales.management_no.notin_(list(exclude_management_nos)))
+    rows = q.all()
+
+    if not rows:
+        return None
+
+    sales = sum(r.sales or 0 for r in rows)
+    uu = sum(r.access_uu or 0 for r in rows)
+    cv = sum(r.cv or 0 for r in rows)
+
+    return {
+        "sales": sales,
+        "access": uu,
+        "cv": cv,
+        "cvr": round((cv / uu * 100) if uu > 0 else 0, 2),
+        "av": round((sales / cv) if cv > 0 else 0, 0),
+    }
+
+
 def get_rpp_month_products(
     db: Session,
     year_month: str,

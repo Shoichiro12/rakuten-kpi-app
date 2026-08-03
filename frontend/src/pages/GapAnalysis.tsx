@@ -44,7 +44,7 @@ const PRODUCT_SORT_ACCESSORS = {
 }
 
 export default function GapAnalysis() {
-  const { period, dateValue, setPeriod, setDateValue } = usePeriodState()
+  const { period, dateValue, setPeriod, setDateValue, jumpToLatest } = usePeriodState()
   const productSort = useTableSort<ProductItem>(PRODUCT_SORT_ACCESSORS)
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [selectedKPI, setSelectedKPI] = useState<'access' | 'cvr' | 'av' | null>(null)
@@ -65,24 +65,29 @@ export default function GapAnalysis() {
   const [loading, setLoading] = useState(false)
   const [excludeInactive, setExcludeInactive] = useState(false)  // 廃盤を集計から除外するか
 
-  const dateParam = period === 'monthly' ? dateValue.slice(0, 7) : dateValue
+  const dateParam =
+    period === 'monthly' ? dateValue.slice(0, 7)
+    : period === 'yearly' ? dateValue.slice(0, 4)
+    : dateValue
   const includeInactive = !excludeInactive
+  const isYearly = period === 'yearly'
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
+      // 年次は表示系のみ。評価マトリクス（診断）は月次前提のため呼ばず、注記を出す。
       const [tree, shop, genre, evalRes] = await Promise.all([
         api.gap.kpiTree(period, dateParam) as Promise<KPITree | null>,
         api.gap.shop(period, dateParam, includeInactive) as Promise<ShopData | null>,
         api.gap.genre(period, dateParam, includeInactive) as Promise<{ genres?: GenreKPI[]; axis?: string | null } | null>,
-        api.evaluation.matrix(period, dateParam, includeInactive).catch(() => null),
+        isYearly ? Promise.resolve(null) : api.evaluation.matrix(period, dateParam, includeInactive).catch(() => null),
       ])
       setTreeData(tree ?? null)
       setShopData(shop ?? null)
       setGenreData(genre?.genres ?? [])
       setGenreAxis(genre?.axis ?? null)
-      setEvaluation(evalRes?.evaluation ?? null)
-      setEvalAxis(evalRes?.axis)
+      setEvaluation((evalRes as { evaluation?: EvaluationResult } | null)?.evaluation ?? null)
+      setEvalAxis((evalRes as { axis?: 'rpp' | 'shop' } | null)?.axis)
     } catch (e) {
       console.error('[GapAnalysis] データ取得エラー:', e)
       // エラー時は既存の表示を維持しつつ、空状態に戻す
@@ -93,7 +98,7 @@ export default function GapAnalysis() {
     } finally {
       setLoading(false)
     }
-  }, [period, dateParam, includeInactive])
+  }, [period, dateParam, includeInactive, isYearly])
 
   const loadProducts = useCallback(async (genre?: string) => {
     try {
@@ -155,6 +160,7 @@ export default function GapAnalysis() {
               onPeriodChange={setPeriod}
               dateValue={dateValue}
               onDateChange={setDateValue}
+              onJumpToLatest={jumpToLatest}
             />
           </>
         }
@@ -167,16 +173,27 @@ export default function GapAnalysis() {
           {/* STEP インジケーター */}
           <StepIndicator currentStep={step} onStepClick={handleStepClick} />
 
+          {/* 年次は表示系のみ（診断は月次前提のため注記） */}
+          {isYearly && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+              <p className="text-sm text-blue-900">
+                年次表示は実績の集計ビューです（暦年・1〜12月）。評価マトリクス・改善アクションの診断は月次で行うため、この画面では表示していません。
+              </p>
+            </div>
+          )}
+
           {/* 評価マトリクス（17パターン・目標×YoY統一判定） */}
           {evaluation && <EvaluationMatrix evaluation={evaluation} axis={evalAxis} />}
 
-          {/* アクションサマリ（スコープ内の課題集中度・要件No.3） */}
-          <ActionSummary
-            scope={selectedGenre ? 'genre' : 'shop'}
-            genre={selectedGenre ?? undefined}
-            period={period}
-            date={dateParam}
-          />
+          {/* アクションサマリ（スコープ内の課題集中度・要件No.3）。診断系のため年次では出さない */}
+          {!isYearly && (
+            <ActionSummary
+              scope={selectedGenre ? 'genre' : 'shop'}
+              genre={selectedGenre ?? undefined}
+              period={period}
+              date={dateParam}
+            />
+          )}
 
           {/* ロジックツリー */}
           <div className="bg-white rounded-xl border shadow-sm p-5">
@@ -383,8 +400,8 @@ export default function GapAnalysis() {
           )}
         </div>
 
-        {/* アクションパネル（右サイド） */}
-        {selectedProduct && shopData?.current && (
+        {/* アクションパネル（右サイド）。4Pアクション提案=診断系のため年次では出さない */}
+        {!isYearly && selectedProduct && shopData?.current && (
           <ActionPanel
             product={selectedProduct}
             shopKpis={shopData.current}

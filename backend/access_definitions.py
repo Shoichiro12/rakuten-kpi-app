@@ -29,10 +29,15 @@ AccessAxis = Literal["rpp_click", "site_uu"]
 # 週次の閾値・既定値は従来どおり100で変更なし。
 MIN_ACCESS_SAMPLE = 100            # 週次（週あたりアクセス）
 MIN_ACCESS_SAMPLE_MONTHLY = 430    # 月次（週100件の月換算）
+# 年次（週100件の年換算 100×365÷7≒5214→5220）。年次は表示系のみの参考値フラグ用で、
+# 診断・アラート・提案は月次のまま（UIバックログ2026-08-03の決定）。
+MIN_ACCESS_SAMPLE_YEARLY = 5220
 
 
-def min_access_for(period_type: Literal["weekly", "monthly"]) -> int:
-    """期間種別に応じたアクセス母数の下限を返す（weekly=100 / monthly=430）。"""
+def min_access_for(period_type: Literal["weekly", "monthly", "yearly"]) -> int:
+    """期間種別に応じたアクセス母数の下限を返す（weekly=100 / monthly=430 / yearly=5220）。"""
+    if period_type == "yearly":
+        return MIN_ACCESS_SAMPLE_YEARLY
     return MIN_ACCESS_SAMPLE_MONTHLY if period_type == "monthly" else MIN_ACCESS_SAMPLE
 
 

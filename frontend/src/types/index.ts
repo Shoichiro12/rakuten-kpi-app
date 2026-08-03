@@ -41,7 +41,7 @@ export interface ShopMetrics {
 }
 
 export interface DashboardData {
-  period: 'weekly' | 'monthly'
+  period: 'weekly' | 'monthly' | 'yearly'
   period_label: string
   prev_label: string
   kpis: KPIs | null

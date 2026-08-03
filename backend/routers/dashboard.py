@@ -5,10 +5,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from database import get_db
-from models import RppWeekly, Target
+from models import RppWeekly, Shop, Target
 from calculations import calc_kpis, calc_change_rate
 from access_definitions import MIN_ACCESS_SAMPLE, is_reliable, min_access_for
-from shop_metrics import get_shop_monthly
+from period_utils import parse_year, year_bounds
+from shop_metrics import get_shop_monthly, get_shop_yearly
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
 
@@ -83,13 +84,96 @@ def aggregate_rpp_monthly(db: Session, year_month: str) -> dict:
     return _aggregate(db, RppWeekly.week_start >= m_start, RppWeekly.week_start < m_end)
 
 
+def aggregate_rpp_yearly(db: Session, year: int) -> dict:
+    y_start, y_end = year_bounds(year)
+    return _aggregate(db, RppWeekly.week_start >= y_start, RppWeekly.week_start < y_end)
+
+
+def resolve_yearly_target(db: Session, year: int) -> tuple[float, float]:
+    """年次の売上目標と経費率を解決する（UIバックログ2026-08-03 区切りB）。
+
+    目標: 年間売上予算（shops.annual_sales_budget・暦年固定）を正とし、
+          未設定なら当該年の月次targetsの合算をフォールバック。
+    経費率: 当該年で一番新しい月次targetの値。無ければ既定0.15。
+    Returns: (target_sales, expense_rate)
+    """
+    shop_row = db.query(Shop).first()
+    annual = shop_row.annual_sales_budget if shop_row else None
+
+    targets = (
+        db.query(Target)
+        .filter(Target.year_month >= f"{year}-01", Target.year_month <= f"{year}-12")
+        .order_by(Target.year_month.asc())
+        .all()
+    )
+    if annual and annual > 0:
+        target_sales = annual
+    else:
+        target_sales = sum(t.target_sales or 0 for t in targets)
+    expense_rate = targets[-1].expense_rate if targets else 0.15
+    return target_sales, expense_rate
+
+
 @router.get("")
 def get_dashboard(
-    period: Literal["weekly", "monthly"] = Query("weekly"),
+    period: Literal["weekly", "monthly", "yearly"] = Query("weekly"),
     date_str: Optional[str] = Query(None, alias="date"),
     db: Session = Depends(get_db),
 ):
     today = date.today()
+
+    # ── 年次（表示系のみ。診断・アラートは月次のまま=フロントで注記） ─────────
+    if period == "yearly":
+        year = parse_year(date_str, today)
+        prev_year_num = year - 1
+
+        current_raw = aggregate_rpp_yearly(db, year)
+        prev_raw = aggregate_rpp_yearly(db, prev_year_num)
+
+        period_label = f"{year}年"
+        prev_label = f"{prev_year_num}年"
+
+        target_sales, expense_rate = resolve_yearly_target(db, year)
+        shop = get_shop_yearly(db, year)
+
+        if not current_raw:
+            achievement_rate = (
+                round(shop["sales"] / target_sales * 100, 1)
+                if shop and target_sales > 0 else None
+            )
+            return {
+                "period": period,
+                "period_label": period_label,
+                "kpis": None,
+                "shop": shop,
+                "target_sales": target_sales,
+                "achievement_rate": achievement_rate,
+                "changes": {},
+            }
+
+        kpis = calc_kpis(**current_raw, expense_rate=expense_rate)
+        changes = {}
+        if prev_raw:
+            prev_kpis = calc_kpis(**prev_raw, expense_rate=expense_rate)
+            # 年次の前期＝前年なので、_wow に前年比を入れ _yoy は出さない（重複表示を避ける）
+            for key in [
+                "gross", "gp", "ad_cost", "rev", "roi", "roas",
+                "cpo", "cvr", "ctr", "cpc", "cv", "ct", "av",
+            ]:
+                changes[f"{key}_wow"] = calc_change_rate(kpis[key], prev_kpis[key])
+
+        kgi_sales = shop["sales"] if shop else kpis["gross"]
+        achievement_rate = round(kgi_sales / target_sales * 100, 1) if target_sales > 0 else None
+        return {
+            "period": period,
+            "period_label": period_label,
+            "prev_label": prev_label,
+            "kpis": kpis,
+            "shop": shop,
+            "target_sales": target_sales,
+            "achievement_rate": achievement_rate,
+            "changes": changes,
+        }
 
     if period == "weekly":
         if date_str:

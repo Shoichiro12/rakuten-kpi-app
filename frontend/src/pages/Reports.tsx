@@ -12,7 +12,7 @@ import { usePeriodState } from '../lib/usePeriodState'
  * 集計は各画面と同じバックエンドロジック（/api/export）を使うため数値が一致する。
  */
 export default function Reports() {
-  const { period, dateValue, setPeriod, setDateValue } = usePeriodState()
+  const { period, dateValue, setPeriod, setDateValue, jumpToLatest } = usePeriodState()
   const [genres, setGenres] = useState<string[]>([])
   const [genre, setGenre] = useState<string>('')
   const [downloading, setDownloading] = useState<string | null>(null)
@@ -26,7 +26,10 @@ export default function Reports() {
       .catch(() => setGenres([]))
   }, [])
 
-  const dateParam = period === 'monthly' ? dateValue.slice(0, 7) : dateValue
+  const dateParam =
+    period === 'monthly' ? dateValue.slice(0, 7)
+    : period === 'yearly' ? dateValue.slice(0, 4)
+    : dateValue
 
   const run = async (key: string, fn: () => Promise<void>) => {
     setError(null)
@@ -40,7 +43,7 @@ export default function Reports() {
     }
   }
 
-  const periodLabel = period === 'weekly' ? '週次' : '月次'
+  const periodLabel = period === 'weekly' ? '週次' : period === 'monthly' ? '月次' : '年次'
 
   return (
     <div className="flex flex-col h-full">
@@ -53,6 +56,7 @@ export default function Reports() {
             onPeriodChange={setPeriod}
             dateValue={dateValue}
             onDateChange={setDateValue}
+            onJumpToLatest={jumpToLatest}
           />
         }
       />

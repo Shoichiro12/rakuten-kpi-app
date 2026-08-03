@@ -8,6 +8,7 @@ from models import RppWeekly
 from calculations import calc_kpis
 from access_definitions import is_reliable, min_access_for
 from masters import inactive_management_nos
+from period_utils import parse_year, year_bounds
 
 router = APIRouter(prefix="/api/products", tags=["products"])
 
@@ -31,7 +32,7 @@ def _month_bounds(ym: str) -> tuple[date, date]:
 
 @router.get("")
 def list_products(
-    period: Literal["weekly", "monthly"] = Query("weekly"),
+    period: Literal["weekly", "monthly", "yearly"] = Query("weekly"),
     date_str: Optional[str] = Query(None, alias="date"),
     genre: Optional[str] = Query(None),
     include_inactive: bool = Query(False, description="Trueで廃盤（is_active=False）商品も含める"),
@@ -47,6 +48,13 @@ def list_products(
         target_date = date.fromisoformat(date_str) if date_str else today
         week_start = get_week_start(target_date)
         q = db.query(RppWeekly).filter(RppWeekly.week_start == week_start)
+    elif period == "yearly":
+        # 年次=暦年。RPP軸のまま年で合算する（UIバックログ2026-08-03 区切りB）
+        year = parse_year(date_str, today)
+        y_start, y_end = year_bounds(year)
+        q = db.query(RppWeekly).filter(
+            RppWeekly.week_start >= y_start, RppWeekly.week_start < y_end
+        )
     else:
         ym = date_str[:7] if date_str else today.strftime("%Y-%m")
         m_start, m_end = _month_bounds(ym)

@@ -75,9 +75,12 @@ _SUMMARY_ROWS: list[tuple[str, str, str]] = [
 ]
 
 
+_PERIOD_TYPE_LABELS = {"weekly": "週次", "monthly": "月次", "yearly": "年次"}
+
+
 @router.get("/summary")
 def export_summary(
-    period: Literal["weekly", "monthly"] = Query("weekly"),
+    period: Literal["weekly", "monthly", "yearly"] = Query("weekly"),
     date_str: Optional[str] = Query(None, alias="date"),
     db: Session = Depends(get_db),
 ):
@@ -110,7 +113,7 @@ def export_summary(
     rows.append(["売上目標(KGI)", _fmt(data.get("target_sales")), "円", "", ""])
     rows.append(["目標達成率", _fmt(data.get("achievement_rate")), "%", "", ""])
 
-    period_type = "週次" if period == "weekly" else "月次"
+    period_type = _PERIOD_TYPE_LABELS[period]
     ascii_name = f"kpi_summary_{period}_{(date_str or date.today().isoformat())[:10]}.csv"
     jp_name = f"KPIサマリ_{period_type}_{period_label}.csv"
     return _csv_response(header, rows, ascii_name, jp_name)
@@ -118,7 +121,7 @@ def export_summary(
 
 @router.get("/products")
 def export_products(
-    period: Literal["weekly", "monthly"] = Query("weekly"),
+    period: Literal["weekly", "monthly", "yearly"] = Query("weekly"),
     date_str: Optional[str] = Query(None, alias="date"),
     genre: Optional[str] = Query(None),
     db: Session = Depends(get_db),
@@ -158,7 +161,7 @@ def export_products(
             "超過" if p.get("limit_cpo_exceeded") else "",
         ])
 
-    period_type = "週次" if period == "weekly" else "月次"
+    period_type = _PERIOD_TYPE_LABELS[period]
     ascii_name = f"products_kpi_{period}_{(date_str or date.today().isoformat())[:10]}.csv"
     jp_name = f"商品別KPI_{period_type}.csv"
     return _csv_response(header, rows, ascii_name, jp_name)

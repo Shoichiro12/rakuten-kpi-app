@@ -4,10 +4,13 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
-from models import RppWeekly, Target, MonthlyItemSales
+from models import RppWeekly, Shop, Target, MonthlyItemSales
 from calculations import calc_kpis, calc_change_rate
-from access_definitions import MIN_ACCESS_SAMPLE_MONTHLY, is_reliable, min_access_for
-from shop_metrics import get_shop_monthly
+from access_definitions import (
+    MIN_ACCESS_SAMPLE_MONTHLY, MIN_ACCESS_SAMPLE_YEARLY, is_reliable, min_access_for,
+)
+from period_utils import parse_year, year_bounds, year_month_range
+from shop_metrics import get_shop_monthly, get_shop_yearly
 
 router = APIRouter(prefix="/api/gap", tags=["gap"])
 
@@ -122,7 +125,41 @@ def _shop_genre_kpis(raw: dict) -> dict:
     }
 
 
-def _build_shop_products(items, prev_items, genre: Optional[str]) -> dict:
+def _merge_shop_items_by_product(rows) -> list:
+    """MonthlyItemSales の複数月分を商品単位に合算する（年次のSTEP3用）。
+
+    月次は1商品=1行だが、年次は同一商品が最大12行になるため、
+    _build_shop_products に渡す前に商品キーで合算する。属性（商品名・ジャンル・URL）
+    は最新月の行の値を採用する。
+    """
+    from types import SimpleNamespace
+    agg: dict = {}
+    for r in rows:
+        key = r.management_no or r.product_url
+        a = agg.get(key)
+        if a is None:
+            a = agg[key] = SimpleNamespace(
+                management_no=r.management_no, product_url=r.product_url,
+                product_name=r.product_name,
+                genre_u1=r.genre_u1, genre_u2=r.genre_u2, genre_u3=r.genre_u3,
+                sales=0.0, access_uu=0, cv=0, ad_cost=0.0, ad_sales=0.0,
+                _latest=r.year_month,
+            )
+        a.sales += r.sales or 0
+        a.access_uu += r.access_uu or 0
+        a.cv += r.cv or 0
+        a.ad_cost += r.ad_cost or 0
+        a.ad_sales += r.ad_sales or 0
+        if r.year_month >= a._latest:
+            a._latest = r.year_month
+            a.product_url = r.product_url
+            a.product_name = r.product_name
+            a.genre_u1, a.genre_u2, a.genre_u3 = r.genre_u1, r.genre_u2, r.genre_u3
+    return list(agg.values())
+
+
+def _build_shop_products(items, prev_items, genre: Optional[str],
+                         site_uu_threshold: int = MIN_ACCESS_SAMPLE_MONTHLY) -> dict:
     """商品分析レポート（店舗全体）から商品別KPIを組み立てる（月次のSTEP3用）。
 
     RPP軸の calc_kpis は広告費・原価が前提だが、商品分析には原価が無いため
@@ -186,7 +223,7 @@ def _build_shop_products(items, prev_items, genre: Optional[str]) -> dict:
             "limit_cpo_exceeded": False,
             # site_uu 軸。母数（訪問UU）が閾値未満ならCVR・客単価は参考値（要件No.5/No.6）。
             "access_axis": "site_uu",
-            "reliable": is_reliable(kpis.get("access"), MIN_ACCESS_SAMPLE_MONTHLY),
+            "reliable": is_reliable(kpis.get("access"), site_uu_threshold),
         })
 
     result.sort(key=lambda x: x["current"]["gross"], reverse=True)
@@ -220,7 +257,7 @@ def agg_rows(rows) -> Optional[dict]:
 
 @router.get("/shop")
 def gap_shop(
-    period: Literal["weekly", "monthly"] = Query("weekly"),
+    period: Literal["weekly", "monthly", "yearly"] = Query("weekly"),
     date_str: Optional[str] = Query(None, alias="date"),
     include_inactive: bool = Query(True, description="Falseで廃盤（is_active=False）商品を集計から除外"),
     db: Session = Depends(get_db),
@@ -234,6 +271,17 @@ def gap_shop(
         prev_week = current_week - timedelta(weeks=1)
         current_rows = db.query(RppWeekly).filter(RppWeekly.week_start == current_week).all()
         prev_rows = db.query(RppWeekly).filter(RppWeekly.week_start == prev_week).all()
+    elif period == "yearly":
+        # 年次=暦年固定。前期=前年（UIバックログ2026-08-03 区切りB）
+        year = parse_year(date_str, today)
+        cur_start, cur_end = year_bounds(year)
+        prev_start, prev_end = year_bounds(year - 1)
+        current_rows = db.query(RppWeekly).filter(
+            RppWeekly.week_start >= cur_start, RppWeekly.week_start < cur_end
+        ).all()
+        prev_rows = db.query(RppWeekly).filter(
+            RppWeekly.week_start >= prev_start, RppWeekly.week_start < prev_end
+        ).all()
     else:
         ym = date_str[:7] if date_str else today.strftime("%Y-%m")
         prev_ym = _prev_month(ym)
@@ -250,13 +298,17 @@ def gap_shop(
         current_rows = [r for r in current_rows if r.management_no not in inactive]
         prev_rows = [r for r in prev_rows if r.management_no not in inactive]
 
-    # 月次はSTEP2・STEP3と同じく商品分析＝店舗全体を正とする。
+    # 月次・年次はSTEP2・STEP3と同じく商品分析＝店舗全体を正とする。
     # ここだけRPP専用のままだと、RPP未取込の月に current が null になり、
     # STEP3が shopData.current.ctr を参照して画面全体がクラッシュする。
     if period != "weekly":
-        shop_cur = get_shop_monthly(db, ym, exclude_management_nos=inactive or None)
+        if period == "yearly":
+            shop_cur = get_shop_yearly(db, year, exclude_management_nos=inactive or None)
+            shop_prev = get_shop_yearly(db, year - 1, exclude_management_nos=inactive or None) if shop_cur else None
+        else:
+            shop_cur = get_shop_monthly(db, ym, exclude_management_nos=inactive or None)
+            shop_prev = get_shop_monthly(db, prev_ym, exclude_management_nos=inactive or None) if shop_cur else None
         if shop_cur:
-            shop_prev = get_shop_monthly(db, prev_ym, exclude_management_nos=inactive or None)
 
             def _to_kpis(s: dict) -> dict:
                 return {
@@ -304,7 +356,7 @@ def gap_shop(
 
 @router.get("/genre")
 def gap_genre(
-    period: Literal["weekly", "monthly"] = Query("weekly"),
+    period: Literal["weekly", "monthly", "yearly"] = Query("weekly"),
     date_str: Optional[str] = Query(None, alias="date"),
     level: Literal["u1", "u2", "u3"] = Query("u1"),
     parent: Optional[str] = Query(None),
@@ -328,11 +380,33 @@ def gap_genre(
     today = date.today()
     shop_cur_items: list = []
     shop_prev_items: list = []
+    # site_uu軸のreliable判定閾値（年次は年換算値を使う。表示系の参考値フラグのみ）
+    site_uu_threshold = MIN_ACCESS_SAMPLE_YEARLY if period == "yearly" else MIN_ACCESS_SAMPLE_MONTHLY
     if period == "weekly":
         current_week = get_week_start(date.fromisoformat(date_str) if date_str else today)
         prev_week = current_week - timedelta(weeks=1)
         current_rows = db.query(RppWeekly).filter(RppWeekly.week_start == current_week).all()
         prev_rows = db.query(RppWeekly).filter(RppWeekly.week_start == prev_week).all()
+    elif period == "yearly":
+        # 年次=暦年。月次と同じく商品分析＝店舗全体を正とし、無ければRPPへフォールバック。
+        year = parse_year(date_str, today)
+        cur_start, cur_end = year_bounds(year)
+        prev_start, prev_end = year_bounds(year - 1)
+        ym_from, ym_to = year_month_range(year)
+        prev_ym_from, prev_ym_to = year_month_range(year - 1)
+        shop_cur_items = db.query(MonthlyItemSales).filter(
+            MonthlyItemSales.year_month >= ym_from, MonthlyItemSales.year_month <= ym_to
+        ).all()
+        if shop_cur_items:
+            shop_prev_items = db.query(MonthlyItemSales).filter(
+                MonthlyItemSales.year_month >= prev_ym_from, MonthlyItemSales.year_month <= prev_ym_to
+            ).all()
+        current_rows = db.query(RppWeekly).filter(
+            RppWeekly.week_start >= cur_start, RppWeekly.week_start < cur_end
+        ).all()
+        prev_rows = db.query(RppWeekly).filter(
+            RppWeekly.week_start >= prev_start, RppWeekly.week_start < prev_end
+        ).all()
     else:
         ym = date_str[:7] if date_str else today.strftime("%Y-%m")
         prev_ym = _prev_month(ym)
@@ -395,7 +469,7 @@ def gap_genre(
                 "changes": changes,
                 # site_uu 軸。母数（訪問UU）が閾値未満ならCVR・客単価は参考値（要件No.5/No.6）。
                 "access_axis": "site_uu",
-                "reliable": is_reliable(kpis.get("access"), MIN_ACCESS_SAMPLE_MONTHLY),
+                "reliable": is_reliable(kpis.get("access"), site_uu_threshold),
                 **_genre_path_parts(genre_key, level),
             })
         shop_result.sort(key=lambda x: x["current"]["gross"], reverse=True)
@@ -461,7 +535,7 @@ def gap_genre(
 
 @router.get("/product")
 def gap_product(
-    period: Literal["weekly", "monthly"] = Query("weekly"),
+    period: Literal["weekly", "monthly", "yearly"] = Query("weekly"),
     date_str: Optional[str] = Query(None, alias="date"),
     genre: Optional[str] = Query(None),
     include_inactive: bool = Query(False, description="Trueで廃盤（is_active=False）商品も含める"),
@@ -476,6 +550,32 @@ def gap_product(
         prev_week = current_week - timedelta(weeks=1)
         q_curr = db.query(RppWeekly).filter(RppWeekly.week_start == current_week)
         q_prev = db.query(RppWeekly).filter(RppWeekly.week_start == prev_week)
+    elif period == "yearly":
+        # 年次=暦年。月次と同じく商品分析を正とし、商品単位に合算してから組み立てる。
+        year = parse_year(date_str, today)
+        cur_start, cur_end = year_bounds(year)
+        prev_start, prev_end = year_bounds(year - 1)
+        q_curr = db.query(RppWeekly).filter(RppWeekly.week_start >= cur_start, RppWeekly.week_start < cur_end)
+        q_prev = db.query(RppWeekly).filter(RppWeekly.week_start >= prev_start, RppWeekly.week_start < prev_end)
+
+        ym_from, ym_to = year_month_range(year)
+        prev_from, prev_to = year_month_range(year - 1)
+        shop_items = db.query(MonthlyItemSales).filter(
+            MonthlyItemSales.year_month >= ym_from, MonthlyItemSales.year_month <= ym_to
+        ).all()
+        if shop_items:
+            shop_prev = db.query(MonthlyItemSales).filter(
+                MonthlyItemSales.year_month >= prev_from, MonthlyItemSales.year_month <= prev_to
+            ).all()
+            if inactive:
+                shop_items = [r for r in shop_items if r.management_no not in inactive]
+                shop_prev = [r for r in shop_prev if r.management_no not in inactive]
+            return _build_shop_products(
+                _merge_shop_items_by_product(shop_items),
+                _merge_shop_items_by_product(shop_prev),
+                genre,
+                site_uu_threshold=MIN_ACCESS_SAMPLE_YEARLY,
+            )
     else:
         ym = date_str[:7] if date_str else today.strftime("%Y-%m")
         prev_ym = _prev_month(ym)
@@ -613,16 +713,24 @@ def _month_bounds(ym: str) -> tuple[date, date]:
 
 @router.get("/kpi-tree")
 def get_kpi_tree(
-    period: Literal["weekly", "monthly"] = Query("weekly"),
+    period: Literal["weekly", "monthly", "yearly"] = Query("weekly"),
     date_str: Optional[str] = Query(None, alias="date"),
     db: Session = Depends(get_db),
 ):
     today = date.today()
+    year: Optional[int] = None
 
     if period == "weekly":
         current_week = get_week_start(date.fromisoformat(date_str) if date_str else today)
         rows = db.query(RppWeekly).filter(RppWeekly.week_start == current_week).all()
         year_month = current_week.strftime("%Y-%m")
+    elif period == "yearly":
+        year = parse_year(date_str, today)
+        y_start, y_end = year_bounds(year)
+        rows = db.query(RppWeekly).filter(
+            RppWeekly.week_start >= y_start, RppWeekly.week_start < y_end
+        ).all()
+        year_month = None
     else:
         year_month = date_str[:7] if date_str else today.strftime("%Y-%m")
         m_start, m_end = _month_bounds(year_month)
@@ -630,7 +738,10 @@ def get_kpi_tree(
             RppWeekly.week_start >= m_start, RppWeekly.week_start < m_end
         ).all()
 
-    target = db.query(Target).filter(Target.year_month == year_month).first()
+    target = (
+        db.query(Target).filter(Target.year_month == year_month).first()
+        if year_month else None
+    )
 
     # KGI分解ツリーはすべて rpp_weekly を母数とする RPP軸で統一する。
     # actual_access = RppWeekly.ct（RPPクリック数）
@@ -641,7 +752,12 @@ def get_kpi_tree(
     # 月次は商品分析レポート（店舗全体売上・UU）を正とする。
     # KGI = アクセスUU × 転換率 × 客単価 が同一データ軸で成立する。
     # データが無い月・週次はRPP軸（クリック数ベース）へフォールバック。
-    shop = get_shop_monthly(db, year_month) if period == "monthly" else None
+    if period == "monthly":
+        shop = get_shop_monthly(db, year_month)
+    elif period == "yearly":
+        shop = get_shop_yearly(db, year)
+    else:
+        shop = None
     if shop:
         actual_gross = shop["sales"]
         actual_access = shop["access"]
@@ -660,11 +776,31 @@ def get_kpi_tree(
     # アクセス軸を明示する（要件No.5）。shop=訪問UU / rpp=RPPクリック数。
     access_axis = "site_uu" if shop else "rpp_click"
 
-    t_sales = target.target_sales if target else 0
-    t_sales = target.target_sales if target else 0
-    t_access = target.target_access if target else 0
-    t_cvr = target.target_cvr if target else 0
-    t_av = target.target_av if target else 0
+    if period == "yearly":
+        # 年次のKGI目標: 年間売上予算（暦年固定）→ 無ければ月次targetsの年内合算。
+        # アクセス・CVR・客単価の年次目標は定義しない（月次目標の単純合算・平均は
+        # 意味が壊れるため0=未設定扱い。KGIのみ目標比較する）。
+        shop_row = db.query(Shop).first()
+        annual = shop_row.annual_sales_budget if shop_row else None
+        if annual and annual > 0:
+            t_sales = annual
+        else:
+            t_sales = sum(
+                t.target_sales or 0
+                for t in db.query(Target).filter(
+                    Target.year_month >= f"{year}-01", Target.year_month <= f"{year}-12"
+                ).all()
+            )
+        t_access = 0
+        t_cvr = 0
+        t_av = 0
+        has_target = t_sales > 0
+    else:
+        t_sales = target.target_sales if target else 0
+        t_access = target.target_access if target else 0
+        t_cvr = target.target_cvr if target else 0
+        t_av = target.target_av if target else 0
+        has_target = target is not None
 
     def node(label: str, key: str, actual: float, target_val: float, unit: str) -> dict:
         gap = actual - target_val
@@ -678,7 +814,7 @@ def get_kpi_tree(
         }
 
     return {
-        "has_target": target is not None,
+        "has_target": has_target,
         "axis": "shop" if shop else "rpp",
         "access_axis": access_axis,
         # アクセス母数が信用に足るか（要件No.6）。false ならCVR・客単価は参考値。

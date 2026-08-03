@@ -12,7 +12,7 @@ import SortableTh from '../components/table/SortableTh'
 import type { ProductKPI, TrendPoint, InventoryAlert } from '../types'
 
 export default function ProductKPIPage() {
-  const { period, dateValue, setPeriod, setDateValue } = usePeriodState()
+  const { period, dateValue, setPeriod, setDateValue, jumpToLatest } = usePeriodState()
   const sort = useTableSort<ProductKPI>()
   const [products, setProducts] = useState<ProductKPI[]>([])
   const [genres, setGenres] = useState<string[]>([])
@@ -32,7 +32,10 @@ export default function ProductKPIPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const dateParam = period === 'monthly' ? dateValue.slice(0, 7) : dateValue
+      const dateParam =
+        period === 'monthly' ? dateValue.slice(0, 7)
+        : period === 'yearly' ? dateValue.slice(0, 4)
+        : dateValue
       const [prod, genreList] = await Promise.all([
         api.products.list(period, dateParam, selectedGenre || undefined, showInactive) as Promise<{ products?: ProductKPI[] } | null>,
         api.products.genres() as Promise<{ genres?: string[] } | null>,
@@ -78,6 +81,7 @@ export default function ProductKPIPage() {
             onPeriodChange={setPeriod}
             dateValue={dateValue}
             onDateChange={setDateValue}
+            onJumpToLatest={jumpToLatest}
           />
         }
       />

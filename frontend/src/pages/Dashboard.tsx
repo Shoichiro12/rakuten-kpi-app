@@ -19,7 +19,7 @@ import type {
 } from '../types'
 
 export default function Dashboard() {
-  const { period, dateValue, setPeriod, setDateValue } = usePeriodState()
+  const { period, dateValue, setPeriod, setDateValue, jumpToLatest } = usePeriodState()
   const [data, setData] = useState<DashboardData | null>(null)
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [trend, setTrend] = useState<TrendPoint[]>([])
@@ -30,25 +30,33 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(false)
   const [activeChart, setActiveChart] = useState<'gross' | 'gp' | 'roi' | 'cvr' | 'roas' | 'ct' | 'cpc'>('gross')
 
+  const isYearly = period === 'yearly'
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const dateParam = period === 'monthly' ? dateValue.slice(0, 7) : dateValue
+      const dateParam =
+        period === 'monthly' ? dateValue.slice(0, 7)
+        : period === 'yearly' ? dateValue.slice(0, 4)
+        : dateValue
+      // 年次は表示系のみ対応。診断・アラート・提案系は月次前提の設計のため呼ばない
+      // （UIバックログ2026-08-03 区切りB。画面には注記を出す）。
+      const yearly = period === 'yearly'
       const [dash, als, tr, evalRes, planRes, recoRes, outcomeRes] = await Promise.all([
         api.dashboard.get(period, dateParam) as Promise<DashboardData | null>,
-        api.dashboard.alerts(period, dateParam) as Promise<{ alerts?: Alert[] } | null>,
+        yearly ? Promise.resolve(null) : api.dashboard.alerts(period, dateParam) as Promise<{ alerts?: Alert[] } | null>,
         api.dashboard.trend(8) as Promise<{ trend?: TrendPoint[] } | null>,
-        api.evaluation.matrix(period, dateParam).catch(() => null),
-        api.evaluation.accessPlan(period, dateParam).catch(() => null),
-        api.recommendations.get(period, dateParam).catch(() => null) as Promise<RecommendationsResponse | null>,
+        yearly ? Promise.resolve(null) : api.evaluation.matrix(period, dateParam).catch(() => null),
+        yearly ? Promise.resolve(null) : api.evaluation.accessPlan(period, dateParam).catch(() => null),
+        yearly ? Promise.resolve(null) : api.recommendations.get(period, dateParam).catch(() => null) as Promise<RecommendationsResponse | null>,
         api.recommendations.outcomes().catch(() => null) as Promise<OutcomesResponse | null>,
       ])
       setData(dash ?? null)
-      setAlerts(als?.alerts ?? [])
+      setAlerts((als as { alerts?: Alert[] } | null)?.alerts ?? [])
       setTrend(tr?.trend ?? [])
-      setEvaluation(evalRes?.evaluation ?? null)
-      setAccessPlan(planRes?.plan ?? null)
-      setRecos(recoRes ?? null)
+      setEvaluation((evalRes as { evaluation?: EvaluationResult } | null)?.evaluation ?? null)
+      setAccessPlan((planRes as { plan?: AccessPlan } | null)?.plan ?? null)
+      setRecos((recoRes as RecommendationsResponse | null) ?? null)
       setOutcomes(outcomeRes ?? null)
     } catch (e) {
       console.error('[Dashboard] データ取得エラー:', e)
@@ -98,6 +106,7 @@ export default function Dashboard() {
               onPeriodChange={setPeriod}
               dateValue={dateValue}
               onDateChange={setDateValue}
+              onJumpToLatest={jumpToLatest}
             />
             <button
               onClick={load}
@@ -117,11 +126,20 @@ export default function Dashboard() {
         )}
 
         {hasAnyData && <div className="p-6 space-y-6">
+        {/* 年次は表示系のみ（診断・アラート・提案は月次前提のため注記を出して非表示） */}
+        {isYearly && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3">
+            <p className="text-sm text-blue-900">
+              年次表示は実績の集計ビューです（暦年・1〜12月）。改善アラート・評価マトリクス・今日やることなどの診断は月次で行うため、この画面では表示していません。
+            </p>
+          </div>
+        )}
+
         {/* 今日やるべきこと（Phase 1）。数値より先に「次の行動」を見せるため最上部に置く。 */}
-        <TodayActions data={recos} onChanged={load} />
+        {!isYearly && <TodayActions data={recos} onChanged={load} />}
 
         {/* 実施した施策のその後（Phase 2 の学習ループ） */}
-        <ActionOutcomes data={outcomes} />
+        {!isYearly && <ActionOutcomes data={outcomes} />}
 
         {/* KGI達成率（月次は商品分析レポート＝店舗全体売上を正とする） */}
         {data?.target_sales != null && data.target_sales > 0 && (
@@ -166,8 +184,9 @@ export default function Dashboard() {
           <EvaluationMatrix evaluation={evaluation} />
         )}
 
-        {/* 売上予算プラン（年間予算の按分 → 必要アクセス → 想定広告費。第4段階v2） */}
-        <RevenuePlanPanel yearMonth={dateValue.slice(0, 7)} />
+        {/* 売上予算プラン（年間予算の按分 → 必要アクセス → 想定広告費。第4段階v2）
+            月次予算の按分パネルのため年次表示では出さない（年間予算そのものはKGIに反映済み） */}
+        {!isYearly && <RevenuePlanPanel yearMonth={dateValue.slice(0, 7)} />}
 
         {/* アクセス逆算パネル（月次目標売上ベース。売上予算プランとは別軸の試算） */}
         {accessPlan && (
