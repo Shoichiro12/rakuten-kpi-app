@@ -131,12 +131,21 @@ app.include_router(feedback.router, dependencies=_auth)     # フィードバッ
 app.include_router(billing.webhook_router)
 
 
+# 例外の詳細をクライアントに返すかどうか（セキュリティ報告書 2026-08-03）。
+# 本番では例外メッセージにDB構造・内部パス等が漏れうるため、既定では定型文だけを
+# 返し、詳細はサーバーログにのみ出す。ローカル/デバッグで詳細を見たいときだけ
+# EXPOSE_ERROR_DETAIL=1 を設定する（ENABLE_DOCS と同じ考え方の切替）。
+_EXPOSE_ERROR_DETAIL = os.environ.get("EXPOSE_ERROR_DETAIL") == "1"
+
+
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    return JSONResponse(
-        status_code=500,
-        content={"detail": str(exc)},
+    # 詳細は必ずログに残す（本番で原因を追えるようにする）。
+    logging.getLogger("main").exception(
+        "未処理の例外: %s %s", request.method, request.url.path
     )
+    detail = str(exc) if _EXPOSE_ERROR_DETAIL else "サーバーエラーが発生しました"
+    return JSONResponse(status_code=500, content={"detail": detail})
 
 
 @app.get("/api")
@@ -256,6 +265,9 @@ def health():
 # 注意: このルートは必ず全API・/docs の登録より後に置くこと（最後にフォールバック）。
 _BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 _FRONTEND_DIST = os.path.join(_BASE_DIR, "..", "frontend", "dist")
+# パストラバーサル対策の基準パス。realpath でシンボリックリンクまで解決した
+# 実体パスを1度だけ確定し、後段の封じ込め判定（startswith）の基準にする。
+_FRONTEND_DIST_REAL = os.path.realpath(_FRONTEND_DIST)
 
 if os.path.isdir(_FRONTEND_DIST):
     _ASSETS_DIR = os.path.join(_FRONTEND_DIST, "assets")
@@ -286,7 +298,17 @@ if os.path.isdir(_FRONTEND_DIST):
     def _serve_spa(full_path: str):
         # /api と /assets は上で処理済み。実ファイルがあればそれを、無ければ
         # SPA のクライアントルーティング用に index.html を返す。
-        candidate = os.path.join(_FRONTEND_DIST, full_path)
-        if full_path and os.path.isfile(candidate):
+        #
+        # ⚠️ パストラバーサル対策（セキュリティ報告書 2026-08-03）:
+        # full_path は認証なしの公開ルートで受け取る任意入力。realpath で実体を
+        # 解決したうえで、_FRONTEND_DIST_REAL の配下に収まっている場合だけ配信する。
+        # これを外すと %2e%2e エンコード等で dist 外のファイル（/etc/passwd 等）を
+        # 読み取られる。os.path.join だけでは防げない（.. を解決しないため）。
+        candidate = os.path.realpath(os.path.join(_FRONTEND_DIST, full_path))
+        if (
+            full_path
+            and candidate.startswith(_FRONTEND_DIST_REAL + os.sep)
+            and os.path.isfile(candidate)
+        ):
             return FileResponse(candidate)
         return _index_response()
