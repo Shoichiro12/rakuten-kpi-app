@@ -385,7 +385,8 @@ export default function MasterSettings() {
         <div className="space-y-6">
           {/* 未確認の提案（マスタ入力支援） */}
           {suggestions.length > 0 && (
-            <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden">
+            // ボタンを ml-auto で右端に寄せる作りなので、全幅だと本文とボタンが極端に離れる（CLAUDE.md「画面幅の規約」）
+            <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden max-w-5xl">
               <div className="px-4 py-3 border-b bg-amber-50 flex items-center justify-between gap-3 flex-wrap">
                 <button
                   onClick={() => setSuggestOpen((v) => !v)}
@@ -488,7 +489,8 @@ export default function MasterSettings() {
           )}
 
           {/* 店舗設定 */}
-          <div className="bg-white rounded-xl border shadow-sm p-6">
+          {/* 3列グリッド＋w-fullの入力欄。全幅だと店舗名の入力欄だけが極端に長くなる（CLAUDE.md「画面幅の規約」） */}
+          <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">店舗設定（デフォルト値）</h3>
             <div className="grid grid-cols-3 gap-4">
               <div>

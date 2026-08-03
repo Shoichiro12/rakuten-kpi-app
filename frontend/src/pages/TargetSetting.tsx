@@ -24,7 +24,9 @@ const CONFIDENCE_LABELS: Record<string, { label: string; cls: string }> = {
 
 function Field({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-3 gap-4 items-start py-4 border-b border-gray-100 last:border-0">
+    // 幅の規約: フォーム行はラベル列が全体の1/3を占めるため、全幅のままだとラベルと入力欄が離れる。
+    // ページ直下は全幅のままにしてブロック側で止める（CLAUDE.md「画面幅の規約」参照）
+    <div className="grid max-w-3xl grid-cols-3 gap-4 items-start py-4 border-b border-gray-100 last:border-0">
       <div>
         <p className="text-sm font-medium text-gray-900">{label}</p>
         {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
@@ -283,7 +285,8 @@ export default function TargetSetting() {
             アイテム別目標・年間目標プランナーの表が画面幅を使い切れるようにするため。max-w-* を戻さないこと */}
         <div className="space-y-6">
           {/* 対象月 */}
-          <div className="bg-white rounded-xl border shadow-sm p-6">
+          {/* フォーム系カードは読みやすい幅で止める（CLAUDE.md「画面幅の規約」） */}
+          <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
             <h3 className="text-sm font-semibold text-gray-700 mb-4">対象月</h3>
             <input
               type="month"
@@ -294,7 +297,7 @@ export default function TargetSetting() {
           </div>
 
           {/* KGI */}
-          <div className="bg-white rounded-xl border shadow-sm p-6">
+          <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
             <h3 className="text-sm font-semibold text-gray-700 mb-1">KGI（最終目標）</h3>
             <p className="text-xs text-gray-500 mb-4">月次売上の目標値を設定します</p>
             <Field label="月次売上目標" description="RPP売上ベース">
@@ -532,7 +535,7 @@ export default function TargetSetting() {
           </div>
 
           {/* KPI */}
-          <div className="bg-white rounded-xl border shadow-sm p-6">
+          <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
             <h3 className="text-sm font-semibold text-gray-700 mb-1">KPI目標値</h3>
             <p className="text-xs text-gray-500 mb-4">売上 = アクセス × CVR × 客単価</p>
             <Field label="アクセス目標（UU）" description="月間ユニークユーザー数">
@@ -573,7 +576,7 @@ export default function TargetSetting() {
           </div>
 
           {/* 経費率 */}
-          <div className="bg-white rounded-xl border shadow-sm p-6">
+          <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
             <h3 className="text-sm font-semibold text-gray-700 mb-1">経費設定</h3>
             <p className="text-xs text-gray-500 mb-4">Steady Cost = RPP売上 × 経費率</p>
             <Field label="店舗運営経費率" description="楽天出店料・ポイント等">
@@ -616,10 +619,11 @@ export default function TargetSetting() {
           </div>
 
           {/* アイテム別目標（3-B''・第3段階） */}
-          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+          <div className="bg-white rounded-xl border shadow-sm overflow-hidden max-w-5xl">
             <div className="px-4 py-3 border-b space-y-3">
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
+                  {/* 6列の表。全幅だと間延びするのでカード側で止める（CLAUDE.md「画面幅の規約」） */}
                   <h3 className="text-sm font-semibold text-gray-700">アイテム別目標（{yearMonth}）</h3>
                   <p className="text-xs text-gray-400 mt-0.5">
                     入力するのは目標売上だけ。目標CVR・客単価は「現状値と前年値の低い方」を自動採用し（保守的な確定公式）、必要アクセス数を逆算します。複数まとめて入力して「一括保存」できます。
@@ -780,7 +784,8 @@ export default function TargetSetting() {
 
           {/* 設定済み目標一覧 */}
           {targets.length > 0 && (
-            <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+            // 4〜5列の表。全幅だと最も間延びするのでカード側で止める（CLAUDE.md「画面幅の規約」）
+            <div className="bg-white rounded-xl border shadow-sm overflow-hidden max-w-3xl">
               <div className="px-4 py-3 border-b">
                 <h3 className="text-sm font-semibold text-gray-700">設定済み目標一覧</h3>
               </div>
