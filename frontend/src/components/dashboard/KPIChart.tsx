@@ -11,6 +11,8 @@ import {
   Bar,
 } from 'recharts'
 import type { TrendPoint } from '../../types'
+import { GRID, AXIS, TOOLTIP } from '../chart/defaults'
+import { formatYenAxis } from '../../lib/format'
 
 interface KPIChartProps {
   data: TrendPoint[]
@@ -47,10 +49,10 @@ export default function KPIChart({
     return (
       <ResponsiveContainer width="100%" height={220}>
         <BarChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-          <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-          <YAxis tickFormatter={tickFormatter} tick={{ fontSize: 11 }} width={50} />
-          <Tooltip formatter={(v: number) => formatter(v)} labelStyle={{ fontWeight: 600 }} />
+          <CartesianGrid {...GRID} />
+          <XAxis dataKey="label" {...AXIS} />
+          <YAxis tickFormatter={tickFormatter} {...AXIS} width={54} />
+          <Tooltip formatter={(v: number) => formatter(v)} {...TOOLTIP} />
           <Bar dataKey={metric as string} name={label} fill={color} radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
@@ -60,11 +62,11 @@ export default function KPIChart({
   return (
     <ResponsiveContainer width="100%" height={220}>
       <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-        <YAxis tickFormatter={tickFormatter} tick={{ fontSize: 11 }} width={50} />
-        <Tooltip formatter={(v: number) => formatter(v)} labelStyle={{ fontWeight: 600 }} />
-        <Legend />
+        <CartesianGrid {...GRID} />
+        <XAxis dataKey="label" {...AXIS} />
+        <YAxis tickFormatter={tickFormatter} {...AXIS} width={54} />
+        <Tooltip formatter={(v: number) => formatter(v)} {...TOOLTIP} />
+        {/* 系列が1本なので凡例は出さない（タイトルが名前を兼ねる）。規約 3-5 */}
         <Line
           type="monotone"
           dataKey={metric as string}
@@ -103,10 +105,10 @@ export function MultiLineChart({ data, metrics, formatter = (v) => v.toLocaleStr
   return (
     <ResponsiveContainer width="100%" height={220}>
       <LineChart data={data} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-        <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-        <YAxis tickFormatter={tickFormatter} tick={{ fontSize: 11 }} width={50} />
-        <Tooltip formatter={(v: number) => formatter(v)} labelStyle={{ fontWeight: 600 }} />
+        <CartesianGrid {...GRID} />
+        <XAxis dataKey="label" {...AXIS} />
+        <YAxis tickFormatter={tickFormatter} {...AXIS} width={54} />
+        <Tooltip formatter={(v: number) => formatter(v)} {...TOOLTIP} />
         <Legend />
         {metrics.map(({ key, label, color }) => (
           <Line

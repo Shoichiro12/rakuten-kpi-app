@@ -14,6 +14,17 @@ interface KPICardProps {
   size?: 'hero' | 'default' | 'compact'
   suffix?: string
   helpMetric?: string
+  /**
+   * 前期比の単位。**割合の指標（ROI/ROAS/CVR/CTR/GPR/達成率）は 'pt' を渡すこと。**
+   * 割合同士の差は「%」ではなく「パーセントポイント」。
+   * 規約: docs/ui_number_and_chart_rules_2026-08-04.md 1-4
+   */
+  changeUnit?: '%' | 'pt'
+  /**
+   * 下がったほうが良い指標（CPC・CPO・広告費）は true。
+   * 既定の「増加=緑」を反転する。規約 1-7
+   */
+  lowerIsBetter?: boolean
 }
 
 export default function KPICard({
@@ -27,7 +38,17 @@ export default function KPICard({
   size = 'default',
   suffix,
   helpMetric,
+  changeUnit = '%',
+  lowerIsBetter = false,
 }: KPICardProps) {
+  // 割合の指標は「差」なので pt。それ以外は変化率なので %
+  const fmt = (v: number) => `${v > 0 ? '+' : ''}${v.toFixed(changeUnit === 'pt' ? 2 : 1)}${changeUnit}`
+  // 良い方向は指標ごと。up=緑 と決め打ちしない（規約 1-7）
+  const toneOf = (v: number | null | undefined) => {
+    if (v == null || v === 0) return 'text-gray-400'
+    const improved = lowerIsBetter ? v < 0 : v > 0
+    return improved ? 'text-green-600' : 'text-red-500'
+  }
   const bg = {
     default: 'bg-white',
     primary: 'bg-blue-50 border-blue-200',
@@ -43,13 +64,11 @@ export default function KPICard({
     danger: 'bg-red-500',
   }[variant]
 
-  const changeColor =
-    change == null ? 'text-gray-400' : change > 0 ? 'text-green-600' : change < 0 ? 'text-red-500' : 'text-gray-400'
+  const changeColor = toneOf(change)
 
   const ChangeIcon = change == null || change === 0 ? Minus : change > 0 ? TrendingUp : TrendingDown
 
-  const yoyColor =
-    yoy == null ? 'text-gray-400' : yoy > 0 ? 'text-green-600' : yoy < 0 ? 'text-red-500' : 'text-gray-400'
+  const yoyColor = toneOf(yoy)
 
   // コンパクト：参考指標用の控えめな1行レイアウト
   if (size === 'compact') {
@@ -70,7 +89,7 @@ export default function KPICard({
           {change != null && (
             <span className={`flex items-center gap-0.5 text-[11px] ${changeColor}`}>
               <ChangeIcon size={11} />
-              {`${change > 0 ? '+' : ''}${change.toFixed(1)}%`}
+              {fmt(change)}
             </span>
           )}
         </div>
@@ -106,7 +125,7 @@ export default function KPICard({
         <div className={`flex items-center gap-1 ${isHero ? 'mt-2.5 text-sm' : 'mt-1.5 text-xs'} ${changeColor}`}>
           <ChangeIcon size={isHero ? 15 : 12} />
           <span>
-            {change != null ? `${change > 0 ? '+' : ''}${change.toFixed(1)}%` : '—'}
+            {change != null ? fmt(change) : '—'}
             {changeLabel && <span className="ml-1 text-gray-400">{changeLabel}</span>}
           </span>
         </div>
@@ -114,7 +133,7 @@ export default function KPICard({
       {yoy != null && (
         <div className={`mt-1 flex items-center gap-1 ${isHero ? 'text-sm' : 'text-xs'} ${yoyColor}`}>
           <span className={`text-gray-400 ${isHero ? 'text-xs' : 'text-[10px]'}`}>YoY</span>
-          <span>{`${yoy > 0 ? '+' : ''}${yoy.toFixed(1)}%`}</span>
+          <span>{fmt(yoy)}</span>
         </div>
       )}
     </div>

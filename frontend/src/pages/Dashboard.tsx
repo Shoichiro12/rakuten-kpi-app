@@ -13,7 +13,7 @@ import TodayActions from '../components/dashboard/TodayActions'
 import ActionOutcomes from '../components/dashboard/ActionOutcomes'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
-import { formatYen, formatYenAxis } from '../lib/format'
+import { formatYen, formatYenAxis, pointDiffFromChangeRate } from '../lib/format'
 import BulletChart from '../components/kpi/BulletChart'
 import { usePeriodState } from '../lib/usePeriodState'
 import type {
@@ -155,18 +155,19 @@ export default function Dashboard() {
     if (period === 'weekly') {
       if (!kpis) return null
       return [
-        { label: 'アクセス（RPPクリック）', value: formatNumber(kpis.ct), change: changes.ct_wow ?? null },
-        { label: '転換率（CVR）', value: formatPercent(kpis.cvr, 2), change: changes.cvr_wow ?? null },
-        { label: '客単価（Av）', value: formatCurrency(kpis.av), change: changes.av_wow ?? null },
+        // CVRは割合なので前期比は pt（変化率から復元する）。アクセスは中立なので色を付けない
+        { label: 'アクセス（RPPクリック）', value: formatNumber(kpis.ct), change: changes.ct_wow ?? null, unit: '%' as const, neutral: true },
+        { label: '転換率（CVR）', value: formatPercent(kpis.cvr, 2), change: pointDiffFromChangeRate(kpis.cvr, changes.cvr_wow), unit: 'pt' as const, neutral: false },
+        { label: '客単価（Av）', value: formatYen(kpis.av), change: changes.av_wow ?? null, unit: '%' as const, neutral: false },
       ]
     }
     if (!decomp) return null
     const c = decomp.current
     const ch = decomp.changes
     return [
-      { label: 'アクセス人数（UU）', value: formatNumber(c.access ?? c.ct), change: ch.access ?? null },
-      { label: '転換率（CVR）', value: formatPercent(c.cvr, 2), change: ch.cvr ?? null },
-      { label: '客単価（Av）', value: formatCurrency(c.av), change: ch.av ?? null },
+      { label: 'アクセス人数（UU）', value: formatNumber(c.access ?? c.ct), change: ch.access ?? null, unit: '%' as const, neutral: true },
+      { label: '転換率（CVR）', value: formatPercent(c.cvr, 2), change: pointDiffFromChangeRate(c.cvr, ch.cvr), unit: 'pt' as const, neutral: false },
+      { label: '客単価（Av）', value: formatYen(c.av), change: ch.av ?? null, unit: '%' as const, neutral: false },
     ]
   })()
 
@@ -297,10 +298,14 @@ export default function Dashboard() {
               <p className="text-xs font-medium text-gray-500">{c.label}</p>
               <div>
                 <p className="text-2xl font-bold text-gray-900 tabular-nums">{c.value}</p>
+                {/* 割合の指標は pt、中立の指標（アクセス）は色を付けない（規約 1-4 / 1-7） */}
                 <p className={`text-xs mt-1 ${
-                  c.change == null ? 'text-gray-300' : c.change >= 0 ? 'text-green-600' : 'text-red-500'
+                  c.change == null || c.neutral ? 'text-gray-500'
+                    : c.change >= 0 ? 'text-green-600' : 'text-red-500'
                 }`}>
-                  {c.change == null ? '— 前期比' : `${c.change >= 0 ? '+' : ''}${c.change.toFixed(1)}% 前期比`}
+                  {c.change == null
+                    ? '前期のデータなし'
+                    : `${c.change >= 0 ? '+' : ''}${c.change.toFixed(c.unit === 'pt' ? 2 : 1)}${c.unit} 前期比`}
                 </p>
               </div>
             </div>
@@ -348,7 +353,7 @@ export default function Dashboard() {
           <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
             <KPICard
               label="Rev（営業利益）"
-              value={formatCurrency(kpis?.rev)}
+              value={formatYen(kpis?.rev)}
               change={changes.rev_wow}
               yoy={changes.rev_yoy}
               changeLabel="前期比"
@@ -358,8 +363,10 @@ export default function Dashboard() {
             <KPICard
               label="ROI（投資利益率）"
               value={formatPercent(kpis?.roi)}
-              change={changes.roi_wow}
-              yoy={changes.roi_yoy}
+              // ROIは割合なので前期比は pt（変化率から復元）
+              change={pointDiffFromChangeRate(kpis?.roi, changes.roi_wow)}
+              yoy={pointDiffFromChangeRate(kpis?.roi, changes.roi_yoy)}
+              changeUnit="pt"
               changeLabel="前期比"
               alert={kpis != null && kpis.roi < 100}
               variant={kpis && kpis.roi < 100 ? 'danger' : 'default'}
@@ -367,7 +374,7 @@ export default function Dashboard() {
             />
             <KPICard
               label="RPP売上（Gross）"
-              value={formatCurrency(kpis?.gross)}
+              value={formatYen(kpis?.gross)}
               change={changes.gross_wow}
               yoy={changes.gross_yoy}
               changeLabel="前期比"
@@ -376,7 +383,7 @@ export default function Dashboard() {
             />
             <KPICard
               label="売上総利益（GP）"
-              value={formatCurrency(kpis?.gp)}
+              value={formatYen(kpis?.gp)}
               change={changes.gp_wow}
               yoy={changes.gp_yoy}
               changeLabel="前期比"
@@ -405,11 +412,12 @@ export default function Dashboard() {
               <tbody className="divide-y divide-gray-100">
                 {([
                   // goodWhenDown: 下がる方が良い指標（CPO/CPC）は変化の色を反転する
-                  { label: 'ROAS（売上回収率）', value: formatPercent(kpis.roas), wow: changes.roas_wow, yoy: changes.roas_yoy, goodWhenDown: false, warn: false },
-                  { label: 'CVR（注文率）', value: formatPercent(kpis.cvr, 2), wow: changes.cvr_wow, yoy: changes.cvr_yoy, goodWhenDown: false, warn: changes.cvr_wow != null && changes.cvr_wow < -5 },
+                  // 割合の指標（ROAS/CVR/CTR/GPR）の前期比は pt。変化率から復元する（規約 1-4）
+                  { label: 'ROAS（売上回収率）', value: formatPercent(kpis.roas), wow: pointDiffFromChangeRate(kpis.roas, changes.roas_wow), yoy: pointDiffFromChangeRate(kpis.roas, changes.roas_yoy), unit: 'pt', goodWhenDown: false, warn: false },
+                  { label: 'CVR（注文率）', value: formatPercent(kpis.cvr, 2), wow: pointDiffFromChangeRate(kpis.cvr, changes.cvr_wow), yoy: pointDiffFromChangeRate(kpis.cvr, changes.cvr_yoy), unit: 'pt', goodWhenDown: false, warn: changes.cvr_wow != null && changes.cvr_wow < -5 },
                   { label: 'CPO（注文獲得単価）', value: formatCurrency(kpis.cpo), wow: changes.cpo_wow, yoy: changes.cpo_yoy, goodWhenDown: true, warn: kpis.limit_cpo != null && kpis.limit_cpo > 0 && kpis.cpo > kpis.limit_cpo },
                   { label: 'Limit CPO（限界CPO）', value: formatCurrency(kpis.limit_cpo), wow: null, yoy: null, goodWhenDown: false, warn: false },
-                  { label: 'CTR（クリック率）', value: formatPercent(kpis.ctr, 2), wow: changes.ctr_wow, yoy: changes.ctr_yoy, goodWhenDown: false, warn: kpis.ctr < 1 },
+                  { label: 'CTR（クリック率）', value: formatPercent(kpis.ctr, 2), wow: pointDiffFromChangeRate(kpis.ctr, changes.ctr_wow), yoy: pointDiffFromChangeRate(kpis.ctr, changes.ctr_yoy), unit: 'pt', goodWhenDown: false, warn: kpis.ctr < 1 },
                   { label: 'CPC（クリック単価）', value: formatCurrency(kpis.cpc), wow: changes.cpc_wow, yoy: changes.cpc_yoy, goodWhenDown: true, warn: changes.cpc_wow != null && changes.cpc_wow > 5 },
                   { label: '客単価（Av）', value: formatCurrency(kpis.av), wow: changes.av_wow, yoy: changes.av_yoy, goodWhenDown: false, warn: false },
                   { label: 'GP率（GPR）', value: formatPercent(kpis.gpr), wow: null, yoy: null, goodWhenDown: false, warn: false },
@@ -419,12 +427,13 @@ export default function Dashboard() {
                   { label: 'クリック数（CT）', value: formatNumber(kpis.ct), wow: changes.ct_wow, yoy: changes.ct_yoy, goodWhenDown: false, warn: false },
                   { label: '店舗運営経費', value: formatCurrency(kpis.steady_cost), wow: null, yoy: null, goodWhenDown: false, warn: false },
                 ]).map((row) => {
+                  const unit = 'unit' in row && row.unit === 'pt' ? 'pt' : '%'
                   const cell = (v: number | null | undefined) => {
                     if (v == null) return <span className="text-gray-300">—</span>
                     const improved = row.goodWhenDown ? v < 0 : v > 0
                     return (
                       <span className={improved ? 'text-green-600' : 'text-red-500'}>
-                        {v > 0 ? '+' : ''}{v.toFixed(1)}%
+                        {v > 0 ? '+' : ''}{v.toFixed(unit === 'pt' ? 2 : 1)}{unit}
                       </span>
                     )
                   }

@@ -94,3 +94,27 @@ function trim(value: number, digits: number): string {
   const head = Number(int).toLocaleString('ja-JP')
   return f ? `${head}.${f}` : head
 }
+
+/**
+ * 「率の変化率(%)」から「率の差(pt)」を復元する。
+ *
+ * バックエンドが返す `*_wow` / `*_yoy` は**変化率**（(今 - 前) ÷ 前 × 100）。
+ * 割合の指標（CVR/CTR/ROAS/ROI/GPR）はこれを pt に直して表示する必要がある。
+ *   前 = 今 ÷ (1 + 変化率/100)
+ *   差(pt) = 今 - 前
+ * 前の値をAPIから取り直さなくても、この式で厳密に復元できる。
+ *
+ * 例: CVR 3.24%、変化率 -5.3% → 前 3.42% → 差 -0.18pt
+ */
+export function pointDiffFromChangeRate(
+  current: number | null | undefined,
+  changePct: number | null | undefined,
+): number | null {
+  if (current == null || changePct == null) return null
+  if (!Number.isFinite(current) || !Number.isFinite(changePct)) return null
+  const factor = 1 + changePct / 100
+  if (factor === 0) return null // 前期が0で復元できない
+  const prev = current / factor
+  const diff = current - prev
+  return Number.isFinite(diff) ? diff : null
+}
