@@ -431,7 +431,7 @@ export default function MasterSettings() {
                                 type="number" min={0} max={100} step={1}
                                 value={editSuggest.cost_pct}
                                 onChange={(e) => setEditSuggest((p) => ({ ...p, cost_pct: Number(e.target.value) }))}
-                                className="w-16 text-right text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-16 text-right tabular-nums text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                               />
                               <span className="text-gray-400 text-xs">%</span>
                             </span>
@@ -608,13 +608,13 @@ export default function MasterSettings() {
                             compact
                           />
                         </td>
-                        <td className="px-3 py-2 text-right whitespace-nowrap">
+                        <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
                           <span className="inline-flex items-center gap-1.5">
                             <input
                               type="number" min={0} max={100} step={1}
                               defaultValue={Math.round(r.cost_rate * 100)}
                               onBlur={(e) => saveRate(r, Number(e.target.value))}
-                              className="w-16 text-right border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-16 text-right tabular-nums border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                             <span className="text-gray-400 text-xs">%</span>
                             <span className={`text-[10px] px-1 py-0.5 rounded ${r.cost_source === 'product' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
@@ -787,7 +787,7 @@ export default function MasterSettings() {
                   value={newBench.value}
                   onChange={(e) => setNewBench((p) => ({ ...p, value: e.target.value }))}
                   placeholder="7.52"
-                  className="w-20 text-right text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-20 text-right tabular-nums text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
                 <span className="text-gray-400 text-xs">%</span>
               </span>

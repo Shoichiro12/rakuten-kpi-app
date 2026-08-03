@@ -412,13 +412,13 @@ export default function TargetSetting() {
                           <tr>
                             <th className="px-2 py-1.5 text-left">月</th>
                             {planView === 'detail' && <th className="px-2 py-1.5 text-right">季節指数</th>}
-                            <th className="px-2 py-1.5 text-right">売上予算（編集で手動補正）</th>
-                            <th className="px-2 py-1.5 text-right">必要アクセス</th>
-                            {planView === 'detail' && <th className="px-2 py-1.5 text-right">目標CVR</th>}
-                            {planView === 'detail' && <th className="px-2 py-1.5 text-right">目標客単価</th>}
-                            <th className="px-2 py-1.5 text-right">想定追加広告費</th>
-                            {planView === 'detail' && <th className="px-2 py-1.5 text-right">実績売上</th>}
-                            <th className="px-2 py-1.5 text-right">達成率</th>
+                            <th className="px-2 py-1.5 text-right">売上予算（円・編集で手動補正）</th>
+                            <th className="px-2 py-1.5 text-right">必要アクセス（UU）</th>
+                            {planView === 'detail' && <th className="px-2 py-1.5 text-right">目標CVR（%）</th>}
+                            {planView === 'detail' && <th className="px-2 py-1.5 text-right">目標客単価（円）</th>}
+                            <th className="px-2 py-1.5 text-right">想定追加広告費（円）</th>
+                            {planView === 'detail' && <th className="px-2 py-1.5 text-right">実績売上（円）</th>}
+                            <th className="px-2 py-1.5 text-right">達成率（%）</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
@@ -465,17 +465,17 @@ export default function TargetSetting() {
                                 </span>
                               </td>
                               <td className="px-2 py-1.5 text-right text-gray-900 whitespace-nowrap" title={m.basis_detail ?? undefined}>
-                                {m.required_access != null ? `${Math.round(m.required_access).toLocaleString()} UU` : '—'}
+                                {m.required_access != null ? Math.round(m.required_access).toLocaleString() : '—'}
                               </td>
                               {planView === 'detail' && (
                                 <td className="px-2 py-1.5 text-right text-gray-700 whitespace-nowrap" title={m.basis_detail ?? undefined}>
-                                  {m.target_cvr != null ? `${m.target_cvr}%` : '—'}
+                                  {m.target_cvr != null ? String(m.target_cvr) : '—'}
                                   {m.target_cvr_basis === 'manual' && <span className="ml-0.5 text-[9px] text-violet-600" title="目標設定画面の手入力を採用">手</span>}
                                 </td>
                               )}
                               {planView === 'detail' && (
                                 <td className="px-2 py-1.5 text-right text-gray-700 whitespace-nowrap" title={m.basis_detail ?? undefined}>
-                                  {m.target_av != null ? `¥${Math.round(m.target_av).toLocaleString()}` : '—'}
+                                  {m.target_av != null ? Math.round(m.target_av).toLocaleString() : '—'}
                                   {m.target_av_basis === 'manual' && <span className="ml-0.5 text-[9px] text-violet-600" title="目標設定画面の手入力を採用">手</span>}
                                 </td>
                               )}
@@ -487,7 +487,7 @@ export default function TargetSetting() {
                                   <span className="text-green-600 font-medium">充足</span>
                                 ) : m.est_ad_cost != null ? (
                                   <span className="text-gray-900">
-                                    ¥{Math.round(m.est_ad_cost).toLocaleString()}
+                                    {Math.round(m.est_ad_cost).toLocaleString()}
                                     {m.cpc_is_fallback && <span className="text-gray-400">※</span>}
                                   </span>
                                 ) : (
@@ -495,10 +495,10 @@ export default function TargetSetting() {
                                 )}
                               </td>
                               {planView === 'detail' && (
-                                <td className="px-2 py-1.5 text-right text-gray-600 whitespace-nowrap">{m.actual_sales != null ? `¥${Math.round(m.actual_sales).toLocaleString()}` : '—'}</td>
+                                <td className="px-2 py-1.5 text-right text-gray-600 whitespace-nowrap">{m.actual_sales != null ? Math.round(m.actual_sales).toLocaleString() : '—'}</td>
                               )}
                               <td className={`px-2 py-1.5 text-right font-medium ${m.achievement_rate == null ? 'text-gray-300' : m.achievement_rate >= 100 ? 'text-green-600' : 'text-red-500'}`}>
-                                {m.achievement_rate != null ? `${m.achievement_rate}%` : '—'}
+                                {m.achievement_rate != null ? String(m.achievement_rate) : '—'}
                               </td>
                             </tr>
                           ))}
@@ -682,9 +682,9 @@ export default function TargetSetting() {
                     <tr>
                       <SortableTh label="商品" sortKey="product_name" sort={itemSort} align="left" className="pl-1" />
                       <SortableTh label="目標売上（入力）" sortKey="target_sales" sort={itemSort} />
-                      <SortableTh label="目標CVR" sortKey="target_cvr" sort={itemSort} />
-                      <SortableTh label="目標客単価" sortKey="target_av" sort={itemSort} />
-                      <SortableTh label="必要アクセス" sortKey="required_access" sort={itemSort} />
+                      <SortableTh label="目標CVR（%）" sortKey="target_cvr" sort={itemSort} />
+                      <SortableTh label="目標客単価（円）" sortKey="target_av" sort={itemSort} />
+                      <SortableTh label="必要アクセス（UU）" sortKey="required_access" sort={itemSort} />
                       <th className="px-3 py-2.5 text-left">根拠</th>
                     </tr>
                   </thead>
@@ -724,10 +724,10 @@ export default function TargetSetting() {
                               {dirty && <span className="text-[10px] text-amber-600">未保存</span>}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-right text-gray-700">{t?.target_cvr != null ? `${t.target_cvr}%` : '—'}</td>
-                          <td className="px-3 py-2 text-right text-gray-700">{t?.target_av != null ? `¥${Math.round(t.target_av).toLocaleString()}` : '—'}</td>
+                          <td className="px-3 py-2 text-right text-gray-700">{t?.target_cvr != null ? String(t.target_cvr) : '—'}</td>
+                          <td className="px-3 py-2 text-right text-gray-700">{t?.target_av != null ? Math.round(t.target_av).toLocaleString() : '—'}</td>
                           <td className="px-3 py-2 text-right font-medium text-gray-900">
-                            {t?.required_access != null ? `${Math.round(t.required_access).toLocaleString()} UU` : '—'}
+                            {t?.required_access != null ? Math.round(t.required_access).toLocaleString() : '—'}
                           </td>
                           <td className="px-3 py-2">
                             {!t ? (
@@ -793,10 +793,10 @@ export default function TargetSetting() {
                 <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
                   <tr>
                     <th className="px-4 py-2 text-left">対象月</th>
-                    <th className="px-4 py-2 text-right">売上目標</th>
-                    <th className="px-4 py-2 text-right">CVR目標</th>
-                    <th className="px-4 py-2 text-right">客単価目標</th>
-                    <th className="px-4 py-2 text-right">経費率</th>
+                    <th className="px-4 py-2 text-right">売上目標（円）</th>
+                    <th className="px-4 py-2 text-right">CVR目標（%）</th>
+                    <th className="px-4 py-2 text-right">客単価目標（円）</th>
+                    <th className="px-4 py-2 text-right">経費率（%）</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -807,10 +807,11 @@ export default function TargetSetting() {
                       className="cursor-pointer hover:bg-blue-50 transition-colors"
                     >
                       <td className="px-4 py-2.5 font-medium text-gray-900">{t.year_month}</td>
-                      <td className="px-4 py-2.5 text-right">¥{t.target_sales.toLocaleString()}</td>
-                      <td className="px-4 py-2.5 text-right">{t.target_cvr}%</td>
-                      <td className="px-4 py-2.5 text-right">¥{t.target_av.toLocaleString()}</td>
-                      <td className="px-4 py-2.5 text-right">{Math.round(t.expense_rate * 100)}%</td>
+                      {/* 単位は見出しに1回だけ。数値は右寄せ＋等幅（規約 1-2） */}
+                      <td className="px-4 py-2.5 text-right tabular-nums">{t.target_sales.toLocaleString()}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{t.target_cvr}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{t.target_av.toLocaleString()}</td>
+                      <td className="px-4 py-2.5 text-right tabular-nums">{Math.round(t.expense_rate * 100)}</td>
                     </tr>
                   ))}
                 </tbody>
