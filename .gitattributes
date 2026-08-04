@@ -1,1 +1,6 @@
 *.bat text eol=crlf
+
+# パッチは改行を LF で固定する。Windows のチェックアウトで CRLF に変換されると
+# git apply が文脈行を一致させられず失敗する（保存した差分が使えなくなる）。
+*.patch text eol=lf
+*.diff text eol=lf
