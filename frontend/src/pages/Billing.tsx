@@ -5,6 +5,7 @@ import Header from '../components/layout/Header'
 import ConsultingInquiryForm from '../components/ConsultingInquiryForm'
 import { requestOpenFeedback } from '../components/FeedbackModal'
 import { api } from '../lib/api'
+import { formatCount } from '../lib/format'
 import type { BillingStatus, BillingPlan, BillingDiagnosis } from '../types'
 
 const STATUS_LABEL: Record<string, string> = {
@@ -364,14 +365,21 @@ export default function Billing() {
                       </p>
                       <p className="text-gray-800">
                         {/* 円は zero-decimal currency なので unit_amount がそのまま円額。
-                            外税(exclusive)なら unit_amount は税抜なので明示する。 */}
+                            外税(exclusive)なら unit_amount は税抜なので明示する。
+
+                            桁区切りは format.ts の formatCount に寄せた（区切り5）。
+                            **`¥` の前置と丸めなしは変えないこと。** この画面の主表記である月額は
+                            バックエンドの `PLAN_AMOUNT_LABEL`（env で上書き可能）が
+                            「¥20,000（税抜） / ¥22,000（税込）」の完成した文字列を返すため、
+                            ここだけ `formatYen` の「円」後置や万・億の丸めにすると
+                            同じ画面で金額の書き方が食い違う。契約金額は正確な値を出す場所でもある。 */}
                         金額: {diag.price?.unit_amount != null
                           ? diag.price.currency === 'jpy'
-                            ? `¥${diag.price.unit_amount.toLocaleString()}${
+                            ? `¥${formatCount(diag.price.unit_amount)}${
                                 diag.price.tax_behavior === 'exclusive' ? '（税抜・外税）'
                                 : diag.price.tax_behavior === 'inclusive' ? '（税込・内税）'
                                 : ''}`
-                            : `${diag.price.unit_amount.toLocaleString()} ${diag.price.currency}`
+                            : `${formatCount(diag.price.unit_amount)} ${diag.price.currency}`
                           : '—'}
                       </p>
                       <p className="text-gray-800">
