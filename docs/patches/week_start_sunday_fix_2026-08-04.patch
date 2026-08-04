@@ -1,0 +1,115 @@
+diff --git a/backend/routers/import_csv.py b/backend/routers/import_csv.py
+index 114fe38..60e0038 100644
+--- a/backend/routers/import_csv.py
++++ b/backend/routers/import_csv.py
+@@ -1,7 +1,7 @@
+ import io
+ import re
+ import calendar
+-from datetime import date
++from datetime import date, timedelta
+ from typing import Literal, Optional
+ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
+ from fastapi.responses import JSONResponse
+@@ -117,6 +117,17 @@ def parse_number(val) -> float:
+         return 0.0
+ 
+ 
++def _week_start_sunday(d: date) -> date:
++    """日付を含む週の日曜日を返す（dashboard.get_week_start と同一規約）。
++
++    RPP集計テーブル（RppWeekly）の week_start は、ダッシュボード/GAP分析が
++    「選択週の日曜」と完全一致で突き合わせる集計キーになっている。CSVの集計期間が
++    日曜始まり以外（例: 月曜〜日曜）でDLされても確実に一致させるため、取込時に
++    必ずこの関数で日曜へ正規化してから保存する。
++    """
++    return d - timedelta(days=d.isoweekday() % 7)
++
++
+ def _decode_content(content: bytes) -> str:
+     """bytes をエンコード自動判別してデコードする。"""
+     for enc in ["utf-8-sig", "utf-8", "cp932", "shift_jis"]:
+@@ -365,11 +376,13 @@ def parse_rpp_real_file(content: bytes) -> tuple[list[dict], list[dict]]:
+             "cpo_12": cpo_12,
+         })
+ 
+-        # RppWeekly への後方互換マッピング
++        # RppWeekly への後方互換マッピング。
++        # week_start は集計キーなので、CSVの開始日が日曜以外でも必ず日曜へ正規化する
++        # （これをしないとダッシュボード/GAPの日曜キーと一致せず無言で反映されない）。
+         try:
+-            week_date = date.fromisoformat(date_from)
++            week_date = _week_start_sunday(date.fromisoformat(date_from))
+         except Exception:
+-            week_date = date.today()
++            week_date = _week_start_sunday(date.today())
+ 
+         rpp_weekly.append({
+             "week_start": week_date,
+@@ -407,6 +420,8 @@ def parse_rpp_df(df: pd.DataFrame) -> list[dict]:
+                 week_date = date.today()
+         else:
+             week_date = date.today()
++        # 集計キーは日曜始まりに正規化（RMS実ファイル取込と同じ規約に統一）
++        week_date = _week_start_sunday(week_date)
+ 
+         records.append({
+             "week_start": week_date,
+@@ -693,16 +708,28 @@ async def import_rpp_file(
+ 
+         period_types = sorted({r["period_type"] for r in rpp_sales_recs})
+         year_months = sorted({r["year_month"] for r in rpp_sales_recs})
++        # 正規化後の週次期間（日曜〜土曜）をユーザーに提示する。
++        # CSVの開始日が日曜以外でも、実際に集計される週がどこかを明示してズレを可視化する。
++        week_starts = sorted({r["week_start"] for r in rpp_weekly_recs})
++        weeks = [
++            f"{ws.isoformat()}〜{(ws + timedelta(days=6)).isoformat()}"
++            for ws in week_starts
++        ]
++        if weeks:
++            period_desc = " / ".join(weeks)
++        else:
++            period_desc = ", ".join(year_months)
+         return {
+             "message": (
+                 f"{len(rpp_sales_recs)}件をインポートしました"
+-                f"（{'/'.join(period_types)} / {', '.join(year_months)}）"
++                f"（{'/'.join(period_types)}・取込期間: {period_desc}）"
+             ),
+             "count": len(rpp_sales_recs),
+             "inserted": inserted,
+             "updated": updated,
+             "period_types": period_types,
+             "year_months": year_months,
++            "weeks": weeks,
+             "format": "rms_rpp",
+         }
+ 
+diff --git a/frontend/src/pages/DataImport.tsx b/frontend/src/pages/DataImport.tsx
+index d1c6c13..5fd64ae 100644
+--- a/frontend/src/pages/DataImport.tsx
++++ b/frontend/src/pages/DataImport.tsx
+@@ -450,7 +450,11 @@ export default function DataImport() {
+                 {status.detail.format && (
+                   <span className="bg-green-100 rounded px-2 py-0.5">形式: {status.detail.format}</span>
+                 )}
+-                {status.detail.year_months && status.detail.year_months.length > 0 && (
++                {status.detail.weeks && status.detail.weeks.length > 0 ? (
++                  <span className="bg-green-100 rounded px-2 py-0.5">
++                    取込週: {status.detail.weeks.join(' / ')}
++                  </span>
++                ) : status.detail.year_months && status.detail.year_months.length > 0 && (
+                   <span className="bg-green-100 rounded px-2 py-0.5">
+                     対象月: {status.detail.year_months.join(', ')}
+                   </span>
+diff --git a/frontend/src/types/index.ts b/frontend/src/types/index.ts
+index 1dc6ff7..d0f21b8 100644
+--- a/frontend/src/types/index.ts
++++ b/frontend/src/types/index.ts
+@@ -174,5 +174,6 @@ export interface RppImportResult {
+   updated?: number
+   period_types?: string[]
+   year_months?: string[]
++  weeks?: string[]
+   format?: string
+ }
