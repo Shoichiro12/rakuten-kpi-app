@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { KeyRound, Loader2, Mail, ShieldAlert, Trash2, UserCircle } from 'lucide-react'
 import { supabase, authEnabled } from '../lib/supabase'
 import { api } from '../lib/api'
+import { formatCount } from '../lib/format'
 
 interface AccountInfo {
   auth_enabled: boolean
@@ -141,7 +142,9 @@ export default function AccountSettings({ userEmail }: Props) {
           {info && (
             <div className="flex gap-3">
               <dt className="w-28 text-gray-500 shrink-0">登録データ</dt>
-              <dd className="text-gray-900">{info.total_rows.toLocaleString()} 行</dd>
+              {/* 件数は format.ts に寄せる（3桁区切り・値が無いときは「—」）。
+                  toLocaleString 直呼びだと null が来たときに例外になる */}
+              <dd className="text-gray-900 tabular-nums">{formatCount(info.total_rows, ' 行')}</dd>
             </div>
           )}
         </dl>
