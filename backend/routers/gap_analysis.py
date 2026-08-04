@@ -16,6 +16,41 @@ router = APIRouter(prefix="/api/gap", tags=["gap"])
 
 
 # ---------------------------------------------------------------------------
+# アクセス軸の判定（この画面の4エンドポイントで必ず同じ答えを返すこと）
+# ---------------------------------------------------------------------------
+
+def uses_shop_axis(db: Session, period: str, *, year_month: Optional[str] = None,
+                   year: Optional[int] = None) -> bool:
+    """この期間のGAP分析を site_uu 軸（商品分析＝サイト全体）で出すか。
+
+    **判定はこの関数1つに集約する（要件No.5「同一画面で両軸を混在させない」）。**
+    以前は kpi-tree / shop / genre / product の4エンドポイントがそれぞれ別の条件で
+    判定しており、条件がわずかに違うせいで**1つの画面の中でツリーだけ site_uu、
+    ジャンルは rpp_click という混在が起こりうる状態だった**。
+
+    規約:
+      - 週次は常に rpp_click（サイト全体アクセスのデータが月次にしか無いため。案A）
+      - 月次・年次は該当期間に MonthlyItemSales の行があれば site_uu、無ければ rpp_click
+      - **廃盤（is_active=False）の除外は判定に混ぜない。** 絞り込んだ結果0件になるのは
+        「データが無い」ではないので、軸まで変わってしまうと画面内で食い違う
+    """
+    if period == "weekly":
+        return False
+    q = db.query(MonthlyItemSales.id)
+    if period == "yearly":
+        if year is None:
+            return False
+        ym_from, ym_to = year_month_range(year)
+        q = q.filter(MonthlyItemSales.year_month >= ym_from,
+                     MonthlyItemSales.year_month <= ym_to)
+    else:
+        if not year_month:
+            return False
+        q = q.filter(MonthlyItemSales.year_month == year_month)
+    return q.first() is not None
+
+
+# ---------------------------------------------------------------------------
 # ジャンル階層ヘルパー
 # ---------------------------------------------------------------------------
 
@@ -301,13 +336,23 @@ def gap_shop(
     # 月次・年次はSTEP2・STEP3と同じく商品分析＝店舗全体を正とする。
     # ここだけRPP専用のままだと、RPP未取込の月に current が null になり、
     # STEP3が shopData.current.ctr を参照して画面全体がクラッシュする。
-    if period != "weekly":
+    # 軸の判定は uses_shop_axis() に集約する（4エンドポイントで必ず同じ答えにするため）。
+    # 廃盤除外で0件になっても軸は変えない＝ここで rpp_click に落ちない。
+    if uses_shop_axis(
+        db, period,
+        year_month=ym if period == "monthly" else None,
+        year=year if period == "yearly" else None,
+    ):
         if period == "yearly":
             shop_cur = get_shop_yearly(db, year, exclude_management_nos=inactive or None)
             shop_prev = get_shop_yearly(db, year - 1, exclude_management_nos=inactive or None) if shop_cur else None
         else:
             shop_cur = get_shop_monthly(db, ym, exclude_management_nos=inactive or None)
             shop_prev = get_shop_monthly(db, prev_ym, exclude_management_nos=inactive or None) if shop_cur else None
+        if not shop_cur:
+            # 軸は site_uu のまま「データ無し」を返す（rpp_click へ落とすと画面内で軸が混ざる）
+            return {"current": None, "prev": None, "changes": {},
+                    "axis": "shop", "access_axis": "site_uu"}
         if shop_cur:
 
             def _to_kpis(s: dict) -> dict:
@@ -332,12 +377,13 @@ def gap_shop(
             if prev_k:
                 for k in ["gross", "cv", "cvr", "av", "access"]:
                     ch[k] = calc_change_rate(cur_k[k], prev_k[k])
-            return {"current": cur_k, "prev": prev_k, "changes": ch, "axis": "shop"}
+            return {"current": cur_k, "prev": prev_k, "changes": ch,
+                    "axis": "shop", "access_axis": "site_uu"}
 
     current = agg_rows(current_rows)
     prev = agg_rows(prev_rows)
     if not current:
-        return {"current": None, "prev": None, "changes": {}}
+        return {"current": None, "prev": None, "changes": {}, "access_axis": "rpp_click"}
 
     current_kpis = calc_kpis(**current)
     prev_kpis = calc_kpis(**prev) if prev else None
@@ -351,6 +397,8 @@ def gap_shop(
         "current": current_kpis,
         "prev": prev_kpis,
         "changes": changes,
+        # 週次＝RPP広告クリック軸。月次・年次で商品分析が無い月もここに来る。
+        "access_axis": "rpp_click",
     }
 
 
@@ -438,6 +486,13 @@ def gap_genre(
         shop_cur_items = [r for r in shop_cur_items if r.management_no not in _inactive]
         shop_prev_items = [r for r in shop_prev_items if r.management_no not in _inactive]
 
+    # 軸の判定は uses_shop_axis() に集約（廃盤除外の結果で軸が変わらないようにする）
+    use_shop = uses_shop_axis(
+        db, period,
+        year_month=ym if period == "monthly" else None,
+        year=year if period == "yearly" else None,
+    )
+
     def _matches_parent(genre_key: str) -> bool:
         """parent フィルタとの一致判定。parent が None の場合は常に True。"""
         if not parent:
@@ -446,8 +501,8 @@ def gap_genre(
         # parent は 1 段上のキーなので前方一致で判定する
         return genre_key == parent or genre_key.startswith(parent + "/")
 
-    # --- 月次かつ商品分析データあり: 店舗全体軸でジャンル内訳を返す ---
-    if shop_cur_items:
+    # --- 月次・年次で商品分析データあり: 店舗全体（site_uu）軸でジャンル内訳を返す ---
+    if use_shop:
         cur_g = _aggregate_shop_genre(shop_cur_items, level, _matches_parent)
         prev_g = _aggregate_shop_genre(shop_prev_items, level, _matches_parent)
         shop_result = []
@@ -560,10 +615,11 @@ def gap_product(
 
         ym_from, ym_to = year_month_range(year)
         prev_from, prev_to = year_month_range(year - 1)
-        shop_items = db.query(MonthlyItemSales).filter(
-            MonthlyItemSales.year_month >= ym_from, MonthlyItemSales.year_month <= ym_to
-        ).all()
-        if shop_items:
+        # 軸の判定は uses_shop_axis() に集約（他の3エンドポイントと必ず同じ答えにする）
+        if uses_shop_axis(db, period, year=year):
+            shop_items = db.query(MonthlyItemSales).filter(
+                MonthlyItemSales.year_month >= ym_from, MonthlyItemSales.year_month <= ym_to
+            ).all()
             shop_prev = db.query(MonthlyItemSales).filter(
                 MonthlyItemSales.year_month >= prev_from, MonthlyItemSales.year_month <= prev_to
             ).all()
@@ -586,8 +642,8 @@ def gap_product(
 
         # STEP2（ジャンル別）と同じく、月次は商品分析＝店舗全体を正とする。
         # RPPしか見ないと、RPP未取込の月にドリルダウンした先が空になる。
-        shop_items = db.query(MonthlyItemSales).filter(MonthlyItemSales.year_month == ym).all()
-        if shop_items:
+        if uses_shop_axis(db, period, year_month=ym):
+            shop_items = db.query(MonthlyItemSales).filter(MonthlyItemSales.year_month == ym).all()
             shop_prev = db.query(MonthlyItemSales).filter(
                 MonthlyItemSales.year_month == prev_ym
             ).all()
@@ -752,9 +808,15 @@ def get_kpi_tree(
     # 月次は商品分析レポート（店舗全体売上・UU）を正とする。
     # KGI = アクセスUU × 転換率 × 客単価 が同一データ軸で成立する。
     # データが無い月・週次はRPP軸（クリック数ベース）へフォールバック。
-    if period == "monthly":
+    # 軸の判定は uses_shop_axis() に集約（shop/genre/product と必ず同じ答えにする）
+    use_shop = uses_shop_axis(
+        db, period,
+        year_month=year_month if period == "monthly" else None,
+        year=year if period == "yearly" else None,
+    )
+    if use_shop and period == "monthly":
         shop = get_shop_monthly(db, year_month)
-    elif period == "yearly":
+    elif use_shop and period == "yearly":
         shop = get_shop_yearly(db, year)
     else:
         shop = None
@@ -771,7 +833,9 @@ def get_kpi_tree(
         actual_access = actual_ct             # RPP軸ではクリック数をアクセス指標とする
         actual_cvr = round((actual_cv / actual_ct * 100) if actual_ct > 0 else 0, 2)
         actual_av = round((actual_gross / actual_cv) if actual_cv > 0 else 0, 0)
-        access_label = "クリック数（RPP）"
+        # 週次はサイト全体アクセスのデータが無いのでRPP広告クリックで代用する（案A）。
+        # 「アクセス」とだけ書くとサイト全体UUと混同されるため、名前で必ず切り分ける。
+        access_label = "アクセス（RPP広告クリック）"
 
     # アクセス軸を明示する（要件No.5）。shop=訪問UU / rpp=RPPクリック数。
     access_axis = "site_uu" if shop else "rpp_click"
@@ -795,6 +859,14 @@ def get_kpi_tree(
         t_cvr = 0
         t_av = 0
         has_target = t_sales > 0
+    elif period == "weekly":
+        # 週次は目標比較を出さない（2026-08-04 オーナー決定）。
+        # 目標は「アクセス目標（UU）＝月間ユニークユーザー数」としてサイト全体・月次で
+        # 定義されている一方、週次の実績はRPP広告クリック基準。期間も軸も違うので
+        # 比べると嘘の達成率になる（実測: 週次の売上達成率が同じ画面の評価マトリクスの
+        # 65.8%に対しツリーは14.8%と食い違っていた）。週次は実績と前週比で見る。
+        t_sales = t_access = t_cvr = t_av = 0
+        has_target = False
     else:
         t_sales = target.target_sales if target else 0
         t_access = target.target_access if target else 0
@@ -815,6 +887,9 @@ def get_kpi_tree(
 
     return {
         "has_target": has_target,
+        # この期間で目標比較を出すか。False のときフロントは達成率・目標線を描かず、
+        # 「目標が未設定」ではなく「この期間は目標比較を出していない」と案内する。
+        "target_comparable": period != "weekly",
         "axis": "shop" if shop else "rpp",
         "access_axis": access_axis,
         # アクセス母数が信用に足るか（要件No.6）。false ならCVR・客単価は参考値。

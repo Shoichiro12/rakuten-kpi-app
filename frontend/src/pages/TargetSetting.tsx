@@ -408,7 +408,7 @@ export default function TargetSetting() {
                           planView === 'summary' ? 'max-w-2xl' : 'max-w-5xl'
                         }`}
                       >
-                        <thead className="bg-gray-50 text-[10px] text-gray-500 uppercase">
+                        <thead className="bg-gray-50 text-[10px] text-gray-500">
                           <tr>
                             <th className="px-2 py-1.5 text-left">月</th>
                             {planView === 'detail' && <th className="px-2 py-1.5 text-right">季節指数</th>}
@@ -678,7 +678,7 @@ export default function TargetSetting() {
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                  <thead className="bg-gray-50 text-xs text-gray-500">
                     <tr>
                       <SortableTh label="商品" sortKey="product_name" sort={itemSort} align="left" className="pl-1" />
                       <SortableTh label="目標売上（入力）" sortKey="target_sales" sort={itemSort} />
@@ -790,7 +790,7 @@ export default function TargetSetting() {
                 <h3 className="text-sm font-semibold text-gray-700">設定済み目標一覧</h3>
               </div>
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                <thead className="bg-gray-50 text-xs text-gray-500">
                   <tr>
                     <th className="px-4 py-2 text-left">対象月</th>
                     <th className="px-4 py-2 text-right">売上目標（円）</th>

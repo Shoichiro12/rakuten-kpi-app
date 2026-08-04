@@ -579,7 +579,7 @@ export default function MasterSettings() {
             {visibleRows.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                  <thead className="bg-gray-50 text-xs text-gray-500">
                     <tr>
                       <SortableTh label="管理番号" sortKey="management_no" sort={masterSort} align="left" className="pl-1" />
                       <SortableTh label="商品名" sortKey="product_name" sort={masterSort} align="left" />

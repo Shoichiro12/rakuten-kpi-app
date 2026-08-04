@@ -68,12 +68,14 @@ interface NodeBoxProps {
   x: number; y: number; w: number; h: number
   node: KPITreeNode
   hasTarget: boolean
+  /** 目標が出せないときの文言。「未設定」なのか「この期間は比較しない」なのかを言い分ける */
+  emptyLabel?: string
   isRoot?: boolean
   isSelected?: boolean
   onClick?: () => void
 }
 
-function NodeBox({ x, y, w, h, node, hasTarget, isRoot, isSelected, onClick }: NodeBoxProps) {
+function NodeBox({ x, y, w, h, node, hasTarget, emptyLabel = '目標未設定', isRoot, isSelected, onClick }: NodeBoxProps) {
   const { stroke, fill, text } = nodeColor(node.achieve_rate, hasTarget)
   const cx = x + w / 2
   const strokeW = isSelected ? 3 : isRoot ? 2 : 1.5
@@ -127,7 +129,7 @@ function NodeBox({ x, y, w, h, node, hasTarget, isRoot, isSelected, onClick }: N
             {formatVal(node)}
           </text>
           <text x={cx} y={y + 72} textAnchor="middle" fontSize={11} fill={MUTED}>
-            目標未設定
+            {emptyLabel}
           </text>
         </>
       )}
@@ -149,6 +151,9 @@ export default function LogicTree({ data, selectedKPI, onKPIClick }: LogicTreePr
       </div>
     )
   }
+
+  // 目標が出ない理由を言い分ける。週次は「未設定」ではなく「この期間は比較しない」
+  const emptyLabel = data.target_comparable === false ? '週次は目標比較なし' : '目標未設定'
 
   // ViewBox: 960 × 295
   const W = 960; const H = 295
@@ -194,6 +199,7 @@ export default function LogicTree({ data, selectedKPI, onKPIClick }: LogicTreePr
         x={RX} y={RY} w={RW} h={RH}
         node={data.kgi}
         hasTarget={data.has_target}
+        emptyLabel={emptyLabel}
         isRoot
       />
 
@@ -204,6 +210,7 @@ export default function LogicTree({ data, selectedKPI, onKPIClick }: LogicTreePr
           x={x} y={CY} w={CW} h={CH}
           node={data[kpi]}
           hasTarget={data.has_target}
+          emptyLabel={emptyLabel}
           isSelected={selectedKPI === kpi}
           onClick={() => onKPIClick(kpi)}
         />
