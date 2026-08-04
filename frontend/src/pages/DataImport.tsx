@@ -10,7 +10,9 @@ import Header from '../components/layout/Header'
 import ErrorBanner from '../components/ErrorBanner'
 import { supabase, authEnabled } from '../lib/supabase'
 import { api } from '../lib/api'
-import { formatCurrency, formatPercent } from '../lib/utils'
+// 表示用の数値は format.ts を通す（金額は万・億、件数は3桁区切り）。
+// CSVの書式は表示用を流用しないこと（出力はバックエンドの export.py が生値で返す）。
+import { formatYen, formatYenExact, formatCount, formatRate } from '../lib/format'
 import type { DataStatus, RppPeriods, RppImportResult, AutoImportResponse, InboxListResponse, MonthlyItemsPeriod, IntegrityResponse } from '../types'
 
 const RPP_TEMPLATE = `計測期間,商品URL,管理番号,商品名,ジャンル,RPP売上,売上原価,広告費,注文件数,クリック数,CTR(%),CPC(円)
@@ -189,14 +191,18 @@ function PreviewCard({
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[
-          { label: '商品数', value: `${preview.count.toLocaleString()}件` },
-          { label: '売上合計', value: formatCurrency(preview.total_sales) },
-          { label: 'アクセス(UU)', value: preview.total_access_uu.toLocaleString() },
-          { label: '平均CVR', value: formatPercent(preview.avg_cvr, 2) },
-        ].map(({ label, value }) => (
+          { label: '商品数', value: formatCount(preview.count, '件'), exact: undefined },
+          // カードは丸める（万・億）。正確な金額はツールチップで確認できるようにする
+          { label: '売上合計', value: formatYen(preview.total_sales), exact: formatYenExact(preview.total_sales) },
+          { label: 'アクセスUU', value: formatCount(preview.total_access_uu), exact: undefined },
+          { label: '平均CVR', value: formatRate(preview.avg_cvr, 2), exact: undefined },
+        ].map(({ label, value, exact }) => (
           <div key={label} className="bg-white rounded-lg border border-violet-100 p-3 text-center">
             <p className="text-xs text-gray-500">{label}</p>
-            <p className="text-sm font-bold text-gray-900 mt-0.5">{value}</p>
+            {/* 万・億の単位が数字から改行で切り離されないように折り返さない */}
+            <p className="text-sm font-bold text-gray-900 mt-0.5 tabular-nums whitespace-nowrap" title={exact}>
+              {value}
+            </p>
           </div>
         ))}
       </div>
@@ -204,12 +210,12 @@ function PreviewCard({
       {preview.no_stock_count > 0 && (
         <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800">
           <Package size={13} className="text-amber-600 shrink-0" />
-          <span>{preview.no_stock_count}件の在庫なし商品を検出 — 在庫ステータスが自動更新されます</span>
+          <span>{formatCount(preview.no_stock_count, '件')}の在庫なし商品を検出。在庫ステータスが自動更新されます</span>
         </div>
       )}
 
       <div>
-        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">売上上位5商品</p>
+        <p className="text-xs font-semibold text-gray-500 mb-2">売上上位5商品</p>
         <div className="bg-white rounded-lg border border-violet-100 divide-y divide-gray-50">
           {preview.top_products.map((p, i) => (
             <div key={p.management_no} className="flex items-center justify-between px-3 py-2">
@@ -220,7 +226,12 @@ function PreviewCard({
                   <p className="text-xs text-gray-400">{p.management_no}</p>
                 </div>
               </div>
-              <span className="text-xs font-bold text-gray-900 shrink-0 ml-2">{formatCurrency(p.sales)}</span>
+              <span
+                className="text-xs font-bold text-gray-900 shrink-0 ml-2 tabular-nums"
+                title={formatYenExact(p.sales)}
+              >
+                {formatYen(p.sales)}
+              </span>
             </div>
           ))}
         </div>
@@ -609,10 +620,10 @@ export default function DataImport() {
             {status.type === 'success' && status.detail && (
               <div className="mt-2 ml-6 flex flex-wrap gap-3 text-xs text-green-700">
                 {status.detail.inserted != null && (
-                  <span className="bg-green-100 rounded px-2 py-0.5">新規 {status.detail.inserted}件</span>
+                  <span className="bg-green-100 rounded px-2 py-0.5 tabular-nums">新規 {formatCount(status.detail.inserted, '件')}</span>
                 )}
                 {status.detail.updated != null && (
-                  <span className="bg-green-100 rounded px-2 py-0.5">更新 {status.detail.updated}件</span>
+                  <span className="bg-green-100 rounded px-2 py-0.5 tabular-nums">更新 {formatCount(status.detail.updated, '件')}</span>
                 )}
                 {status.detail.format && (
                   <span className="bg-green-100 rounded px-2 py-0.5">形式: {status.detail.format}</span>
@@ -755,7 +766,7 @@ export default function DataImport() {
             <div className="border-t border-gray-100 pt-4">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-gray-700">
-                  取込み結果: 成功 {autoResults.ok_count}件 / 失敗 {autoResults.ng_count}件
+                  取込み結果: 成功 {formatCount(autoResults.ok_count, '件')} / 失敗 {formatCount(autoResults.ng_count, '件')}
                 </p>
                 <button onClick={() => setAutoResults(null)} className="text-xs text-gray-400 hover:text-gray-600">
                   閉じる
@@ -927,7 +938,7 @@ export default function DataImport() {
             <div className="grid sm:grid-cols-2 gap-3">
               {rppPeriods.weekly.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">週次</p>
+                  <p className="text-xs font-semibold text-gray-500 mb-1.5">週次</p>
                   <div className="flex flex-wrap gap-1.5">
                     {rppPeriods.weekly.map((p) => (
                       <span key={`${p.year_month}-${p.date_from}`} className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-100 rounded px-2 py-0.5">
@@ -947,7 +958,7 @@ export default function DataImport() {
               )}
               {rppPeriods.monthly.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">月次</p>
+                  <p className="text-xs font-semibold text-gray-500 mb-1.5">月次</p>
                   <div className="flex flex-wrap gap-1.5">
                     {rppPeriods.monthly.map((p) => (
                       <span key={p.year_month} className="inline-flex items-center gap-1 text-xs bg-violet-50 text-violet-700 border border-violet-100 rounded px-2 py-0.5">
@@ -980,7 +991,7 @@ export default function DataImport() {
             <div className="flex flex-wrap gap-1.5">
               {monthlyPeriods.map((m) => (
                 <span key={m.year_month} className="inline-flex items-center gap-1 text-xs bg-violet-50 text-violet-700 border border-violet-100 rounded px-2 py-0.5">
-                  {m.year_month}（{m.rows.toLocaleString()}件）
+                  <span className="tabular-nums">{m.year_month}（{formatCount(m.rows, '件')}）</span>
                   <button
                     onClick={() => handleDeleteMonthlyItems(m.year_month)}
                     disabled={loading}

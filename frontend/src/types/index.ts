@@ -8,8 +8,24 @@ export type AccessAxis = 'rpp_click' | 'site_uu'
 
 /** アクセス軸の表示ラベル（UIで「アクセス」単独表示を避けるため統一） */
 export const ACCESS_AXIS_LABEL: Record<AccessAxis, string> = {
-  rpp_click: 'アクセス（RPPクリック）',
-  site_uu: 'アクセス（UU）',
+  // 「アクセス」とだけ書くとサイト全体UUと混同されるため、名前で必ず切り分ける
+  // （2026-08-04 決定・週次は案A＝RPPクリックのまま名前で区別する）
+  rpp_click: 'アクセス（RPP広告クリック）',
+  site_uu: 'アクセス（サイト全体UU）',
+}
+
+/** 軸バッジの短い表記（画面ヘッダー用） */
+export const ACCESS_AXIS_BADGE: Record<AccessAxis, string> = {
+  rpp_click: 'RPP広告クリック',
+  site_uu: 'サイト全体UU',
+}
+
+/** 軸バッジのツールチップ。CVRの母数が変わることを必ず添える */
+export const ACCESS_AXIS_HINT: Record<AccessAxis, string> = {
+  rpp_click:
+    'この画面のアクセスはRPP広告のクリック数です。CVRはクリック数を母数にした転換率（クリック→注文）で、サイト全体の訪問UUとは母数が違います。',
+  site_uu:
+    'この画面のアクセスは商品分析レポートの訪問ユニークユーザー数（サイト全体）です。CVRはUUを母数にした転換率（訪問→注文）で、RPP広告のクリック基準とは母数が違います。',
 }
 
 export interface KPIs {
@@ -475,6 +491,13 @@ export interface KPITreeNode {
 
 export interface KPITree {
   has_target: boolean
+  /**
+   * この期間で目標比較を出すか（2026-08-04 決定）。
+   * 週次は false。目標は「アクセス目標（UU）＝月間UU」でサイト全体・月次の定義なので、
+   * RPP広告クリック基準の週次実績と比べると嘘の達成率になるため。
+   * false のときは「目標未設定」ではなく「この期間は目標比較を出していない」と案内する。
+   */
+  target_comparable?: boolean
   /** 集計データ軸: shop=店舗全体UU（商品分析） / rpp=RPP広告クリック数 */
   axis?: 'shop' | 'rpp'
   /** アクセス指標の軸（要件No.5） */

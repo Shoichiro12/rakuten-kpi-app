@@ -7,6 +7,8 @@ import StepIndicator from '../components/gap/StepIndicator'
 import GenreCards from '../components/gap/GenreCards'
 import ActionSummary from '../components/gap/ActionSummary'
 import ActionPanel from '../components/gap/ActionPanel'
+import AccessAxisBadge from '../components/gap/AccessAxisBadge'
+import { orderBySalesGap, SALES_ORDER_NOTE } from '../components/gap/kpiGap'
 import EvaluationMatrix from '../components/EvaluationMatrix'
 import ReliabilityNote from '../components/ReliabilityNote'
 import { useTableSort } from '../components/table/useTableSort'
@@ -39,6 +41,7 @@ const PRODUCT_SORT_ACCESSORS = {
   ct: (p: ProductItem) => p.current.ct,
   cv: (p: ProductItem) => p.current.cv,
   cvr: (p: ProductItem) => p.current.cvr,
+  av: (p: ProductItem) => p.current.av,
   roas: (p: ProductItem) => p.current.roas,
   cpo: (p: ProductItem) => p.current.cpo,
 }
@@ -139,6 +142,11 @@ export default function GapAnalysis() {
 
   const weekKey = period === 'monthly' ? dateValue.slice(0, 7) : dateValue
 
+  // 商品テーブルの既定順は「売上の前期比が悪い順」で固定（選択KPIでは切り替えない）。
+  // 列見出しクリックのソート（useTableSort）は既定順の上に乗るので、
+  // ユーザーが列を選べばそちらが勝つ。適用順は 既定順 → 列ソート。
+  const orderedProducts = orderBySalesGap(productData)
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
       <Header
@@ -146,6 +154,8 @@ export default function GapAnalysis() {
         subtitle="KGI・KPIロジックツリーから課題を特定し改善アクションへ"
         actions={
           <>
+            {/* 画面全体のアクセス軸。ブロックごとではなくここに1つだけ出す */}
+            <AccessAxisBadge axis={treeData?.access_axis} />
             <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
               <input
                 type="checkbox"
@@ -202,7 +212,7 @@ export default function GapAnalysis() {
                 <h3 className="text-sm font-bold text-gray-900">ロジックツリー — KGI・KPI比較</h3>
                 <p className="text-xs text-gray-500 mt-0.5">KPIノードをクリックするとジャンル別ドリルダウンに進みます</p>
               </div>
-              {!treeData?.has_target && (
+              {!treeData?.has_target && treeData?.target_comparable !== false && (
                 <a
                   href="/targets"
                   className="text-xs text-blue-500 hover:text-blue-700 border border-blue-200 rounded-lg px-3 py-1.5"
@@ -224,11 +234,18 @@ export default function GapAnalysis() {
               </div>
             )}
 
-            {!treeData?.has_target && (
+            {treeData?.target_comparable === false ? (
+              // 週次は目標比較を出さない（2026-08-04 決定）。「未設定」と誤解されないよう理由を書く
+              <p className="mt-3 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg px-3 py-2 max-w-3xl leading-relaxed">
+                週次は目標との比較を出していません。目標は「アクセス目標（UU）＝月間ユニークユーザー数」として
+                サイト全体・月単位で設定されているのに対し、週次の実績はRPP広告クリック基準で期間も母数も違うためです。
+                週次はRPP広告の動きを前週比で追い、目標に対する達成率は月次で確認してください。
+              </p>
+            ) : !treeData?.has_target ? (
               <p className="mt-3 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
                 💡 「目標設定」画面でKGI/KPI目標を設定すると、達成率・GAP分析が有効になります
               </p>
-            )}
+            ) : null}
             {treeData && (
               <ReliabilityNote
                 reliable={treeData.reliable}
@@ -237,6 +254,11 @@ export default function GapAnalysis() {
               />
             )}
           </div>
+
+          {/* 打ち手はこの画面では評価マトリクスのカード（上）と、商品を選んだときの
+              右サイド ActionPanel の2箇所だけにする（2026-08-04 オーナー決定）。
+              KPI選択に連動する打ち手ブロックを別に足すと、同じ画面に似たリストが3つ並ぶため。
+              **ここに新しい打ち手の表示先を増やさないこと。** */}
 
           {/* STEP2: ジャンルカード */}
           {(step >= 2 || selectedKPI) && genreData.length > 0 && (
@@ -257,7 +279,12 @@ export default function GapAnalysis() {
               <div className="px-4 py-3 border-b flex items-center justify-between bg-gray-50">
                 <div>
                   <h3 className="text-sm font-bold text-gray-900">商品別KPI</h3>
-                  <p className="text-xs text-gray-500">{selectedGenre} — {productData.length}件</p>
+                  <p className="text-xs text-gray-500">
+                    {selectedGenre} — {productData.length}件
+                    {!productSort.key && (
+                      <span className="ml-1.5 text-gray-400">／ 並び順: {SALES_ORDER_NOTE}</span>
+                    )}
+                  </p>
                 </div>
                 <button
                   onClick={() => { setSelectedProduct(null); setStep(2) }}
@@ -280,13 +307,16 @@ export default function GapAnalysis() {
                       />
                       <SortableTh label="CV" sortKey="cv" sort={productSort} />
                       <SortableTh label="CVR" sortKey="cvr" sort={productSort} />
+                      {/* 客単価は売上3分解の1つ。選択KPIが客単価のとき並び替えの根拠が
+                          画面に無いと読めないため、列として常設する */}
+                      <SortableTh label="客単価" sortKey="av" sort={productSort} />
                       <SortableTh label="ROAS" sortKey="roas" sort={productSort} />
                       <SortableTh label="CPO" sortKey="cpo" sort={productSort} />
                       <th className="px-3 py-2.5 text-center">アクション</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {productSort.apply(productData).map((p) => {
+                    {productSort.apply(orderedProducts).map((p) => {
                       const isSelected = selectedProduct?.product_url === p.product_url
                       // 優先度: 在庫 > アクセス > 客単価 = CVR（講座ロジック準拠）
                       // shopData.current は「対象期間にショップ全体の実績が無い」場合 null になる。
@@ -330,6 +360,10 @@ export default function GapAnalysis() {
                           <td className={`px-3 py-2.5 text-right text-xs font-medium ${cvrWarn ? 'text-red-600' : ''}`}>
                             {formatPercent(p.current.cvr, 2)}
                             {cvrWarn && ' ⚠️'}
+                          </td>
+                          <td className={`px-3 py-2.5 text-right text-xs font-medium ${avWarn ? 'text-red-600' : ''}`}>
+                            {formatCurrency(p.current.av)}
+                            {avWarn && ' ⚠️'}
                           </td>
                           <td className="px-3 py-2.5 text-right text-xs">{formatPercent(p.current.roas)}</td>
                           <td className={`px-3 py-2.5 text-right text-xs ${p.limit_cpo_exceeded ? 'text-red-600 font-bold' : ''}`}>
