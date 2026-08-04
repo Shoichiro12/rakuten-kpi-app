@@ -32,6 +32,41 @@ function ChangeCell({ value }: { value: number | null | undefined }) {
   return <span className={`font-medium ${up ? 'text-green-600' : 'text-red-500'}`}>{up ? '+' : ''}{value.toFixed(1)}%</span>
 }
 
+/* 表の作法（docs/ui_number_and_chart_rules_2026-08-04.md 4章／区切り4の残り）。
+   この画面の2つの表（商品別・ジャンル別参照）で同じ定数を使う。
+
+   固定ヘッダーは「表のラッパー自身が縦スクロールすること」が前提。
+   ラッパーが overflow-x-auto だけだと縦の計算値も auto になるが高さ無制限で
+   縦スクロールが起きないため、sticky top-0 を書いてもヘッダーは固定されず、
+   ページ側のスクロールで枠ごと画面外に出る。max-h と必ずセットで使う。 */
+const TABLE_SCROLL = 'max-h-[70vh] overflow-auto'
+/* ヘッダーは浮くのでセルごとに背景と下境界線を持たせる（thead への背景指定だけでは
+   スクロールした本文が透ける）。 */
+const TH_STICKY = 'sticky top-0 z-20 bg-gray-50 border-b border-gray-200 whitespace-nowrap'
+/* 左端の識別列は横スクロールでも残す（規約: 1列目は人間が読める識別子）。
+   縦横が交差するヘッダーだけ z を1段上げる。
+   min-w が無いと、狭い幅のときに商品名と「母数不足・参考値」バッジが1文字ずつ折り返して
+   行の高さが数百pxに膨らむ（固定した識別列が読めないと左端固定の意味がない）。 */
+const STICKY_LEFT_MIN_W = 'min-w-[11rem]'
+const TH_STICKY_LEFT = `sticky top-0 left-0 z-30 bg-gray-50 border-b border-r border-gray-200 whitespace-nowrap ${STICKY_LEFT_MIN_W}`
+const TD_STICKY_LEFT = `sticky left-0 z-10 border-r border-gray-100 ${STICKY_LEFT_MIN_W}`
+
+/* 行の背景は「警告 > 選択 > 通常」の1本で決める。
+   左端セルは sticky で浮くため行と同じ背景を明示的に持たせないと、横スクロールした
+   右の列が下から透けて見える。bg-inherit は Tailwind の出力順に依存して崩れるので使わない。
+   tr 自身は :hover、浮いているセルは group-hover で追随させる（group-hover は子孫
+   セレクタなので、group を付けた tr 自身には効かない）。 */
+const ROW_BG = {
+  warn: 'bg-red-50 hover:bg-red-100',
+  selected: 'bg-blue-50 hover:bg-blue-100',
+  normal: 'bg-white hover:bg-gray-50',
+} as const
+const ROW_BG_STICKY = {
+  warn: 'bg-red-50 group-hover:bg-red-100',
+  selected: 'bg-blue-50 group-hover:bg-blue-100',
+  normal: 'bg-white group-hover:bg-gray-50',
+} as const
+
 // 商品別テーブルのソート用アクセサ（ネストした current/changes の値を読む）
 const PRODUCT_SORT_ACCESSORS = {
   product_name: (p: ProductItem) => p.product_name,
@@ -293,26 +328,29 @@ export default function GapAnalysis() {
                   ← ジャンル一覧へ
                 </button>
               </div>
-              <div className="overflow-x-auto">
+              {/* 日本語見出しに uppercase は効かないので外した（計画書6章の残り2箇所のうち1つ）。
+                  単位はセル側の formatCurrency / formatPercent が出しているため、見出しには足さない
+                  （見出しへ寄せるならセルを lib/format.ts に移す別作業になる） */}
+              <div className={TABLE_SCROLL}>
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                  <thead className="text-xs text-gray-500">
                     <tr>
-                      <SortableTh label="商品名" sortKey="product_name" sort={productSort} align="left" className="pl-1" />
-                      <SortableTh label="売上" sortKey="gross" sort={productSort} />
-                      <SortableTh label="前期比" sortKey="gross_change" sort={productSort} />
-                      <SortableTh label="GP" sortKey="gp" sort={productSort} />
+                      <SortableTh label="商品名" sortKey="product_name" sort={productSort} align="left" className={`pl-1 ${TH_STICKY_LEFT}`} />
+                      <SortableTh label="売上" sortKey="gross" sort={productSort} className={TH_STICKY} />
+                      <SortableTh label="前期比" sortKey="gross_change" sort={productSort} className={TH_STICKY} />
+                      <SortableTh label="GP" sortKey="gp" sort={productSort} className={TH_STICKY} />
                       <SortableTh
                         label={productAxis ? ACCESS_AXIS_LABEL[productAxis] : 'アクセス'}
-                        sortKey="ct" sort={productSort}
+                        sortKey="ct" sort={productSort} className={TH_STICKY}
                       />
-                      <SortableTh label="CV" sortKey="cv" sort={productSort} />
-                      <SortableTh label="CVR" sortKey="cvr" sort={productSort} />
+                      <SortableTh label="CV" sortKey="cv" sort={productSort} className={TH_STICKY} />
+                      <SortableTh label="CVR" sortKey="cvr" sort={productSort} className={TH_STICKY} />
                       {/* 客単価は売上3分解の1つ。選択KPIが客単価のとき並び替えの根拠が
                           画面に無いと読めないため、列として常設する */}
-                      <SortableTh label="客単価" sortKey="av" sort={productSort} />
-                      <SortableTh label="ROAS" sortKey="roas" sort={productSort} />
-                      <SortableTh label="CPO" sortKey="cpo" sort={productSort} />
-                      <th className="px-3 py-2.5 text-center">アクション</th>
+                      <SortableTh label="客単価" sortKey="av" sort={productSort} className={TH_STICKY} />
+                      <SortableTh label="ROAS" sortKey="roas" sort={productSort} className={TH_STICKY} />
+                      <SortableTh label="CPO" sortKey="cpo" sort={productSort} className={TH_STICKY} />
+                      <th className={`px-3 py-2.5 text-center font-medium ${TH_STICKY}`}>アクション</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -329,15 +367,15 @@ export default function GapAnalysis() {
                       // アクセス母数不足(100未満)の場合、CVR・客単価の警告は表示しない（信用できない数値のため）
                       const cvrWarn = !lowAccess && !!shopCur && shopCur.cvr > 0 && p.current.cvr < shopCur.cvr * 0.85
                       const avWarn = !lowAccess && !!shopCur && shopCur.av > 0 && p.current.av < shopCur.av * 0.85
+                      // 背景色は警告専用に空けておく規約のため、警告→選択→通常の1本で決める
+                      const tone = p.limit_cpo_exceeded ? 'warn' : isSelected ? 'selected' : 'normal'
                       return (
                         <tr
                           key={p.product_url}
                           onClick={() => setSelectedProduct(isSelected ? null : p)}
-                          className={`cursor-pointer transition-colors ${
-                            isSelected ? 'bg-blue-50 hover:bg-blue-100' : 'hover:bg-gray-50'
-                          } ${p.limit_cpo_exceeded ? 'bg-red-50 hover:bg-red-100' : ''}`}
+                          className={`group cursor-pointer transition-colors ${ROW_BG[tone]}`}
                         >
-                          <td className="px-4 py-2.5">
+                          <td className={`px-4 py-2.5 ${TD_STICKY_LEFT} ${ROW_BG_STICKY[tone]}`}>
                             <div className="flex items-center gap-1.5">
                               {p.limit_cpo_exceeded && <AlertTriangle size={12} className="text-red-500 shrink-0" />}
                               <div>
@@ -349,24 +387,27 @@ export default function GapAnalysis() {
                               </div>
                             </div>
                           </td>
-                          <td className="px-3 py-2.5 text-right font-medium text-xs">{formatCurrency(p.current.gross)}</td>
-                          <td className="px-3 py-2.5 text-right text-xs"><ChangeCell value={p.changes.gross} /></td>
-                          <td className="px-3 py-2.5 text-right text-xs">{formatCurrency(p.current.gp)}</td>
-                          <td className={`px-3 py-2.5 text-right text-xs font-medium ${accessWarn ? 'text-red-600' : ''}`}>
+                          {/* 表は丸めない（生値）。数値は右寄せ＋等幅（tabular-nums）で桁位置を揃え、
+                              横スクロールする表なので折り返させない。規約 1-2 / 4
+                              色を付けるのは「しきい値を跨いだセル」だけ */}
+                          <td className="px-3 py-2.5 text-right font-medium text-xs tabular-nums whitespace-nowrap">{formatCurrency(p.current.gross)}</td>
+                          <td className="px-3 py-2.5 text-right text-xs tabular-nums whitespace-nowrap"><ChangeCell value={p.changes.gross} /></td>
+                          <td className="px-3 py-2.5 text-right text-xs tabular-nums whitespace-nowrap">{formatCurrency(p.current.gp)}</td>
+                          <td className={`px-3 py-2.5 text-right text-xs font-medium tabular-nums whitespace-nowrap ${accessWarn ? 'text-red-600' : ''}`}>
                             {formatNumber(p.current.ct)}
                             {accessWarn && ' ⚠️'}
                           </td>
-                          <td className="px-3 py-2.5 text-right text-xs">{formatNumber(p.current.cv)}</td>
-                          <td className={`px-3 py-2.5 text-right text-xs font-medium ${cvrWarn ? 'text-red-600' : ''}`}>
+                          <td className="px-3 py-2.5 text-right text-xs tabular-nums whitespace-nowrap">{formatNumber(p.current.cv)}</td>
+                          <td className={`px-3 py-2.5 text-right text-xs font-medium tabular-nums whitespace-nowrap ${cvrWarn ? 'text-red-600' : ''}`}>
                             {formatPercent(p.current.cvr, 2)}
                             {cvrWarn && ' ⚠️'}
                           </td>
-                          <td className={`px-3 py-2.5 text-right text-xs font-medium ${avWarn ? 'text-red-600' : ''}`}>
+                          <td className={`px-3 py-2.5 text-right text-xs font-medium tabular-nums whitespace-nowrap ${avWarn ? 'text-red-600' : ''}`}>
                             {formatCurrency(p.current.av)}
                             {avWarn && ' ⚠️'}
                           </td>
-                          <td className="px-3 py-2.5 text-right text-xs">{formatPercent(p.current.roas)}</td>
-                          <td className={`px-3 py-2.5 text-right text-xs ${p.limit_cpo_exceeded ? 'text-red-600 font-bold' : ''}`}>
+                          <td className="px-3 py-2.5 text-right text-xs tabular-nums whitespace-nowrap">{formatPercent(p.current.roas)}</td>
+                          <td className={`px-3 py-2.5 text-right text-xs tabular-nums whitespace-nowrap ${p.limit_cpo_exceeded ? 'text-red-600 font-bold' : ''}`}>
                             {formatCurrency(p.current.cpo)}
                           </td>
                           <td className="px-3 py-2.5 text-center text-xs">
@@ -399,31 +440,34 @@ export default function GapAnalysis() {
                 ジャンル別KPI（参照用テーブル）
               </summary>
               <div className="mt-2 bg-white rounded-xl border shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
+                {/* 商品別テーブルと同じ表の作法。ジャンル数は通常少ないので max-h は実際には
+                    発動しないが、ジャンルの多い店舗で固定ヘッダーが効くよう揃えておく */}
+                <div className={TABLE_SCROLL}>
                   <table className="w-full text-sm">
-                    <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                    <thead className="text-xs text-gray-500">
                       <tr>
-                        <th className="px-4 py-2 text-left">ジャンル</th>
-                        <th className="px-4 py-2 text-right">RPP売上</th>
-                        <th className="px-4 py-2 text-right">前期比</th>
-                        <th className="px-4 py-2 text-right">GP</th>
-                        <th className="px-4 py-2 text-right">CVR</th>
-                        <th className="px-4 py-2 text-right">客単価</th>
-                        <th className="px-4 py-2 text-right">ROAS</th>
-                        <th className="px-4 py-2 text-right">ROI</th>
+                        <th className={`px-4 py-2 text-left font-medium ${TH_STICKY_LEFT}`}>ジャンル</th>
+                        <th className={`px-4 py-2 text-right font-medium ${TH_STICKY}`}>RPP売上</th>
+                        <th className={`px-4 py-2 text-right font-medium ${TH_STICKY}`}>前期比</th>
+                        <th className={`px-4 py-2 text-right font-medium ${TH_STICKY}`}>GP</th>
+                        <th className={`px-4 py-2 text-right font-medium ${TH_STICKY}`}>CVR</th>
+                        <th className={`px-4 py-2 text-right font-medium ${TH_STICKY}`}>客単価</th>
+                        <th className={`px-4 py-2 text-right font-medium ${TH_STICKY}`}>ROAS</th>
+                        <th className={`px-4 py-2 text-right font-medium ${TH_STICKY}`}>ROI</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {genreData.map((g) => (
-                        <tr key={g.genre} className="hover:bg-gray-50">
-                          <td className="px-4 py-2.5 font-medium text-gray-900 text-xs">{g.genre}</td>
-                          <td className="px-4 py-2.5 text-right text-xs">{formatCurrency(g.current.gross)}</td>
-                          <td className="px-4 py-2.5 text-right text-xs"><ChangeCell value={g.changes.gross} /></td>
-                          <td className="px-4 py-2.5 text-right text-xs">{formatCurrency(g.current.gp)}</td>
-                          <td className="px-4 py-2.5 text-right text-xs">{formatPercent(g.current.cvr, 2)}</td>
-                          <td className="px-4 py-2.5 text-right text-xs">{formatCurrency(g.current.av)}</td>
-                          <td className="px-4 py-2.5 text-right text-xs">{formatPercent(g.current.roas)}</td>
-                          <td className="px-4 py-2.5 text-right text-xs">{formatPercent(g.current.roi)}</td>
+                        // 参照用テーブルは選択・警告の状態を持たないので通常の背景1つで足りる
+                        <tr key={g.genre} className={`group ${ROW_BG.normal}`}>
+                          <td className={`px-4 py-2.5 font-medium text-gray-900 text-xs ${TD_STICKY_LEFT} ${ROW_BG_STICKY.normal}`}>{g.genre}</td>
+                          <td className="px-4 py-2.5 text-right text-xs tabular-nums whitespace-nowrap">{formatCurrency(g.current.gross)}</td>
+                          <td className="px-4 py-2.5 text-right text-xs tabular-nums whitespace-nowrap"><ChangeCell value={g.changes.gross} /></td>
+                          <td className="px-4 py-2.5 text-right text-xs tabular-nums whitespace-nowrap">{formatCurrency(g.current.gp)}</td>
+                          <td className="px-4 py-2.5 text-right text-xs tabular-nums whitespace-nowrap">{formatPercent(g.current.cvr, 2)}</td>
+                          <td className="px-4 py-2.5 text-right text-xs tabular-nums whitespace-nowrap">{formatCurrency(g.current.av)}</td>
+                          <td className="px-4 py-2.5 text-right text-xs tabular-nums whitespace-nowrap">{formatPercent(g.current.roas)}</td>
+                          <td className="px-4 py-2.5 text-right text-xs tabular-nums whitespace-nowrap">{formatPercent(g.current.roi)}</td>
                         </tr>
                       ))}
                     </tbody>
