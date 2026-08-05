@@ -16,6 +16,7 @@ import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
 import { formatYen, formatYenAxis, pointDiffFromChangeRate } from '../lib/format'
 import BulletChart from '../components/kpi/BulletChart'
 import { usePeriodState } from '../lib/usePeriodState'
+import { FOCUS_RING, TAP_TARGET } from '../lib/a11y'
 import type {
   DashboardData, Alert, TrendPoint, EvaluationResult, AccessPlan, RecommendationsResponse, OutcomesResponse,
 } from '../types'
@@ -264,11 +265,11 @@ export default function Dashboard() {
                       <span
                         className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${
                           actualSales >= pacer
-                            ? 'border-[#bfe3bf] bg-[#f2faf2] text-[#0a7a0a]'
-                            : 'border-[#f0cfcf] bg-[#fdf4f4] text-[#b2312f]'
+                            ? 'border-success/30 bg-success/10 text-success-ink'
+                            : 'border-danger/30 bg-danger/10 text-danger'
                         }`}
                       >
-                        {actualSales >= pacer ? '● 順調' : '● 遅れ'}
+                        {actualSales >= pacer ? '順調' : '遅れ'}
                       </span>
                     )}
                   </span>
@@ -278,7 +279,7 @@ export default function Dashboard() {
                 </div>
               </>
             ) : (
-              <p className="text-xs text-gray-400 mt-3">目標未設定（目標設定画面で売上目標を入力すると達成率が出ます）</p>
+              <p className="text-xs text-gray-500 mt-3">目標未設定（目標設定画面で売上目標を入力すると達成率が出ます）</p>
             )}
             <div className="flex items-center justify-between text-xs mt-auto pt-2 border-t border-gray-100">
               <span className="text-gray-500">
@@ -301,7 +302,7 @@ export default function Dashboard() {
                 {/* 割合の指標は pt、中立の指標（アクセス）は色を付けない（規約 1-4 / 1-7） */}
                 <p className={`text-xs mt-1 ${
                   c.change == null || c.neutral ? 'text-gray-500'
-                    : c.change >= 0 ? 'text-green-600' : 'text-red-500'
+                    : c.change >= 0 ? 'text-success-ink' : 'text-danger'
                 }`}>
                   {c.change == null
                     ? '前期のデータなし'
@@ -401,7 +402,7 @@ export default function Dashboard() {
           </summary>
           <div className="overflow-x-auto border-t">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+              <thead className="bg-gray-50 text-xs text-gray-500">
                 <tr>
                   <th className="px-4 py-2 text-left">指標</th>
                   <th className="px-3 py-2 text-right">実績</th>
@@ -429,10 +430,10 @@ export default function Dashboard() {
                 ]).map((row) => {
                   const unit = 'unit' in row && row.unit === 'pt' ? 'pt' : '%'
                   const cell = (v: number | null | undefined) => {
-                    if (v == null) return <span className="text-gray-300">—</span>
+                    if (v == null) return <span className="text-gray-400" aria-hidden="true">—</span>
                     const improved = row.goodWhenDown ? v < 0 : v > 0
                     return (
-                      <span className={improved ? 'text-green-600' : 'text-red-500'}>
+                      <span className={improved ? 'text-success-ink' : 'text-danger'}>
                         {v > 0 ? '+' : ''}{v.toFixed(unit === 'pt' ? 2 : 1)}{unit}
                       </span>
                     )
@@ -464,7 +465,7 @@ export default function Dashboard() {
                 <button
                   key={key}
                   onClick={() => setActiveChart(key)}
-                  className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
+                  className={`px-2.5 rounded text-xs font-medium transition-colors ${TAP_TARGET} ${FOCUS_RING} ${
                     activeChart === key
                       ? 'bg-gray-900 text-white'
                       : 'text-gray-600 hover:bg-gray-100'

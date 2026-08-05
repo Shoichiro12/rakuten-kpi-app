@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { maskEmail } from '../../lib/utils'
 import { HELP_URL, EXTERNAL_LINK_PROPS } from '../../lib/links'
+import { FOCUS_RING_ON_DARK } from '../../lib/a11y'
 import {
   LayoutDashboard,
   TrendingUp,
@@ -72,9 +73,8 @@ function Tooltip({ label }: { label: string }) {
   )
 }
 
-/** outline は必ず focus-visible のリングで置き換える（見えないフォーカスを作らない）。タブレットの二度押し遅延も潰す */
-const FOCUS_RING =
-  'touch-manipulation outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-white/70'
+/** タブレットの二度押し遅延も潰す。リング自体は lib/a11y の共有定数 */
+const FOCUS_RING = `touch-manipulation ${FOCUS_RING_ON_DARK}`
 
 /** ナビ行（上段）のクラス。折りたたみ時はアイコンを中央寄せにする */
 function navRowClass(collapsed: boolean, isActive: boolean) {

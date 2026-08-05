@@ -3,6 +3,7 @@ import type { GenreKPI } from '../../types'
 import { formatYen, formatRate, formatCount } from '../../lib/format'
 import Stat from '../kpi/Stat'
 import Delta, { type DeltaState } from '../kpi/Delta'
+import { FOCUS_RING } from '../../lib/a11y'
 import {
   orderBySalesGap,
   salesGapDelta,
@@ -102,7 +103,7 @@ export default function GenreCards({ genres, selectedGenre, selectedKPI, onSelec
             <button
               key={g.genre}
               onClick={() => onSelect(g.genre)}
-              className={`shrink-0 w-52 rounded-xl border-2 p-4 text-left transition-colors ${
+              className={`shrink-0 w-52 rounded-xl border-2 p-4 text-left transition-colors ${FOCUS_RING} ${
                 isSelected
                   ? 'border-blue-500 bg-blue-50'
                   : isWorst

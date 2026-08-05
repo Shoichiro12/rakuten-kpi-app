@@ -7,3 +7,30 @@
     @apply text-gray-900 antialiased;
   }
 }
+
+@layer utilities {
+  /* 内部スクロール領域（max-h + overflow-auto）向けの細いスクロールバー。見た目だけの変更で、
+     sticky header・横スクロールには影響しない。
+
+     ⚠️ 現在このクラスを使っている画面はない。
+     元々は GAP分析で「ページ本体のスクロールバーと表のスクロールバーが右端に二重に見える」
+     対策として、内側を細くして区別させるために書かれたもの（2026-08-04）。翌日オーナー判断で
+     表の縦スクロール自体を無くす方針に変わった（PR #7）ため、その用途では不要になった。
+     残してあるのは、データ取込み画面のように内側スクロールを持つ他のブロックへ当てる余地が
+     あるため。使い道が無いと判断したらこのブロックごと消してよい。 */
+  .table-scroll-thin {
+    scrollbar-width: thin; /* Firefox */
+    scrollbar-color: #d1d5db transparent;
+  }
+  .table-scroll-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .table-scroll-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .table-scroll-thin::-webkit-scrollbar-thumb {
+    background-color: #d1d5db;
+    border-radius: 9999px;
+  }
+}

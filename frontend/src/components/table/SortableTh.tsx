@@ -1,5 +1,6 @@
 import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react'
 import type { TableSort } from './useTableSort'
+import { FOCUS_RING } from '../../lib/a11y'
 
 /**
  * ソート可能な列見出しセル（useTableSortとセットで使う）。
@@ -33,7 +34,7 @@ export default function SortableTh<Row>({
         type="button"
         onClick={() => sort.toggle(sortKey)}
         title={`${label}で並び替え`}
-        className={`group w-full px-3 py-2.5 flex items-center gap-1 whitespace-nowrap cursor-pointer select-none touch-manipulation hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-blue-500 transition-colors ${
+        className={`group w-full px-3 py-2.5 flex items-center gap-1 whitespace-nowrap cursor-pointer select-none touch-manipulation hover:bg-gray-100 transition-colors ${FOCUS_RING} ${
           align === 'right' ? 'justify-end' : 'justify-start'
         } ${active ? 'text-gray-900 font-semibold' : ''}`}
       >

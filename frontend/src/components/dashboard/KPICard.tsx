@@ -47,7 +47,7 @@ export default function KPICard({
   const toneOf = (v: number | null | undefined) => {
     if (v == null || v === 0) return 'text-gray-400'
     const improved = lowerIsBetter ? v < 0 : v > 0
-    return improved ? 'text-green-600' : 'text-red-500'
+    return improved ? 'text-success-ink' : 'text-danger'
   }
   const bg = {
     default: 'bg-white',
@@ -104,7 +104,7 @@ export default function KPICard({
       {isHero && <div className={`absolute inset-x-0 top-0 h-1 ${heroAccent}`} />}
       <div className="flex items-start justify-between gap-1">
         <p
-          className={`font-medium uppercase tracking-wide leading-tight ${
+          className={`font-medium leading-tight ${
             isHero ? 'text-sm text-gray-600' : 'text-xs text-gray-500'
           }`}
         >
