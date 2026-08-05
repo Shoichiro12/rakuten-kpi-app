@@ -35,20 +35,28 @@ function ChangeCell({ value }: { value: number | null | undefined }) {
 /* 表の作法（docs/ui_number_and_chart_rules_2026-08-04.md 4章／区切り4の残り）。
    この画面の2つの表（商品別・ジャンル別参照）で同じ定数を使う。
 
-   固定ヘッダーは「表のラッパー自身が縦スクロールすること」が前提。
-   ラッパーが overflow-x-auto だけだと縦の計算値も auto になるが高さ無制限で
-   縦スクロールが起きないため、sticky top-0 を書いてもヘッダーは固定されず、
-   ページ側のスクロールで枠ごと画面外に出る。max-h と必ずセットで使う。 */
-const TABLE_SCROLL = 'max-h-[70vh] overflow-auto'
-/* ヘッダーは浮くのでセルごとに背景と下境界線を持たせる（thead への背景指定だけでは
-   スクロールした本文が透ける）。 */
-const TH_STICKY = 'sticky top-0 z-20 bg-gray-50 border-b border-gray-200 whitespace-nowrap'
+   ⚠️ ここに max-h（縦スクロール）を戻さないこと。
+   区切り4では固定ヘッダーのために `max-h-[70vh] overflow-auto` を付けていたが、
+   この画面はページ本文側（`flex-1 overflow-y-auto`）が既に縦スクロール領域なので、
+   表にも縦スクロールを持たせると縦スクロールバーが右端に2本並ぶ（実測: 本文側の
+   バーが x=1250〜1265、表のバーが x=1214〜1229）。オーナー指摘により縦スクロールは
+   本文側の1本に統一した。
+
+   固定ヘッダー（sticky top-0）は「表のラッパー自身が縦スクロールすること」が前提のため、
+   この変更で成立しなくなる。したがって top-0 も併せて外してある（残すと効かない指定が
+   コードに残り、次に読む人が「固定されるはず」と誤解する）。
+   横スクロールは overflow-x-auto で残るため、左端の識別列の固定（sticky left-0）は
+   従来どおり機能する＝広い表で「今どの商品の行か」を見失う問題は解消したまま。 */
+const TABLE_SCROLL = 'overflow-x-auto'
+/* ヘッダーはセルごとに背景と下境界線を持たせる（thead への背景指定だけでは
+   横スクロール時に本文が透ける）。 */
+const TH_STICKY = 'bg-gray-50 border-b border-gray-200 whitespace-nowrap'
 /* 左端の識別列は横スクロールでも残す（規約: 1列目は人間が読める識別子）。
-   縦横が交差するヘッダーだけ z を1段上げる。
+   ヘッダー行の左端セルだけ z を1段上げる。
    min-w が無いと、狭い幅のときに商品名と「母数不足・参考値」バッジが1文字ずつ折り返して
    行の高さが数百pxに膨らむ（固定した識別列が読めないと左端固定の意味がない）。 */
 const STICKY_LEFT_MIN_W = 'min-w-[11rem]'
-const TH_STICKY_LEFT = `sticky top-0 left-0 z-30 bg-gray-50 border-b border-r border-gray-200 whitespace-nowrap ${STICKY_LEFT_MIN_W}`
+const TH_STICKY_LEFT = `sticky left-0 z-30 bg-gray-50 border-b border-r border-gray-200 whitespace-nowrap ${STICKY_LEFT_MIN_W}`
 const TD_STICKY_LEFT = `sticky left-0 z-10 border-r border-gray-100 ${STICKY_LEFT_MIN_W}`
 
 /* 行の背景は「警告 > 選択 > 通常」の1本で決める。
@@ -440,8 +448,7 @@ export default function GapAnalysis() {
                 ジャンル別KPI（参照用テーブル）
               </summary>
               <div className="mt-2 bg-white rounded-xl border shadow-sm overflow-hidden">
-                {/* 商品別テーブルと同じ表の作法。ジャンル数は通常少ないので max-h は実際には
-                    発動しないが、ジャンルの多い店舗で固定ヘッダーが効くよう揃えておく */}
+                {/* 商品別テーブルと同じ表の作法（横スクロール＋左端のジャンル列固定） */}
                 <div className={TABLE_SCROLL}>
                   <table className="w-full text-sm">
                     <thead className="text-xs text-gray-500">
