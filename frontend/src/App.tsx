@@ -121,7 +121,30 @@ export default function App() {
 
   return (
     <BrowserRouter>
-      <div className="flex h-screen overflow-hidden bg-gray-50">
+      {/* relative は必須。外すとページ自体にスクロールバーが出る。
+          `sr-only`（Tailwind）は position:absolute なので、包含ブロックを持つ
+          位置指定の祖先が無いと ICB（＝ビューポート）基準になり、この
+          `overflow-hidden` に切り取られずドキュメントの高さを押し広げてしまう。
+          実際 GAP分析では Delta.tsx の読み上げ用スパン（「減少」）が本文の奥にあるため
+          静的位置が y=1329 まで下がり、h-screen なのに 530px ぶん本文がスクロールする
+          ＝画面右端のスクロールバーが1本余分に見える状態になっていた（2026-08-05 実測）。 */}
+      <div className="relative flex h-screen overflow-hidden bg-gray-50">
+        {/* 本文へスキップ（キーボード操作の入口）。
+            サイドバーのナビは項目が多く、Tabだけで本文（GAP分析の改善ボタン等）に
+            届くまで十数回かかる。DOM上の最初のフォーカス可能要素をここに置くことで、
+            Tab 1回 → Enter で main へ飛べるようにする。
+
+            通常は sr-only で見えず、フォーカスが当たったときだけ現れる。
+            position は focus:absolute ではなく focus:fixed を使うこと。親は
+            `relative overflow-hidden` なので、absolute だとこの枠に切り取られて
+            フォーカスしても見えなくなる。fixed はビューポート基準で描画される
+            （祖先に transform が無いため）。 */}
+        <a
+          href="#main-content"
+          className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-lg focus:bg-white focus:px-4 focus:py-2 focus:text-sm focus:font-bold focus:text-gray-900 focus:shadow-lg focus:outline-none focus:ring-2 focus:ring-red-500"
+        >
+          本文へスキップ
+        </a>
         <Sidebar
           onOpenHelp={reopenOnboarding}
           onOpenFeedback={() => { setFeedbackCategory('bug'); setShowFeedback(true) }}
@@ -131,7 +154,9 @@ export default function App() {
         {/* main 自体はスクロールさせず、内側のラッパーをスクロール領域にする。
             こうするとフッター（法的ページへのリンク）が常に画面下に残る。
             各ページの `h-full` は flex-1 + min-h-0 の親に対して解決される。 */}
-        <main className="flex-1 overflow-hidden flex flex-col">
+        {/* tabIndex={-1} が無いと、スキップリンクを踏んでもスクロールするだけで
+            フォーカスが移らず、次の Tab がサイドバーの続きに戻ってしまう */}
+        <main id="main-content" tabIndex={-1} className="flex-1 overflow-hidden flex flex-col focus:outline-none">
           <div className="flex-1 min-h-0 overflow-auto flex flex-col">
             <AppRoutes userEmail={session?.user?.email ?? null} />
           </div>
