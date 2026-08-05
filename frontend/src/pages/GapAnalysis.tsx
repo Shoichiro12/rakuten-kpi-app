@@ -16,6 +16,7 @@ import SortableTh from '../components/table/SortableTh'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
 import { usePeriodState } from '../lib/usePeriodState'
+import { FOCUS_RING, TAP_TARGET } from '../lib/a11y'
 import type { KPIs, GenreKPI, KPITree, EvaluationResult, AccessAxis } from '../types'
 import { ACCESS_AXIS_LABEL } from '../types'
 
@@ -27,9 +28,9 @@ interface ProductItem {
 }
 
 function ChangeCell({ value }: { value: number | null | undefined }) {
-  if (value == null) return <span className="text-gray-400">—</span>
+  if (value == null) return <span className="text-gray-400" aria-hidden="true">—</span>
   const up = value > 0
-  return <span className={`font-medium ${up ? 'text-green-600' : 'text-red-500'}`}>{up ? '+' : ''}{value.toFixed(1)}%</span>
+  return <span className={`font-medium ${up ? 'text-success-ink' : 'text-danger'}`}>{up ? '+' : ''}{value.toFixed(1)}%</span>
 }
 
 /* 表の作法（docs/ui_number_and_chart_rules_2026-08-04.md 4章／区切り4の残り）。
@@ -46,7 +47,11 @@ function ChangeCell({ value }: { value: number | null | undefined }) {
    この変更で成立しなくなる。したがって top-0 も併せて外してある（残すと効かない指定が
    コードに残り、次に読む人が「固定されるはず」と誤解する）。
    横スクロールは overflow-x-auto で残るため、左端の識別列の固定（sticky left-0）は
-   従来どおり機能する＝広い表で「今どの商品の行か」を見失う問題は解消したまま。 */
+   従来どおり機能する＝広い表で「今どの商品の行か」を見失う問題は解消したまま。
+
+   なお 2026-08-04 には同じ二重スクロールバーへの対策として、内側だけを細いスクロールバーに
+   する `.table-scroll-thin`（index.css）を当てる案が書かれていた。縦スクロール自体を
+   無くした本対応で不要になったため、ここでは使っていない。 */
 const TABLE_SCROLL = 'overflow-x-auto'
 /* ヘッダーはセルごとに背景と下境界線を持たせる（thead への背景指定だけでは
    横スクロール時に本文が透ける）。 */
@@ -199,12 +204,12 @@ export default function GapAnalysis() {
           <>
             {/* 画面全体のアクセス軸。ブロックごとではなくここに1つだけ出す */}
             <AccessAxisBadge axis={treeData?.access_axis} />
-            <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+            <label className={`flex items-center gap-1.5 px-2 text-xs text-gray-600 cursor-pointer select-none ${TAP_TARGET}`}>
               <input
                 type="checkbox"
                 checked={excludeInactive}
                 onChange={(e) => setExcludeInactive(e.target.checked)}
-                className="rounded border-gray-300"
+                className={`rounded border-gray-300 ${FOCUS_RING}`}
               />
               廃盤を除外
             </label>
@@ -272,7 +277,7 @@ export default function GapAnalysis() {
                 onKPIClick={handleKPIClick}
               />
             ) : (
-              <div className="h-48 flex items-center justify-center text-sm text-gray-400">
+              <div className="h-48 flex items-center justify-center text-sm text-gray-500">
                 {loading ? '読み込み中...' : 'データがありません'}
               </div>
             )}
@@ -420,7 +425,12 @@ export default function GapAnalysis() {
                           </td>
                           <td className="px-3 py-2.5 text-center text-xs">
                             <button
-                              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setSelectedProduct(isSelected ? null : p)
+                              }}
+                              aria-expanded={isSelected}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${FOCUS_RING} ${
                                 isSelected
                                   ? 'bg-blue-600 text-white'
                                   : accessWarn || cvrWarn || avWarn || p.limit_cpo_exceeded

@@ -12,6 +12,7 @@ import { GRID, SERIES } from '../components/chart/defaults'
 import { formatYenAxis } from '../lib/format'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent } from '../lib/utils'
+import { FOCUS_RING, TAP_TARGET } from '../lib/a11y'
 import type {
   RppPeriods, RppWeeklyPeriod, RppMonthlyPeriod,
   RppSummaryResponse, RppSalesItem, RppDiagnosisResponse, RppDiagnosisItem,
@@ -44,7 +45,7 @@ function MiniKpiCard({
 }) {
   return (
     <div className="bg-white rounded-xl border shadow-sm p-4 space-y-2">
-      <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</p>
+      <p className="text-xs font-medium text-gray-500">{label}</p>
       <div className="flex items-end gap-3">
         <div>
           <p className="text-2xl font-bold text-gray-900">{value720}</p>
@@ -310,7 +311,7 @@ export default function RppAnalysis() {
               <button
                 key={t}
                 onClick={() => setPeriodType(t)}
-                className={`px-4 py-1.5 text-sm font-medium rounded-md transition-colors ${
+                className={`px-4 text-sm font-medium rounded-md transition-colors ${TAP_TARGET} ${FOCUS_RING} ${
                   periodType === t
                     ? 'bg-blue-600 text-white shadow-sm'
                     : 'text-gray-600 hover:text-gray-900'
@@ -370,7 +371,7 @@ export default function RppAnalysis() {
             {/* KPIカード 4枚 */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white rounded-xl border shadow-sm p-4">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">広告費</p>
+                <p className="text-xs font-medium text-gray-500">広告費</p>
                 <p className="text-2xl font-bold text-gray-900 mt-2">
                   {s?.total_ad_cost != null ? formatCurrency(s.total_ad_cost) : 'データなし'}
                 </p>
@@ -398,7 +399,7 @@ export default function RppAnalysis() {
             {/* 売上カード */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="bg-white rounded-xl border shadow-sm p-4">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <p className="text-xs font-medium text-gray-500">
                   売上（720h基準）
                 </p>
                 <p className="text-2xl font-bold text-gray-900 mt-2">
@@ -406,7 +407,7 @@ export default function RppAnalysis() {
                 </p>
               </div>
               <div className="bg-white rounded-xl border shadow-sm p-4">
-                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+                <p className="text-xs font-medium text-gray-500">
                   売上（12h基準）
                 </p>
                 <p className="text-2xl font-bold text-gray-900 mt-2">
@@ -461,7 +462,7 @@ export default function RppAnalysis() {
               <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
                 <p className="text-sm font-bold text-gray-900">商品別実績</p>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-400">行クリックで診断を表示</span>
+                  <span className="text-xs text-gray-500">行クリックで診断を表示</span>
                   {salesTotal > salesItems.length && (
                     <span className="text-xs text-gray-400">
                       {salesItems.length}件表示 / 全{salesTotal}件
@@ -512,7 +513,21 @@ export default function RppAnalysis() {
                             )}
                           </td>
                           <td className="px-4 py-2.5 whitespace-nowrap">
-                            <DiagnosisBadges diag={diag} />
+                            {item.item_code && diag ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  setSelectedCode(item.item_code!)
+                                }}
+                                aria-expanded={isSelected}
+                                className={`rounded ${FOCUS_RING}`}
+                              >
+                                <DiagnosisBadges diag={diag} />
+                              </button>
+                            ) : (
+                              <DiagnosisBadges diag={diag} />
+                            )}
                           </td>
                           <td className="px-4 py-2.5 text-right font-medium text-gray-900 whitespace-nowrap tabular-nums">
                             {rppNum(item.ad_cost)}
@@ -526,7 +541,7 @@ export default function RppAnalysis() {
                                 className={
                                   // 色を付けるのはしきい値を割った行だけ。300%以上を緑にすると
                                   // 全行が色付きになり、何も目立たなくなる（規約 4）
-                                  item.roas_720 < 100 ? 'text-red-500' : 'text-gray-700'
+                                  item.roas_720 < 100 ? 'text-danger' : 'text-gray-700'
                                 }
                               >
                                 {item.roas_720.toFixed(1)}
@@ -549,7 +564,7 @@ export default function RppAnalysis() {
                             {item.roas_12 != null ? (
                               <span
                                 className={
-                                  item.roas_12 < 100 ? 'text-red-500' : 'text-gray-600'
+                                  item.roas_12 < 100 ? 'text-danger' : 'text-gray-600'
                                 }
                               >
                                 {item.roas_12.toFixed(1)}

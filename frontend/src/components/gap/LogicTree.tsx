@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from 'react'
 import type { KPITree, KPITreeNode } from '../../types'
 
 interface LogicTreeProps {
@@ -80,11 +81,32 @@ function NodeBox({ x, y, w, h, node, hasTarget, emptyLabel = '目標未設定', 
   const cx = x + w / 2
   const strokeW = isSelected ? 3 : isRoot ? 2 : 1.5
 
+  const ariaLabel = onClick
+    ? `${node.label}　実績${formatVal(node)}${
+        hasTarget && node.target > 0
+          ? `　目標${formatTarget(node)}　達成率${node.achieve_rate.toFixed(0)}%`
+          : ''
+      }　クリックでジャンル別内訳へ`
+    : undefined
+
+  const handleKeyDown = onClick
+    ? (e: KeyboardEvent<SVGGElement>) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onClick()
+        }
+      }
+    : undefined
+
   return (
     <g
       onClick={onClick}
-      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      onKeyDown={handleKeyDown}
+      tabIndex={onClick ? 0 : undefined}
       role={onClick ? 'button' : undefined}
+      aria-label={ariaLabel}
+      style={{ cursor: onClick ? 'pointer' : 'default' }}
+      className={onClick ? 'outline-none focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary focus-visible:outline-offset-2' : undefined}
     >
       <rect
         x={x} y={y} width={w} height={h} rx={12}
@@ -146,7 +168,7 @@ export default function LogicTree({ data, selectedKPI, onKPIClick }: LogicTreePr
   // kgi/access/cvr/av のいずれかが欠けている場合はガード
   if (!data?.kgi || !data?.access || !data?.cvr || !data?.av) {
     return (
-      <div className="h-48 flex items-center justify-center text-sm text-gray-400">
+      <div className="h-48 flex items-center justify-center text-sm text-gray-500">
         データがありません
       </div>
     )
