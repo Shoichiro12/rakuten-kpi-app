@@ -123,6 +123,37 @@ def parse_number(val) -> float:
         return 0.0
 
 
+def _week_start_sunday(d: date) -> date:
+    """日付を含む週の日曜日を返す（dashboard.get_week_start と同一規約）。
+
+    RPP集計テーブル（RppWeekly）の week_start は、ダッシュボード/GAP分析が
+    「選択週の日曜」と完全一致で突き合わせる集計キーになっている。楽天RMSのRPP
+    レポートは任意の日付範囲でダウンロードでき、開始日が日曜とは限らないため、
+    取込時に必ずこの関数で日曜へ正規化してから保存する。
+    （正規化しないと取込は成功するのに週次画面に何も出ない無言の不具合になる）
+
+    ⚠️ 月次レポート由来の行には適用しないこと。RppWeekly の月合計行は
+    week_start が月初であること自体が識別子で、detect_rpp_double_count() が
+    「week_start == 月次レポートの date_from」で二重計上を検出している。
+    """
+    return d - timedelta(days=d.isoweekday() % 7)  # Sunday=0, Monday=1, ...
+
+
+def _is_seven_days(d_from: str, d_to: str) -> bool:
+    """集計期間がちょうど7日間か。日曜正規化を適用してよいかの判定に使う。
+
+    RMSは任意の日付範囲でDLできるため「22日間」「5日間」といった期間も実在する。
+    これらを日曜へ丸めると、
+      - 複数週ぶんの数値が1つの週キーに集約され、既存の週の行を上書きしてしまう
+      - 月初側の期間（例 8/1〜8/5）が前月の週キーへ移動し、月次集計から抜け落ちる
+    という新たな事故になる。7日間ちょうどの「1週間ぶん」のときだけ正規化する。
+    """
+    try:
+        return (date.fromisoformat(d_to) - date.fromisoformat(d_from)).days == 6
+    except ValueError:
+        return False
+
+
 def _decode_content(content: bytes) -> str:
     """bytes をエンコード自動判別してデコードする。"""
     for enc in ["utf-8-sig", "utf-8", "cp932", "shift_jis"]:
@@ -371,11 +402,17 @@ def parse_rpp_real_file(content: bytes) -> tuple[list[dict], list[dict]]:
             "cpo_12": cpo_12,
         })
 
-        # RppWeekly への後方互換マッピング
+        # RppWeekly への後方互換マッピング。
+        # week_start は集計キーなので、1週間ぶん（7日間）の週次レポートは開始日が
+        # 日曜以外でも必ず日曜へ正規化する（読み出し側は日曜キーで突き合わせるため）。
+        # 月次由来の行・7日間以外の期間は従来どおり開始日のまま
+        # （_week_start_sunday / _is_seven_days の docstring 参照）。
         try:
             week_date = date.fromisoformat(date_from)
         except Exception:
             week_date = date.today()
+        if period_type == "weekly" and _is_seven_days(date_from, date_to):
+            week_date = _week_start_sunday(week_date)
 
         rpp_weekly.append({
             "week_start": week_date,
@@ -416,6 +453,9 @@ def parse_rpp_df(df: pd.DataFrame) -> list[dict]:
                 week_date = date.today()
         else:
             week_date = date.today()
+        # 集計キーは日曜始まりに正規化（RMS実ファイル取込と同じ規約に統一）。
+        # この旧シンプル形式は週次のみを想定しており period_type を持たない。
+        week_date = _week_start_sunday(week_date)
 
         records.append({
             "week_start": week_date,
@@ -851,17 +891,62 @@ def _import_rpp_bytes(content: bytes, db: Session, overwrite: bool = False) -> d
 
     period_types = sorted({r["period_type"] for r in rpp_sales_recs})
     year_months = sorted({r["year_month"] for r in rpp_sales_recs})
+
+    # ── 週始まりの正規化を可視化する ──────────────────────────────────
+    # RMSのRPPレポートは任意の日付範囲でDLできるため、CSVの開始日は日曜とは限らない。
+    # week_start は日曜へ正規化して保存する（読み出し側が日曜キーで突き合わせるため）が、
+    # 無言で日付をズラすと利用者が混乱するので、実際に集計される週を必ず提示する。
+    # 7日間以外の期間（例: 22日分を一度にDL）は日曜正規化の対象外。丸めると複数週ぶんが
+    # 1週に集約されて既存の週を上書きしたり、月をまたいで移動してしまうため
+    # （_is_seven_days 参照）。「取込週」にも出さず、注記で週次に出ない旨を伝える。
+    week_starts: set[date] = set()
+    shifted: list[str] = []
+    odd_ranges: list[str] = []
+    for d_from, d_to in sorted({
+        (r["date_from"], r["date_to"]) for r in rpp_sales_recs if r["period_type"] == "weekly"
+    }):
+        if _is_seven_days(d_from, d_to):
+            ws = _week_start_sunday(date.fromisoformat(d_from))
+            week_starts.add(ws)
+            if ws.isoformat() != d_from:
+                shifted.append(d_from)
+            continue
+        try:
+            days = (date.fromisoformat(d_to) - date.fromisoformat(d_from)).days + 1
+        except ValueError:
+            continue
+        odd_ranges.append(f"{d_from}〜{d_to}（{days}日間）")
+
+    weeks = [
+        f"{ws.isoformat()}〜{(ws + timedelta(days=6)).isoformat()}"
+        for ws in sorted(week_starts)
+    ]
+    if shifted:
+        guard_notes.append(
+            f"CSVの集計開始日（{'・'.join(shifted)}）が日曜ではないため、"
+            "週の始まり（日曜）に丸めて集計しました"
+        )
+    if odd_ranges:
+        guard_notes.append(
+            f"7日間ではない期間（{'・'.join(odd_ranges)}）は週の始まりを揃えられないため、"
+            "週次の画面に表示されない場合があります。RMSでは日曜〜土曜の7日間で"
+            "ダウンロードしてください"
+        )
+    # ─────────────────────────────────────────────────────────────────
+
+    period_desc = " / ".join(weeks) if weeks else ", ".join(year_months)
     _note = f"／{'・'.join(guard_notes)}" if guard_notes else ""
     return {
         "message": (
             f"{len(rpp_sales_recs)}件をインポートしました"
-            f"（{'/'.join(period_types)} / {', '.join(year_months)}）{_note}"
+            f"（{'/'.join(period_types)}・取込期間: {period_desc}）{_note}"
         ),
         "count": len(rpp_sales_recs),
         "inserted": inserted,
         "updated": updated,
         "period_types": period_types,
         "year_months": year_months,
+        "weeks": weeks,
         "format": "rms_rpp",
     }
 
