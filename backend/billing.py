@@ -112,6 +112,64 @@ def is_exempt_test_email(email: Optional[str]) -> bool:
     return email.strip().lower() in _EXEMPT_TEST_EMAILS
 
 
+# ── 【一時措置】カード登録なしでトライアル開始（2026-08-06） ─────────
+# なぜ入れたか:
+#   Stripe側の決済・入金が一時停止中で、Checkout でのカード登録が機能しない。
+#   トライアル運用のテストを止めないため、カード登録を挟まず trialing を
+#   DBに直接作成できるようにする（EXEMPT_TEST_EMAILS と同じコードパス）。
+#   この期間の課金が必要になった場合は、手動で請求書を発行する運用にする。
+#
+# ⚠️ Stripeの問題が解決したら env を削除して元に戻すこと。コードは残してよいが、
+#    フラグが立っている限りカード登録なしで全機能が使える状態が続く。
+#
+# 設定:
+#   TRIAL_WITHOUT_CARD=true             … 有効化（既定は無効。env を消せば即座に元通り）
+#   TRIAL_WITHOUT_CARD_DOMAINS=a.co.jp  … 任意。カンマ区切り。**指定するとそのドメインの
+#                                          メールだけ**が対象になる。未指定だと
+#                                          【サインアップした全員】が対象になる点に注意
+#                                          （self-serveでサインアップできるため、
+#                                            期間中は誰でも無料で全機能を使える）。
+#
+# ⚠️ この経路で作った契約は Stripe 側に存在しない（顧客もサブスクも作らない）。
+#    そのため Webhook が来ず、トライアル期限が過ぎても自動で停止しない
+#    （status は trialing のまま）。フラグを戻したあと、該当ユーザーの
+#    Subscription 行をどうするか（手動で status を変える／契約してもらう）は
+#    運用で決めること。
+_TRIAL_WITHOUT_CARD = os.environ.get("TRIAL_WITHOUT_CARD", "").strip().lower() in (
+    "1", "true", "yes", "on",
+)
+_TRIAL_WITHOUT_CARD_DOMAINS = frozenset(
+    d.strip().lower().lstrip("@")
+    for d in os.environ.get("TRIAL_WITHOUT_CARD_DOMAINS", "").split(",")
+    if d.strip()
+)
+
+
+def trial_without_card_enabled() -> bool:
+    """一時措置のフラグが立っているか（画面・診断の表示用）。"""
+    return _TRIAL_WITHOUT_CARD
+
+
+def trial_without_card_domains() -> list:
+    """対象を絞っているドメイン一覧（空＝全ユーザーが対象）。"""
+    return sorted(_TRIAL_WITHOUT_CARD_DOMAINS)
+
+
+def trial_without_card_for(email: Optional[str]) -> bool:
+    """このユーザーはカード登録なしでトライアルを開始できるか。
+
+    判定には必ず【JWT検証済みの認証ユーザーのメール】を渡すこと
+    （リクエストボディ等の入力値で判定すると誰でも名乗るだけで回避できる）。
+    """
+    if not _TRIAL_WITHOUT_CARD:
+        return False
+    if not _TRIAL_WITHOUT_CARD_DOMAINS:
+        return True  # ドメイン未指定 = 全ユーザー対象
+    if not email or "@" not in email:
+        return False
+    return email.strip().lower().rsplit("@", 1)[-1] in _TRIAL_WITHOUT_CARD_DOMAINS
+
+
 def get_stripe():
     """api_key を設定した stripe SDK を返す（未設定/未導入なら None）。"""
     if not _SECRET:

@@ -13,6 +13,7 @@
   DB操作の直前に current_user_id を明示セットしてテナントを固定する（tenancy.py 参照）。
   秘密鍵・Webhook署名シークレットはフロントへ渡さない。
 """
+import logging
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -32,12 +33,19 @@ webhook_router = APIRouter(prefix="/api/stripe", tags=["billing"])
 
 _ACTIVE_STATUSES = ("trialing", "active")
 
+_log = logging.getLogger("billing")
+
 
 def _sub_dict(s) -> dict:
     if s is None:
         return {"plan": None, "status": None, "trial_end": None,
-                "current_period_end": None, "is_active": False}
+                "current_period_end": None, "is_active": False, "stripe_linked": False}
     return {
+        # Stripe に顧客が紐付いているか。カード登録なしで作った契約（TRIAL_WITHOUT_CARD /
+        # EXEMPT_TEST_EMAILS）は false で、カスタマーポータルを開けない。
+        # フロントは false のとき「お支払い方法の変更」を出さない（押しても
+        # 「契約情報が見つかりません」になり、利用者を混乱させるため）。
+        "stripe_linked": bool(s.stripe_customer_id),
         "plan": s.plan,
         "plan_label": B.PLAN_LABELS.get(s.plan, s.plan) if s.plan else None,
         "status": s.status,
@@ -81,9 +89,18 @@ def billing_plans(_u: AuthUser = Depends(get_current_user)):
     livemode: 設定中のStripe鍵が本番か（true=本番 / false=テスト / null=未設定）。
     フロントは「テストモードでは4242…で登録できます」の案内をテスト時だけ表示する。
     本番でこの文言が出ると、実カードを求められた顧客を混乱させるため。
+
+    card_required: このユーザーの開始時にカード登録が要るか。
+    一時措置 TRIAL_WITHOUT_CARD（および EXEMPT_TEST_EMAILS）が効いていると false。
+    画面の「決済は Stripe の安全な画面で行われます」を出し分けるために返す
+    （実際にはStripeへ飛ばないのに飛ぶと書いてあると、利用者が混乱するため）。
     """
+    card_required = not (
+        B.is_exempt_test_email(_u.email) or B.trial_without_card_for(_u.email)
+    )
     return {"enabled": B.BILLING_ENABLED, "trial_days": B.trial_days(),
-            "livemode": B.key_is_live(), "plans": B.configured_plans()}
+            "livemode": B.key_is_live(), "plans": B.configured_plans(),
+            "card_required": card_required}
 
 
 class CheckoutPayload(BaseModel):
@@ -101,19 +118,27 @@ def create_checkout(
 
     プランは単一（standard）なので分岐しない。トライアルは B.trial_days() 日。
 
-    例外: EXEMPT_TEST_EMAILS（テスト・デモ用アカウント）は Stripe Checkout を
-    通さず trialing を直接作成する（下の分岐参照）。通常ユーザーの流れは変えない。
+    例外: EXEMPT_TEST_EMAILS（テスト・デモ用アカウント）と TRIAL_WITHOUT_CARD
+    （Stripe停止中の一時措置）は Stripe Checkout を通さず trialing を直接作成する
+    （下の分岐参照）。それ以外の通常ユーザーの流れは変えない。
     """
-    # ── テスト・デモ用アカウントの除外分岐（2026-07-30） ──────────────
-    #   社内の検証・レビュー用アカウントはカード登録ができず、カード必須化以降
-    #   ログイン後の画面を確認できなくなったため、Checkout をスキップして
-    #   trialing のサブスクリプションをDBに直接作成する。
+    # ── カード登録をスキップして trialing を直接作る分岐 ────────────────
+    #   (1) EXEMPT_TEST_EMAILS（2026-07-30）… 社内の検証・デモ用アカウント。
+    #       カード登録ができず、カード必須化以降ログイン後の画面を確認できなくなったため。
+    #   (2) TRIAL_WITHOUT_CARD（2026-08-06・一時措置）… Stripe側の決済・入金が
+    #       停止中でカード登録が機能しないため。**解決後は env を消して元に戻すこと。**
+    #
+    #   共通の注意:
     #   - 判定は【JWT検証済み】の user.email のみ（ボディ等の入力値は使わない）
     #   - Stripe には顧客もサブスクリプションも作らない（DBレコードのみ）。
-    #     Webhook が来ないため、この契約は期限切れで自動停止しない点に注意
-    #     （テスト専用の想定。対象は env で自社管理のメールに限定すること）
+    #     Webhook が来ないため、この契約は期限切れで自動停止しない
     #   - Stripe 未設定のローカル環境でも動くよう、get_stripe() より前に置く
+    _skip_reason = None
     if B.is_exempt_test_email(user.email):
+        _skip_reason = "EXEMPT_TEST_EMAILS"
+    elif B.trial_without_card_for(user.email):
+        _skip_reason = "TRIAL_WITHOUT_CARD"
+    if _skip_reason:
         s = db.query(Subscription).first()
         if s is None:
             s = Subscription()
@@ -123,6 +148,12 @@ def create_checkout(
         s.trial_end = datetime.utcnow() + timedelta(days=B.trial_days())
         s.current_period_end = s.trial_end
         db.commit()
+        # 後から手動で請求書を発行する運用のため、誰にカードなしで開始したかを残す。
+        # （Stripe側に記録が無いので、ログが唯一の手掛かりになる）
+        _log.info(
+            "カード登録なしでトライアルを開始しました（%s）: user_id=%s email=%s trial_end=%s",
+            _skip_reason, user.id, user.email, s.trial_end.isoformat(),
+        )
         # フロントは url に遷移するだけなので、Checkout 成功時と同じ戻り先を返す。
         # session_id を付けない＝フロントの confirm 呼び出しは走らない（Billing.tsx 参照）。
         return {"url": f"{B.app_base_url()}/billing?checkout=success"}
@@ -285,6 +316,20 @@ def _diagnose(db: Session) -> dict:
 
     if B.trial_days() != 14:
         note("error", f"トライアル日数が {B.trial_days()} 日です（環境変数 STRIPE_TRIAL_DAYS を確認）。")
+
+    # 一時措置が入ったままにならないよう、診断で必ず見えるようにする（2026-08-06）
+    out["config"]["trial_without_card"] = B.trial_without_card_enabled()
+    out["config"]["trial_without_card_domains"] = B.trial_without_card_domains()
+    if B.trial_without_card_enabled():
+        _scope = (
+            "対象: " + " / ".join(B.trial_without_card_domains()) + " のメール"
+            if B.trial_without_card_domains()
+            else "対象: 【全ユーザー】（ドメイン未指定）"
+        )
+        note("warn",
+             "一時措置 TRIAL_WITHOUT_CARD が有効です。カード登録なしでトライアルを開始でき、"
+             f"その契約は Stripe 側に作られません（自動課金も自動停止もされません）。{_scope}。"
+             "Stripeの決済・入金が復旧したら env を削除して元に戻してください。")
 
     # 表示用の税抜金額は手計算（税込 ÷ 1.1）なので、Stripeの設定から自動追従しない。
     # 税込金額だけ直して税抜表示を直し忘れる事故を検出する。
