@@ -30,6 +30,10 @@ export default function Billing() {
   // true=本番 / null・undefined=未設定や取得前は出さない。本番でテスト用文言を
   // 見せると実カードを求められた顧客が混乱するため）
   const [livemode, setLivemode] = useState<boolean | null>(null)
+  // 開始時にカード登録が要るか（false = Stripeの決済画面へ飛ばずにトライアルが始まる）。
+  // 一時措置 TRIAL_WITHOUT_CARD が効いているときに false になる。既定は true 側に倒す
+  // （未取得の状態で「カード不要」と出すと、実際には求められて混乱するため）
+  const [cardRequired, setCardRequired] = useState(true)
   const [loading, setLoading] = useState(false)
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
@@ -48,6 +52,7 @@ export default function Billing() {
       setPlans(pl.plans)
       setTrialDays(pl.trial_days)
       setLivemode(pl.livemode ?? null)
+      setCardRequired(pl.card_required ?? true)
     } catch (e) {
       console.error('[Billing] 取得エラー:', e)
     } finally {
@@ -199,13 +204,18 @@ export default function Billing() {
                 </div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <button
-                  onClick={openPortal}
-                  disabled={busy === 'portal'}
-                  className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
-                >
-                  <ExternalLink size={15} /> お支払い方法の変更
-                </button>
+                {/* カード登録なしで作った契約（TRIAL_WITHOUT_CARD 等）はStripeに顧客が
+                    無く、ポータルを開けない。押すと「契約情報が見つかりません」になり
+                    混乱させるだけなので、その場合はボタン自体を出さない。 */}
+                {status.stripe_linked !== false && (
+                  <button
+                    onClick={openPortal}
+                    disabled={busy === 'portal'}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-colors"
+                  >
+                    <ExternalLink size={15} /> お支払い方法の変更
+                  </button>
+                )}
                 <button
                   onClick={async () => {
                     setBusy('refresh')
@@ -223,7 +233,11 @@ export default function Billing() {
               {/* ポータルの自己解約は意図的に無効化している（Stripeダッシュボード側の設定）。
                   解約は下の「解約をご希望の場合」セクション＝問い合わせ経由で受け付ける。
                   「解約ボタンがない」は不具合ではない（CLAUDE.md 申し送り参照）。 */}
-              <p className="text-xs text-gray-400 mt-2">Stripeのカスタマーポータルでお支払い方法の変更・ご契約内容の確認ができます。</p>
+              <p className="text-xs text-gray-400 mt-2">
+                {status.stripe_linked === false
+                  ? 'このご契約はお支払い方法の登録なしで開始されています。自動での課金は行われません。'
+                  : 'Stripeのカスタマーポータルでお支払い方法の変更・ご契約内容の確認ができます。'}
+              </p>
             </div>
           )}
 
@@ -283,9 +297,17 @@ export default function Billing() {
                 <a href={LEGAL_LINKS.terms} {...EXTERNAL_LINK_PROPS} className="text-blue-600 hover:underline">利用規約</a>
                 {' '}をご確認ください。
               </p>
+              {/* カード登録が要らない状態（一時措置 TRIAL_WITHOUT_CARD 等）で
+                  「Stripeの画面へ行く」と書いたままにしない。実際には遷移しないため。 */}
               <p className="text-xs text-gray-400 mt-2">
-                決済は Stripe の安全な画面で行われます。
-                {livemode === false && ' テストモードでは番号 4242 4242 4242 4242（有効期限は未来・任意のCVV）で登録できます。'}
+                {cardRequired ? (
+                  <>
+                    決済は Stripe の安全な画面で行われます。
+                    {livemode === false && ' テストモードでは番号 4242 4242 4242 4242（有効期限は未来・任意のCVV）で登録できます。'}
+                  </>
+                ) : (
+                  'ただいまカード登録なしでトライアルを開始できます。お支払い方法の登録は不要で、自動での課金は行われません。'
+                )}
               </p>
             </div>
           )}

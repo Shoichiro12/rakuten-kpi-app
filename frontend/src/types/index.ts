@@ -341,6 +341,12 @@ export interface BillingStatus {
   trial_end: string | null
   current_period_end: string | null
   is_active: boolean
+  /**
+   * Stripeに顧客が紐付いているか。カード登録なしで開始した契約
+   * （TRIAL_WITHOUT_CARD / EXEMPT_TEST_EMAILS）は false で、
+   * カスタマーポータルを開けないため「お支払い方法の変更」を出さない。
+   */
+  stripe_linked?: boolean
 }
 
 export interface BillingPlan {
@@ -430,6 +436,11 @@ export interface BillingPlansResponse {
   trial_days: number
   /** Stripe鍵のモード（true=本番 / false=テスト / null=未設定）。テスト時だけ4242案内を出す */
   livemode?: boolean | null
+  /**
+   * 開始時にカード登録が要るか。一時措置 TRIAL_WITHOUT_CARD（Stripe決済停止中）や
+   * EXEMPT_TEST_EMAILS が効いていると false になり、Stripeの決済画面へは飛ばない。
+   */
+  card_required?: boolean
   plans: BillingPlan[]
 }
 
