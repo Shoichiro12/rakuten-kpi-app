@@ -628,8 +628,13 @@ export default function DataImport() {
                 {status.detail.format && (
                   <span className="bg-green-100 rounded px-2 py-0.5">形式: {status.detail.format}</span>
                 )}
-                {status.detail.year_months && status.detail.year_months.length > 0 && (
-                  <span className="bg-green-100 rounded px-2 py-0.5">
+                {status.detail.weeks && status.detail.weeks.length > 0 ? (
+                  /* 週次はCSVの開始日ではなく、正規化後（日曜起点）の実際の集計週を出す */
+                  <span className="bg-green-100 rounded px-2 py-0.5 tabular-nums whitespace-nowrap">
+                    取込週: {status.detail.weeks.join(' / ')}
+                  </span>
+                ) : status.detail.year_months && status.detail.year_months.length > 0 && (
+                  <span className="bg-green-100 rounded px-2 py-0.5 tabular-nums">
                     対象月: {status.detail.year_months.join(', ')}
                   </span>
                 )}

@@ -724,6 +724,8 @@ export interface RppImportResult {
   updated?: number
   period_types?: string[]
   year_months?: string[]
+  /** 正規化後の週（日曜〜土曜）。RMSのCSV開始日が日曜以外でも実際に集計される週を示す */
+  weeks?: string[]
   format?: string
 }
 
