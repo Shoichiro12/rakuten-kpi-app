@@ -13,16 +13,16 @@
 
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ウレシル | 楽天市場の売上・RPP広告KPI管理ツール</title>
-<meta name="description" content="楽天RMSのCSVを貼り付けるだけ。売上をアクセス×転換率×客単価に分解し、RPP広告のROI・CPO・ROASを自動で監視。利益を削っている商品を自動アラートするKPI管理ツール。">
+<meta name="description" content="楽天RMSのCSVを取り込むと、売上をアクセス×転換率×客単価に分解し、どのKPIが弱いかを判定して、今週やることまで出します。ROI・CPO・ROASの監視と、年間予算からの逆算まで。">
 <link rel="canonical" href="https://ureshiru.com/">
 
 <!-- OGP（独自ドメイン ureshiru.com で確定済み） -->
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="ウレシル">
 <meta property="og:title" content="ウレシル | 楽天市場の売上・RPP広告KPI管理ツール">
-<meta property="og:description" content="RMSのCSVを貼り付けるだけ。ROI・CPO・ROASを毎週監視し、利益を削っている商品を自動でアラートします。">
+<meta property="og:description" content="RMSのCSVを取り込むと、売上を分解し、弱いKPIを判定し、今週やることまで出します。">
 <meta property="og:url" content="https://ureshiru.com/">
-<meta property="og:image" content="https://ureshiru.com/screenshot-1784278207302-65ff3047.jpg">
+<meta property="og:image" content="https://ureshiru.com/shot-hero.jpg">
 <meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
 
@@ -35,7 +35,7 @@
   "name": "ウレシル",
   "applicationCategory": "BusinessApplication",
   "operatingSystem": "Web",
-  "description": "楽天市場の売上・RPP広告KPIを管理・分析するWebアプリ。RMSのCSVを取り込むだけでROI・CPO・ROASを週次で自動監視します。",
+  "description": "楽天市場の売上・RPP広告KPIを管理・分析するWebアプリ。RMSのCSVを取り込むだけでROI・CPO・ROASを週次・月次・年次で監視します。",
   "offers": [
     { "@type": "Offer", "name": "ウレシル 月額プラン", "price": "22000", "priceCurrency": "JPY" }
   ],
@@ -48,9 +48,17 @@
 <link href="https://fonts.googleapis.com/css2?family=Zen+Maru+Gothic:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&family=Quicksand:wght@500;700&display=swap" rel="stylesheet">
 
 <style>
-  /* デザイントークン（2026-07-30 C案トーン。docs/LP_lowya_dna_2026-07-30.md 参照）
-     - sage(#78927b)は下線・ドット等の装飾専用（白地3.3:1のためテキスト不可）
-     - テキストに使う緑は sage-deep(#4c6850)。アラート赤/上昇緑は意味色 */
+/* Hallmark · macrostructure: Narrative Workflow · tone: 実務的・穏やか · anchor hue: sage (chromatic-other)
+ * nav: N9 Edge-aligned minimal · footer: Ft1 Mast-headed · enrichment: none（実画面5枚を配置）
+ * theme: C案トーン（2026-07-30 の既存資産を維持。骨格のみ入れ替え）
+ * 設計: docs/LP_redesign_sekkei_2026-08-07.md
+ * pre-emit critique: P5 H5 E4 S5 R5 V4
+ *
+ * トークンはこのファイル内の :root が単一の真実。tokens.css へ切り出していないのは、
+ * 同じ値が2箇所に増えると必ずズレるため（価格が LP と アプリ で食い違った事故の教訓）。
+ * - sage(#78927b) は下線・ドット等の装飾専用（白地3.3:1のためテキスト不可）
+ * - テキストに使う緑は sage-deep(#4c6850)。アラート赤/上昇緑は意味色
+ */
   :root {
     --ink: #383731;
     --ink-strong: #2e2d29;
@@ -59,146 +67,261 @@
     --paper: #fdfcf9;
     --bg-alt: #f4f1ea;
     --line: #e5dfd4;
+    --rule: #cfc7b8;
     --sage: #78927b;
     --sage-soft: #eef2ec;
     --sage-deep: #4c6850;
     --alert: #c2382f;
-    --alert-soft: #fdecea;
     --up: #17714d;
+
+    /* カード面。紙色(--paper)よりわずかに白く、面が浮いて見えるようにする */
+    --surface: #ffffff;
+    /* 暗色地（CTAバンド・フッター）の上に載る色 */
+    --on-ink: #d9d4c9;
+    --on-ink-dim: #b8b2a6;
+    --on-ink-faint: #8d8880;
+    --line-on-ink: #4a473f;
+
+    --font-display: "Zen Maru Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+    --font-body: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+    --font-num: Quicksand, "Zen Kaku Gothic New", sans-serif;
+
+    --space-xs: 8px;
+    --space-sm: 12px;
+    --space-md: 20px;
+    --space-lg: 32px;
+    --space-xl: 52px;
+    --space-2xl: 80px;
+    --space-3xl: 112px;
+
+    --shot-max: 780px;   /* 実画面の上限。1568px÷2＝784px を超えると網膜表示で滲む */
+    --wrap-max: 1120px;
+    --measure: 34em;
+
+    --ease-out: cubic-bezier(.22,.61,.36,1);
+    --dur-fast: 120ms;
+    --dur-mid: 200ms;
   }
-  * { box-sizing: border-box; }
-  body { margin: 0; font-family: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif; color: var(--ink); background: var(--paper); line-height: 1.75; }
+
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { overflow-x: clip; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    font-family: var(--font-body);
+    color: var(--ink);
+    background: var(--paper);
+    line-height: 1.8;
+    font-size: 16px;
+    /* 日本語の折り返しを文節単位にする（「トライア/ル中」のようにカタカナ語の
+       途中で切れるのを防ぐ）。未対応ブラウザは無視するだけなので副作用はない */
+    word-break: auto-phrase;
+  }
+  img { max-width: 100%; height: auto; display: block; }
   a { color: var(--ink); }
   a:hover { color: var(--sage-deep); }
-  a:focus-visible, button:focus-visible, summary:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-  /* 暗色地（CTAバンド・フッター）では墨色リングが背景に同化するため紙色に反転（3:1以上を確保） */
-  .cta a:focus-visible, footer a:focus-visible { outline-color: var(--paper); }
-  img { max-width: 100%; }
+  a:focus-visible, button:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--ink); outline-offset: 3px; border-radius: 2px;
+  }
+  /* 暗色地では墨色リングが背景に同化するため紙色へ反転（3:1以上を確保） */
+  .band-ink a:focus-visible, footer a:focus-visible { outline-color: var(--paper); }
+
+  .wrap { max-width: var(--wrap-max); margin: 0 auto; padding: 0 clamp(1rem, 4vw, 1.5rem); }
   .nw { white-space: nowrap; }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
-  h2 { font-size: clamp(26px, 3vw, 36px); text-align: center; margin: 0 0 14px; color: var(--ink); font-family: "Zen Maru Gothic", sans-serif; font-weight: 700; letter-spacing: 0; text-wrap: balance; }
-  h3 { text-wrap: balance; }
-  .lead { text-align: center; color: var(--muted); margin: 0 0 56px; font-size: 16px; }
-  section { padding: 110px 0; }
+
   .skip { position: absolute; left: -9999px; }
-  .skip:focus { left: 12px; top: 12px; background: var(--paper); padding: 10px 16px; border-radius: 8px; z-index: 100; }
+  .skip:focus {
+    position: fixed; left: 16px; top: 16px; z-index: 100;
+    background: var(--paper); color: var(--ink);
+    padding: 10px 18px; border-radius: 8px;
+    border: 2px solid var(--ink); text-decoration: none; font-weight: 700;
+  }
 
-  .btn-primary { display: inline-block; background: var(--ink); color: #fff; text-decoration: none; font-weight: 700; border-radius: 8px; }
-  .btn-primary:hover { opacity: .82; color: #fff; }
+  /* 見出し共通 — 長い日本語でも桁溢れしないように */
+  h1, h2, h3 {
+    font-family: var(--font-display); font-weight: 700; font-style: normal;
+    letter-spacing: 0; text-wrap: balance;
+    overflow-wrap: anywhere; min-width: 0;
+    margin: 0;
+  }
 
-  header { position: sticky; top: 0; background: rgba(253,252,249,.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); z-index: 10; }
-  .nav { display: flex; align-items: center; justify-content: space-between; height: 72px; }
-  .logo-badge { color: var(--ink); font-family: "Zen Maru Gothic", sans-serif; font-weight: 700; font-size: 23px; letter-spacing: .06em; text-decoration: none; }
-  .logo-badge .dot { color: var(--sage); }
-  .nav nav { display: flex; align-items: center; gap: 28px; }
-  .nav a.menu { color: var(--ink); text-decoration: none; font-size: 14px; }
-  .nav a.menu:hover { color: var(--sage-deep); }
-  .nav .btn-primary { font-size: 14px; padding: 10px 24px; }
+  .btn {
+    display: inline-block; background: var(--ink); color: var(--paper);
+    text-decoration: none; font-weight: 700; border-radius: 8px;
+    padding: 15px 32px; font-size: 16px; white-space: nowrap;
+    transition: opacity var(--dur-fast) var(--ease-out), transform var(--dur-fast) var(--ease-out);
+  }
+  .btn:hover { opacity: .84; color: var(--paper); }
+  .btn:active { transform: translateY(1px); }
+  .btn-quiet {
+    display: inline-block; border: 2px solid var(--ink); color: var(--ink);
+    text-decoration: none; font-weight: 700; border-radius: 8px;
+    padding: 13px 30px; font-size: 16px; white-space: nowrap;
+    transition: background var(--dur-fast) var(--ease-out), color var(--dur-fast) var(--ease-out);
+  }
+  .btn-quiet:hover { background: var(--ink); color: var(--paper); }
 
-  .hero { background: var(--paper); color: var(--ink); padding: 96px 0 110px; border-bottom: 1px solid var(--line); }
-  .hero .wrap { display: flex; gap: 64px; align-items: center; flex-wrap: wrap; }
-  .hero-copy { flex: 1 1 460px; }
-  .hero h1 { font-size: clamp(32px, 4.2vw, 52px); line-height: 1.45; margin: 0 0 24px; font-family: "Zen Maru Gothic", sans-serif; font-weight: 700; letter-spacing: 0; }
-  .hero h1 em { font-style: normal; text-decoration: underline; text-decoration-color: var(--sage); text-decoration-thickness: 2px; text-underline-offset: 6px; }
-  .hero-copy > p { color: var(--sub); margin: 0 0 36px; font-size: 17px; max-width: 34em; }
-  .hero-cta { display: flex; gap: 16px; flex-wrap: wrap; align-items: center; }
-  .hero .btn-primary { font-size: 17px; padding: 16px 40px; }
-  .hero .btn-primary::after { content: "→"; margin-left: 14px; font-weight: 400; }
-  .btn-outline { border: 2px solid var(--ink); color: var(--ink); text-decoration: none; font-weight: 700; font-size: 16px; padding: 14px 34px; border-radius: 8px; }
-  .btn-outline:hover { background: var(--ink); color: #fff; }
-  .hero-note { font-size: 13px; color: var(--muted); margin: 16px 0 0; }
-  .hero-visual { flex: 1 1 400px; }
+  /* ── N9 · Edge-aligned minimal ──────────────────────────────
+     ロゴ左・CTA右。間にリンク行を置かない。
+     リンク行が無いので「狭い画面でナビ項目が全部消える」事故が構造的に起きない。
+     面内の位置把握は工程番号(1.0〜5.0)が担い、料金・FAQ へはフッターから到達する。 */
+  .nav {
+    position: sticky; top: 0; z-index: 10;
+    background: color-mix(in srgb, var(--paper) 92%, transparent);
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid var(--line);
+  }
+  .nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: 72px; }
+  .wordmark {
+    display: inline-block; padding-block: 4px;
+    font-family: var(--font-display); font-weight: 700; font-size: 23px;
+    letter-spacing: .06em; text-decoration: none; color: var(--ink);
+  }
+  .wordmark .dot { color: var(--sage); }
+  .nav .btn { padding: 10px 22px; font-size: 15px; }
 
-  .mock { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 22px; box-shadow: 0 2px 10px rgba(0,0,0,.05); color: var(--ink); }
-  .mock-title { font-size: 12px; font-weight: 700; color: var(--ink); margin-bottom: 12px; }
-  .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
-  .kpi { background: var(--bg-alt); border-radius: 8px; padding: 12px; }
-  .kpi .k { font-size: 11px; color: var(--muted); }
-  .kpi .v { font-size: 20px; font-weight: 700; font-family: Quicksand, "Zen Kaku Gothic New", sans-serif; font-variant-numeric: tabular-nums; }
-  .kpi .up { color: var(--up); font-size: 11px; }
-  .kpi .down { color: var(--alert); font-size: 11px; }
-  .bars { display: flex; align-items: flex-end; gap: 7px; height: 100px; padding: 10px; background: var(--bg-alt); border-radius: 8px; }
-  .bars div { flex: 1; background: var(--ink); border-radius: 2px 2px 0 0; }
-  .bars div.hot { background: var(--alert); }
-  .alert { margin-top: 14px; background: var(--alert-soft); border-left: 4px solid var(--alert); font-size: 12px; padding: 10px 12px; border-radius: 8px; }
+  /* ── Hero ────────────────────────────────────────────────── */
+  .hero { padding: clamp(56px, 9vw, 104px) 0 clamp(48px, 7vw, 88px); }
+  .hero h1 {
+    font-size: clamp(34px, 6vw, 60px); line-height: 1.35;
+    margin: 0 0 var(--space-md);
+  }
+  .hero h1 u {
+    text-decoration: underline; text-decoration-color: var(--sage);
+    text-decoration-thickness: 3px; text-underline-offset: 8px;
+  }
+  .hero-lede {
+    color: var(--sub); font-size: clamp(15px, 1.6vw, 17px);
+    max-width: var(--measure); margin: 0 0 var(--space-lg);
+  }
+  .hero-cta { display: flex; flex-wrap: wrap; gap: var(--space-sm); align-items: center; }
+  .hero-note { font-size: 13.5px; color: var(--muted); margin: var(--space-md) 0 0; max-width: var(--measure); }
+  /* 工程スパインの実画面と左端を揃える（ページ全体を1本の左寄せ列に保つ） */
+  .hero-shot { margin: var(--space-xl) 0 0; max-width: var(--shot-max); }
 
-  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 28px; }
-  .card { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 36px 32px; }
-  .card h3 { font-size: 19px; margin: 0 0 12px; color: var(--ink); font-family: "Zen Maru Gothic", sans-serif; font-weight: 700; }
-  .card p { font-size: 14px; color: var(--muted); margin: 0; text-wrap: pretty; }
-  .num { display: inline-flex; width: 38px; height: 38px; border-radius: 50%; background: var(--sage-soft); color: var(--sage-deep); align-items: center; justify-content: center; font-family: Quicksand, sans-serif; font-weight: 700; margin-bottom: 16px; }
-  .bg-alt { background: var(--bg-alt); }
+  figure.shot { margin: 0; }
+  figure.shot img { width: 100%; border: 1px solid var(--line); border-radius: 10px; }
+  figure.shot figcaption { font-size: 13px; color: var(--muted); margin-top: var(--space-xs); }
 
-  #features .lead { margin-bottom: 72px; }
-  .feature { display: flex; gap: 56px; align-items: center; margin-bottom: 88px; flex-wrap: wrap; }
-  .feature.reverse { flex-direction: row-reverse; }
-  .feature:last-child { margin-bottom: 0; }
-  .feature > div { flex: 1 1 400px; }
-  .tag { display: inline-block; background: var(--sage-soft); color: var(--sage-deep); font-size: 12px; font-weight: 700; padding: 5px 14px; border-radius: 999px; margin-bottom: 14px; }
-  .feature h3 { font-size: 26px; color: var(--ink); margin: 0 0 14px; font-family: "Zen Maru Gothic", sans-serif; font-weight: 700; line-height: 1.4; }
-  .feature p { margin: 0; color: var(--sub); font-size: 15px; text-wrap: pretty; }
-  .shot img { width: 100%; height: auto; display: block; border-radius: 12px; border: 1px solid var(--line); box-shadow: 0 8px 24px rgba(56,55,49,.08); }
+  /* ── 前提（旧「こんな運用、していませんか？」を数文へ圧縮。カード3枚は廃止） ── */
+  .premise { background: var(--bg-alt); border-block: 1px solid var(--line); padding: clamp(48px, 7vw, 84px) 0; }
+  .premise p {
+    font-family: var(--font-display); font-weight: 500;
+    font-size: clamp(19px, 2.4vw, 26px); line-height: 1.75;
+    max-width: 30em; margin: 0; color: var(--ink);
+    overflow-wrap: anywhere;
+  }
+  .premise .after { font-family: var(--font-body); font-weight: 400; font-size: clamp(15px,1.6vw,16.5px); color: var(--sub); margin-top: var(--space-md); max-width: var(--measure); }
 
-  .plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(290px, 1fr)); gap: 28px; max-width: 760px; margin: 0 auto; }
-  .plan { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 44px 32px; text-align: center; position: relative; }
-  .plan.hot { border: 2px solid var(--sage); }
-  .plan .badge { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); background: var(--ink); color: #fff; font-size: 12px; font-weight: 700; padding: 5px 18px; border-radius: 999px; }
-  .plan h3 { color: var(--ink); font-family: "Zen Maru Gothic", sans-serif; margin: 0 0 10px; font-size: 20px; }
-  .price { font-size: 44px; font-weight: 700; color: var(--ink); font-family: Quicksand, "Zen Kaku Gothic New", sans-serif; font-variant-numeric: tabular-nums; }
-  .price small { font-size: 14px; font-weight: 400; color: var(--muted); font-family: "Zen Kaku Gothic New", sans-serif; }
-  .price .nw { display: block; line-height: 1.35; }
-  .psep { display: none; }
-  .plan ul { list-style: none; text-align: left; margin: 24px 0 32px; padding: 0; font-size: 14px; display: grid; gap: 4px; }
-  .plan li { padding: 4px 0 4px 26px; position: relative; }
+  /* ── 工程スパイン（Narrative Workflow） ──────────────────────
+     段階番号は見出しの「真上・同じ列」に置く。
+     番号を左マージンに逃がす二段組（hanging header）は使わない。 */
+  .spine { padding: clamp(56px, 8vw, 96px) 0 clamp(40px, 6vw, 72px); }
+  .spine-intro { max-width: var(--measure); margin: 0 0 var(--space-2xl); }
+  .spine-intro h2 { font-size: clamp(24px, 3vw, 33px); margin-bottom: var(--space-sm); }
+  .spine-intro p { color: var(--sub); margin: 0; font-size: 15.5px; }
+
+  .stage { border-top: 2px solid var(--ink); padding-top: var(--space-md); margin-bottom: var(--space-2xl); }
+  .stage:last-of-type { margin-bottom: 0; }
+  .stage-no {
+    font-family: var(--font-num); font-weight: 700; font-size: 15px;
+    font-variant-numeric: tabular-nums; letter-spacing: .04em;
+    color: var(--sage-deep); display: block; margin-bottom: var(--space-xs);
+  }
+  .stage h3 { font-size: clamp(21px, 2.6vw, 29px); line-height: 1.45; margin: 0 0 var(--space-sm); max-width: 22em; }
+  .stage p { color: var(--sub); margin: 0; max-width: var(--measure); font-size: 15.5px; }
+  .stage .shot { margin-top: var(--space-lg); max-width: var(--shot-max); }
+  .stage-note {
+    margin-top: var(--space-md); padding: var(--space-sm) var(--space-md);
+    background: var(--sage-soft); border-radius: 8px;
+    font-size: 14px; color: var(--sage-deep); max-width: var(--measure);
+  }
+
+  /* ── 補助画面（F3 · Tabular spec sheet。カードを増やさない） ── */
+  .also { background: var(--bg-alt); border-block: 1px solid var(--line); padding: clamp(48px, 7vw, 84px) 0; }
+  .also h2 { font-size: clamp(21px, 2.4vw, 27px); margin-bottom: var(--space-xs); }
+  .also .lede { color: var(--muted); font-size: 15px; margin: 0 0 var(--space-lg); max-width: var(--measure); }
+  .spec { width: 100%; border-collapse: collapse; max-width: 860px; }
+  .spec th, .spec td { text-align: left; vertical-align: top; padding: var(--space-md) 0; border-top: 1px solid var(--rule); }
+  .spec tr:last-child th, .spec tr:last-child td { border-bottom: 1px solid var(--rule); }
+  .spec th { font-family: var(--font-display); font-weight: 700; font-size: 15.5px; width: 34%; padding-right: var(--space-md); }
+  .spec td { color: var(--sub); font-size: 14.5px; }
+
+  /* ── 料金 ─────────────────────────────────────────────────── */
+  .pricing { padding: clamp(56px, 8vw, 96px) 0; }
+  .pricing h2 { font-size: clamp(24px, 3vw, 33px); margin-bottom: var(--space-xs); }
+  .pricing .lede { color: var(--muted); font-size: 15px; margin: 0 0 var(--space-xl); }
+  .plan {
+    border: 2px solid var(--sage); border-radius: 14px; background: var(--surface);
+    padding: clamp(28px, 4vw, 44px); max-width: 560px; position: relative;
+  }
+  .plan .badge {
+    display: inline-block; background: var(--ink); color: var(--paper);
+    font-size: 12px; font-weight: 700; padding: 5px 16px; border-radius: 999px;
+    margin-bottom: var(--space-md);
+  }
+  .plan h3 { font-size: 20px; margin-bottom: var(--space-sm); }
+  .price { font-family: var(--font-num); font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); line-height: 1.3; }
+  .price .main { font-size: clamp(34px, 5vw, 44px); display: block; }
+  .price .main small, .price .sub small { font-family: var(--font-body); font-weight: 400; font-size: 14px; color: var(--muted); }
+  .price .sub { font-size: clamp(26px, 4vw, 34px); display: block; }
+  .plan ul { list-style: none; margin: var(--space-lg) 0; padding: 0; font-size: 14.5px; display: grid; gap: 6px; }
+  .plan li { padding-left: 26px; position: relative; }
   .plan li::before { content: "✓"; position: absolute; left: 0; color: var(--sage-deep); font-weight: 700; }
-  .plan .btn-primary { font-size: 16px; padding: 14px 36px; }
-  .btn-navy-outline { display: inline-block; border: 2px solid var(--ink); color: var(--ink); text-decoration: none; font-weight: 700; font-size: 16px; padding: 12px 34px; border-radius: 8px; }
-  .btn-navy-outline:hover { background: var(--ink); color: #fff; }
-  .trial-note { text-align: center; margin: 28px 0 0; color: var(--muted); font-size: 14px; }
-  .consult { max-width: 640px; margin: 40px auto 0; padding: 24px 28px; background: #fff; border: 1px solid var(--line); border-radius: 12px; text-align: center; }
-  .consult h3 { margin: 0 0 8px; color: var(--ink); font-family: "Zen Maru Gothic", sans-serif; }
-  .consult-p { margin: 0 0 16px; color: var(--sub); font-size: 14px; }
+  .plan .btn { display: block; text-align: center; }
+  .trial-note { color: var(--muted); font-size: 14px; margin: var(--space-md) 0 0; max-width: 560px; }
 
-  .faq-list { display: grid; gap: 14px; max-width: 780px; margin: 0 auto; }
-  details { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 20px 24px; }
-  summary { font-weight: 700; cursor: pointer; color: var(--ink); }
-  details p { margin: 12px 0 0; font-size: 14px; color: var(--muted); }
-  details a { color: var(--sage-deep); text-decoration: underline; }
+  .consult { margin-top: var(--space-xl); padding-top: var(--space-xl); border-top: 1px solid var(--rule); max-width: 640px; }
+  .consult h3 { font-size: 18px; margin-bottom: var(--space-xs); }
+  .consult p { color: var(--sub); font-size: 14.5px; margin: 0 0 var(--space-md); }
 
-  .cta { background: var(--ink); color: #fff; text-align: center; }
-  .cta h2 { color: #fff; font-size: clamp(26px, 3vw, 38px); margin: 0 0 16px; }
-  .cta p { color: #d9d4c9; margin: 0 0 36px; font-size: 16px; }
-  .cta .btn-primary { font-size: 17px; padding: 16px 44px; background: #fff; color: var(--ink); }
-  .cta .btn-primary:hover { color: var(--ink); }
-  .cta .btn-primary::after { content: "→"; margin-left: 12px; font-weight: 400; }
-  .cta a { color: #d9d4c9; }
-  .cta a:hover { color: #fff; }
-  .cta .btn-primary { color: var(--ink); }
-  .cta-sub { margin: 16px 0 0; font-size: 14px; }
-  .cta-sub a { text-decoration: underline; text-underline-offset: 3px; }
-  .demo-note { text-align: center; margin: 24px 0 0; font-size: 14px; color: var(--sub); }
-  .demo-note a { text-decoration: underline; text-underline-offset: 3px; }
-  footer { background: var(--ink-strong); color: #b8b2a6; font-size: 13px; padding: 44px 0; }
-  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; align-items: center; }
-  footer .links { display: flex; gap: 24px; flex-wrap: wrap; }
-  footer a { color: #d9d4c9; text-decoration: none; }
-  footer a:hover { color: #fff; }
-  .footer-brand { display: flex; align-items: center; gap: 12px; }
-  .logo-badge-invert { background: var(--paper); color: var(--ink); font-weight: 700; font-family: "Zen Maru Gothic", sans-serif; font-size: 13px; padding: 4px 12px; border-radius: 8px; }
-  .logo-badge-invert .dot { color: var(--sage); }
+  /* ── FAQ ─────────────────────────────────────────────────── */
+  .faq { background: var(--bg-alt); border-block: 1px solid var(--line); padding: clamp(56px, 8vw, 96px) 0; }
+  .faq h2 { font-size: clamp(24px, 3vw, 33px); margin-bottom: var(--space-xl); }
+  .faq-list { display: grid; gap: 10px; max-width: 820px; }
+  details { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: var(--space-md) var(--space-lg); }
+  summary { font-weight: 700; cursor: pointer; font-family: var(--font-display); font-size: 15.5px; }
+  details p { margin: var(--space-sm) 0 0; font-size: 14.5px; color: var(--sub); }
+  details a { color: var(--sage-deep); }
 
-  @media (max-width: 640px) {
-    section { padding: 64px 0; }
-    .hero { padding: 72px 0 80px; }
-    .nav a.menu { display: none; }
-    .feature { gap: 32px; margin-bottom: 56px; }
-    /* CTAラベルの2行折り防止: 文言は変えず全幅ブロック+サイズ調整で1行維持 */
+  /* ── CTA ─────────────────────────────────────────────────── */
+  .band-ink { background: var(--ink); color: var(--paper); padding: clamp(56px, 8vw, 96px) 0; }
+  .band-ink h2 { color: var(--paper); font-size: clamp(24px, 3.4vw, 36px); margin-bottom: var(--space-md); max-width: 18em; }
+  .band-ink p { color: var(--on-ink); margin: 0 0 var(--space-lg); max-width: var(--measure); font-size: 15.5px; }
+  .band-ink .btn { background: var(--paper); color: var(--ink); }
+  .band-ink .btn:hover { color: var(--ink); }
+  .band-ink a { color: var(--on-ink); }
+  .band-ink a:hover { color: var(--paper); }
+  .band-sub { margin: var(--space-xs) 0 0; font-size: 14px; }
+  /* 文中リンクではなく単独のCTAなので、こちらも 44px を確保する */
+  .band-sub a { display: inline-block; padding-block: 11px; text-decoration: underline; text-underline-offset: 3px; }
+
+  /* ── Ft1 · Mast-headed ───────────────────────────────────── */
+  footer { background: var(--ink-strong); color: var(--on-ink-dim); font-size: 13.5px; padding: var(--space-2xl) 0 var(--space-xl); }
+  .foot-mast { display: flex; align-items: baseline; gap: var(--space-md); flex-wrap: wrap; }
+  .foot-mast .wordmark { color: var(--paper); font-size: 26px; }
+  .foot-tagline { color: var(--on-ink-dim); font-size: 14.5px; }
+  .foot-links { display: flex; flex-wrap: wrap; gap: 0 var(--space-lg); margin: var(--space-xl) 0 var(--space-md); padding-top: var(--space-xs); border-top: 1px solid var(--line-on-ink); }
+  /* タップ領域は幅を問わず 44px 以上にする（タブレットも指で触る）。
+     文字リンクは行の高さだけだと 24px しかなく、指では押しづらい */
+  .foot-links a { display: inline-block; padding-block: 11px; }
+  footer a { color: var(--on-ink); text-decoration: none; }
+  footer a:hover { color: var(--paper); }
+  .foot-legal { color: var(--on-ink-faint); font-size: 12.5px; margin: 0; }
+
+  @media (max-width: 40rem) {
+    body { line-height: 1.75; }
+    .btn, .btn-quiet { display: block; text-align: center; width: 100%; padding-inline: 12px; }
+    .nav .btn { display: inline-block; width: auto; padding: 10px 18px; }
     .hero-cta { flex-direction: column; align-items: stretch; }
-    .hero .btn-primary, .btn-outline { display: block; text-align: center; white-space: nowrap; padding-left: 16px; padding-right: 16px; font-size: 16px; }
-    .plan { padding: 40px 20px; }
-    .plan .btn-primary { display: block; white-space: nowrap; padding: 14px 10px; font-size: 14px; }
-    .btn-navy-outline { display: block; text-align: center; white-space: nowrap; padding: 12px 16px; font-size: 15px; }
-    .cta .btn-primary { white-space: nowrap; padding: 16px 20px; font-size: 16px; }
+    .spec th, .spec td { display: block; width: 100%; }
+    .spec th { border-bottom: 0; padding-bottom: 4px; }
+    .spec td { border-top: 0; padding-top: 0; padding-bottom: var(--space-md); }
+    .spec tr:last-child th { border-bottom: 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition-duration: 1ms !important; animation-duration: 1ms !important; }
   }
 </style>
 </head>
@@ -206,16 +329,10 @@
 
 <a class="skip" href="#main">本文へスキップ</a>
 
-<header>
-  <div class="wrap nav">
-    <a class="logo-badge" href="./">ウレシル<span class="dot">.</span></a>
-    <nav>
-      <a class="menu" href="#features">機能</a>
-      <a class="menu" href="#pricing">料金</a>
-      <a class="menu" href="#faq">FAQ</a>
-      <a class="menu" href="help.html">使い方</a>
-      <a class="btn-primary js-signup" href="https://app.ureshiru.com/billing?signup=1">無料で試す</a>
-    </nav>
+<header class="nav">
+  <div class="wrap">
+    <a class="wordmark" href="./">ウレシル<span class="dot">.</span></a>
+    <a class="btn js-signup" href="https://app.ureshiru.com/billing?signup=1">無料で試す</a>
   </div>
 </header>
 
@@ -223,148 +340,170 @@
 
 <section class="hero">
   <div class="wrap">
-    <div class="hero-copy">
-      <h1>楽天の売上と<span class="nw">RPP広告</span>、<br>その分析<em>まだ<span class="nw">Excel</span>でやりますか？</em></h1>
-      <p>RMSのCSVを貼り付けるだけ。売上を「アクセス × 転換率 × 客単価」に自動分解し、ROI・CPO・ROASを毎週監視。利益を削っている商品を自動でアラートします。</p>
-      <div class="hero-cta">
-        <a class="btn-primary js-signup" href="https://app.ureshiru.com/billing?signup=1">まずは14日間、無料で試す</a>
-        <a class="btn-outline" href="#pricing">料金を見る</a>
-      </div>
-      <p class="hero-note">14日間の無料トライアル付き。トライアル中の解約で料金はかかりません。<br>導入前に相談したい方は <a class="js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">無料デモ（30分）</a> もご利用いただけます。</p>
+    <h1>次の一手が、<u>毎週決まる</u>。</h1>
+    <p class="hero-lede">楽天RMSのCSVを取り込むと、売上を「アクセス × 転換率 × 客単価」に分解し、どのKPIが足を引っ張っているかを判定して、今週やることまで出します。</p>
+    <div class="hero-cta">
+      <a class="btn js-signup" href="https://app.ureshiru.com/billing?signup=1">14日間、無料で試す</a>
+      <a class="btn-quiet" href="#pricing">料金を見る</a>
     </div>
-    <div class="hero-visual">
-      <div class="mock">
-        <div class="mock-title">ダッシュボード | 2026年7月 第2週</div>
-        <div class="kpis">
-          <div class="kpi"><div class="k">売上（KGI達成率）</div><div class="v">82%</div><div class="up">▲ 前週比 +6pt</div></div>
-          <div class="kpi"><div class="k">ROI</div><div class="v">124%</div><div class="up">▲ +11pt</div></div>
-          <div class="kpi"><div class="k">CPO</div><div class="v">¥812</div><div class="down">▼ Limit CPO超過 2商品</div></div>
-        </div>
-        <div class="bars">
-          <div style="height:45%"></div><div style="height:60%"></div><div style="height:52%"></div>
-          <div style="height:70%"></div><div class="hot" style="height:38%"></div><div style="height:78%"></div>
-          <div style="height:88%"></div>
-        </div>
-        <div class="alert js-hero-alert">⚠ 「商品A-102」CTR 0.8%（1%未満）。サムネイル改善を推奨</div>
-      </div>
+    <p class="hero-note">トライアル中の解約で料金はかかりません。導入前に相談したい方は <a class="js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">無料デモ（30分）</a> もご利用いただけます。</p>
+
+    <div class="hero-shot">
+      <figure class="shot">
+        <img src="shot-hero.jpg" width="1568" height="706" alt="ウレシルのダッシュボード。売上と目標を比べる弾丸グラフ、達成率、着地見込み、アクセス・転換率・客単価の3指標が並んでいる" decoding="async" fetchpriority="high">
+      </figure>
     </div>
   </div>
 </section>
 
-<section>
+<section class="premise">
   <div class="wrap">
-    <h2>こんな運用、していませんか？</h2>
-    <p class="lead">RPPを回している店舗ほど、数字の管理が追いつかなくなります。</p>
-    <div class="cards">
-      <div class="card">
-        <h3>毎週のCSV集計に2時間</h3>
-        <p>RPPレポートと商品分析CSVをExcelに貼り付けて関数を直して…。集計するだけで施策を考える時間がなくなっていませんか。</p>
-      </div>
-      <div class="card">
-        <h3>ROASは見てるが利益は不明</h3>
-        <p>ROASが良くても、原価と経費を引いたら赤字の商品は珍しくありません。広告費がLimit CPOを超えた瞬間に気づけていますか。</p>
-      </div>
-      <div class="card">
-        <h3>どの商品から直すべきか勘頼み</h3>
-        <p>売上が落ちた原因はアクセスか、転換率か、客単価か。ショップ全体→ジャンル→商品と順に絞り込まないと、打ち手を外します。</p>
-      </div>
+    <p>ROASは見ている。でも、原価と経費を引いたあとに利益が残っているかは、月末までわからない。</p>
+    <p class="after">そして「どの商品から直すか」は、だいたい勘で決めている。RPPを回している店舗ほど、数字の管理が運用に追いつかなくなります。</p>
+  </div>
+</section>
+
+<section class="spine" id="how">
+  <div class="wrap">
+    <div class="spine-intro">
+      <h2>ウレシルが回す5つの工程</h2>
+      <p>数字を並べて終わりにしません。取り込んでから、次の打ち手が決まって、その効果を確かめるところまでを1本の流れにしています。</p>
+    </div>
+
+    <div class="stage">
+      <span class="stage-no">1.0 — 取り込む</span>
+      <h3>RMSのCSVを、ダウンロードしたまま放り込む</h3>
+      <p>RPP広告レポート（週次）と商品分析レポート（月次）を、そのまま取り込めます。API連携の申請も、列の並べ替えも、文字コードの変換も要りません。zipのままでも、複数ファイル同時でも受け付けます。</p>
+      <figure class="shot">
+        <img src="shot-1-intake.jpg" width="1568" height="706" alt="データ取込み画面。CSVのドラッグ&amp;ドロップ枠と、取り込み済みの週次・月次データの一覧" loading="lazy" decoding="async">
+      </figure>
+    </div>
+
+    <div class="stage">
+      <span class="stage-no">2.0 — わかる</span>
+      <h3>売上が落ちた原因を、階層で絞り込む</h3>
+      <p>売上を「アクセス × 転換率 × 客単価」に分解し、店舗全体 → ジャンル → 商品の順に辿ります。17のパターンで現状を判定し、どのKPIがボトルネックかを名指しします。週次・月次・年次のどれでも見られます。</p>
+      <figure class="shot">
+        <img src="shot-2-diagnose.jpg" width="1568" height="706" alt="GAP分析画面。KGI売上目標を頂点に、アクセス人数・転換率・客単価の3つのKPIが弾丸グラフで枝分かれするロジックツリー" loading="lazy" decoding="async">
+      </figure>
+    </div>
+
+    <div class="stage">
+      <span class="stage-no">3.0 — 決める</span>
+      <h3>年間予算から、今月の必要数字を逆算する</h3>
+      <p>年間の売上予算を、過去実績の季節性で月次に按分します。そのうえで各月に必要なアクセス数・転換率・客単価を逆算するので、「今月あと何人集めればいいか」が数字で出ます。商品ごとの目標も、過去実績から同じ考え方で算出できます。</p>
+      <figure class="shot">
+        <img src="shot-3-plan.jpg" width="1568" height="706" alt="目標設定画面の年間目標プランナー。月ごとの季節指数、売上予算、必要アクセス、目標CVR、目標客単価、想定追加広告費、達成率が並ぶ表" loading="lazy" decoding="async">
+      </figure>
+    </div>
+
+    <div class="stage">
+      <span class="stage-no">4.0 — 動く</span>
+      <h3>「今日やること」まで落とし込む</h3>
+      <p>CPOが限界注文獲得単価（Limit CPO）を超えたとき、ROIが100%を割ったときに警告します。そのうえで、店舗全体の打ち手と商品ページの打ち手を分けて提示します。「気づいたら広告で利益が溶けていた」を防ぐための工程です。</p>
+      <figure class="shot">
+        <img src="shot-4-act.jpg" width="1568" height="706" alt="ダッシュボードの改善重要アラートとKPI評価マトリクス。売上・アクセス・転換率・客単価の達成状況と、店舗全体および商品ページの具体的な打ち手が一覧で並ぶ" loading="lazy" decoding="async">
+      </figure>
+    </div>
+
+    <div class="stage">
+      <span class="stage-no">5.0 — 効く</span>
+      <h3>打った施策の、その後を追う</h3>
+      <p>実施した施策を記録しておくと、翌月の実績と突き合わせて効果を確認できます。季節要因や他の施策の影響も混ざるため、その施策だけの効果とは限りません。それでも「やりっぱなしにしない」ための土台になります。</p>
+      <!-- 5.0 の実画面は未掲載。サンプルデータでは施策の実施月＝当月のため、
+           比較対象の翌月実績がまだ存在せず全件「測定待ち」になる（構造上の制約）。
+           backend/sample_data.py に過去月の施策＋翌月実績を仕込んだうえで撮り直し、
+           ここに <figure class="shot"> を差し込む。詳細は docs/LP_redesign_sekkei_2026-08-07.md §8 -->
+      <p class="stage-note">この工程は現在も改善を続けている段階です。実施記録と翌月実績の突き合わせまでが動いています。</p>
     </div>
   </div>
 </section>
 
-<section class="bg-alt" id="features">
+<!-- お客様の声はここに差し込む。アイズコーポレーションのトライアルは 2026-08-07 時点で
+     運用テストの段階かつ許諾未取得のため、今回は掲載しない（書けば捏造になる）。
+     許諾が取れた段階でこの位置にセクションを追加する。判断は docs/LP_redesign_sekkei_2026-08-07.md §5 -->
+
+<section class="also">
   <div class="wrap">
-    <h2>ウレシルができること</h2>
-    <p class="lead">広告運用コンサルのKPI管理手法を、そのままツールにしました。</p>
-
-    <div class="feature">
-      <div>
-        <span class="tag">ダッシュボード</span>
-        <h3>ROI・CPO・ROASを週次で自動監視</h3>
-        <p>売上目標に対する達成率、前週比・前月比・前年同月比をひと目で確認。CPOがLimit CPO（限界注文獲得単価）を超えたら自動で警告するので、「気づいたら広告で利益が溶けていた」を防ぎます。</p>
-      </div>
-      <div class="shot"><img src="screenshot-1784278207302-65ff3047.jpg" alt="ウレシルのダッシュボード画面。KGI達成率と主要KPIを週次で表示" loading="lazy" decoding="async"></div>
-    </div>
-
-    <div class="feature reverse">
-      <div>
-        <span class="tag">GAP分析</span>
-        <h3>売上ダウンの原因を3クリックで特定</h3>
-        <p>売上を「アクセス × 転換率 × 客単価」に分解し、ショップ全体→ジャンル→商品の3階層でドリルダウン。課題のある階層を自動でハイライトするので、直すべき商品がすぐ分かります。</p>
-      </div>
-      <div class="shot"><img src="screenshot-1784278186077-f60ca64b.jpg" alt="ウレシルのGAP分析画面。KGIとKPIを比較するロジックツリー" loading="lazy" decoding="async"></div>
-    </div>
-
-    <div class="feature">
-      <div>
-        <span class="tag">かんたん導入</span>
-        <h3>RMSのCSVを貼り付けるだけ</h3>
-        <p>RPP週次レポートと月次商品分析データをコピペするだけで取り込み完了。API連携の申請も、面倒な初期設定も不要。今日から使えます。</p>
-      </div>
-      <div class="shot"><img src="screenshot-1784278093156-e5f46359.jpg" alt="ウレシルのデータ取込み画面。CSVをドラッグ＆ドロップで取り込む" loading="lazy" decoding="async"></div>
-    </div>
+    <h2>そのほかの画面</h2>
+    <p class="lede">工程の主役ではありませんが、日々の運用で使う画面です。</p>
+    <table class="spec">
+      <tbody>
+        <tr>
+          <th>商品別KPI</th>
+          <td>商品ごとの売上・広告費・注文件数・転換率・ROAS・利益の一覧。CPOがLimit CPOを超えた商品には警告が出ます。</td>
+        </tr>
+        <tr>
+          <th>RPP広告実績</th>
+          <td>取り込んだRPP広告データを週次・月次で確認。広告の状態を判定する診断パネルつき。</td>
+        </tr>
+        <tr>
+          <th>商品マスタ・原価</th>
+          <td>商品ごとの売上原価とカテゴリを管理します。ここを入れると利益・ROI・Limit CPOが正しく計算されます。</td>
+        </tr>
+        <tr>
+          <th>レポート出力</th>
+          <td>集計済みのKPIをCSVで書き出せます。経営者・マネージャーへの共有用。</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
 </section>
 
-<section>
+<section class="pricing" id="pricing">
   <div class="wrap">
-    <h2 style="margin-bottom:56px;">導入はかんたん3ステップ</h2>
-    <div class="cards">
-      <div class="card"><span class="num">1</span><h3>アカウント登録</h3><p>メールアドレスで登録し、そのまま14日間の無料トライアルを開始できます。</p></div>
-      <div class="card"><span class="num">2</span><h3>14日間無料トライアル</h3><p>CSVを取り込んで実際に運用。トライアル中に解約すれば料金はかかりません。</p></div>
-      <div class="card"><span class="num">3</span><h3>有料プランへ移行</h3><p>継続する場合のみお支払い。月単位で解約できます。</p></div>
-    </div>
-    <p class="demo-note">導入前に画面を見てから決めたい方には、無料デモ（30分）もご用意しています。<a class="js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">デモを予約する</a></p>
-  </div>
-</section>
-
-<section class="bg-alt" id="pricing">
-  <div class="wrap">
-    <h2>料金プラン</h2>
-    <p class="lead">初期費用なし。月単位で解約できます。</p>
-    <!-- 価格を変えるときは tokushoho.html・terms.html 第3条・下のJSON-LD・
+    <h2>料金</h2>
+    <p class="lede">初期費用なし。最低契約期間はありません。</p>
+    <!-- 価格を変えるときは tokushoho.html・terms.html 第3条・上のJSON-LD・
          アプリ側 backend/billing.py も合わせて直すこと（lp/README.md 参照）。
          総額表示義務があるため税込金額を必ず併記する（税抜のみの表示にしない） -->
-    <div class="plans">
-      <div class="plan hot" style="max-width:520px;margin:0 auto;">
-        <span class="badge">14日間無料トライアル</span>
-        <h3>ウレシル 月額プラン</h3>
-        <div class="price"><span class="nw">¥20,000<small>（税抜）</small></span><span class="psep"> / </span><span class="nw">¥22,000<small>（税込）/月</small></span></div>
-        <ul>
-          <li>ダッシュボード・GAP分析・全機能</li>
-          <li>データ保存期間の上限なし</li>
-          <li>1店舗・ユーザー数無制限</li>
-          <li>週次アラート通知</li>
-          <li>メール・チャットサポート</li>
-        </ul>
-        <a class="btn-primary js-signup" href="https://app.ureshiru.com/billing?signup=1">14日間の無料トライアルを始める</a>
+    <div class="plan">
+      <span class="badge">14日間 無料トライアル</span>
+      <h3>ウレシル 月額プラン</h3>
+      <div class="price">
+        <span class="main nw">¥20,000<small>（税抜）</small></span>
+        <span class="sub nw">¥22,000<small>（税込）/ 月</small></span>
       </div>
+      <ul>
+        <li>ダッシュボード・GAP分析・全機能</li>
+        <li>週次・月次・年次の3期間に対応</li>
+        <li>データ保存期間の上限なし</li>
+        <li>1店舗・ユーザー数無制限</li>
+        <li>週次・月次の改善アラート表示</li>
+        <li>メール・アプリ内フォームでのサポート</li>
+      </ul>
+      <a class="btn js-signup" href="https://app.ureshiru.com/billing?signup=1">14日間の無料トライアルを始める</a>
     </div>
-    <p class="trial-note">14日間の無料トライアル付き。トライアル中の解約で料金はかかりません。</p>
+    <p class="trial-note">トライアル中に解約すれば料金は一切かかりません。</p>
 
     <div class="consult">
       <h3>運用まで一緒にやってほしい方へ</h3>
-      <p class="consult-p">ECコンサルティングは、店舗の規模・課題をお聞きしたうえで個別にお見積りします（¥150,000〜）。KPIレビュー会、RPP入札・予算配分の改善提案、商品ページ改善のアドバイスなど。</p>
-      <a class="btn-navy-outline" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%20EC%E3%82%B3%E3%83%B3%E3%82%B5%E3%83%AB%E3%81%AE%E3%81%94%E7%9B%B8%E8%AB%87">コンサルの相談をする</a>
+      <p>ECコンサルティングは、店舗の規模・課題をお聞きしたうえで個別にお見積りします（¥150,000〜）。KPIレビュー会、RPP入札・予算配分の改善提案、商品ページ改善のアドバイスなど。</p>
+      <a class="btn-quiet" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%20EC%E3%82%B3%E3%83%B3%E3%82%B5%E3%83%AB%E3%81%AE%E3%81%94%E7%9B%B8%E8%AB%87">コンサルの相談をする</a>
     </div>
   </div>
 </section>
 
-<section id="faq">
+<section class="faq" id="faq">
   <div class="wrap">
-    <h2 style="margin-bottom:48px;">よくある質問</h2>
+    <h2>よくある質問</h2>
     <div class="faq-list">
       <details>
         <summary>楽天RMSとのAPI連携は必要ですか？</summary>
-        <p>不要です。RMSからダウンロードできるRPP週次レポートと商品分析CSVを貼り付けるだけで利用できます。</p>
+        <p>不要です。RMSからダウンロードできるRPP週次レポートと商品分析CSVを、そのまま取り込むだけで利用できます。</p>
       </details>
       <details>
         <summary>複数店舗を運営していますが使えますか？</summary>
         <p>現在は1契約1店舗です。複数店舗をご希望の場合はお問い合わせください。</p>
       </details>
       <details>
+        <summary>原価を入れていなくても使えますか？</summary>
+        <p>売上・アクセス・転換率・客単価などの売上系KPIは、原価を入れなくても確認できます。利益・ROI・Limit CPOといった利益系の指標は、商品マスタで売上原価を設定すると計算されるようになります。</p>
+      </details>
+      <details>
         <summary>解約はいつでもできますか？</summary>
-        <p>はい、月単位でいつでも解約できます。最低契約期間はありません。</p>
+        <!-- 解約手続きの文言は tokushoho.html「返品・キャンセル」・terms.html 第5条と一致させること -->
+        <p>はい、最低契約期間はありません。解約をご希望の場合は、アプリ内のお問い合わせフォームよりご連絡ください。ご連絡いただいてから2〜3営業日以内に手続きを完了し、次回以降の請求を停止します。手続き完了までの間も、現在の請求期間の終了日まで引き続きご利用いただけます。無料トライアル期間中の解約は即時・無条件で完了し、料金は一切発生しません。詳細は<a href="terms.html">利用規約</a>をご確認ください。</p>
       </details>
       <details>
         <summary>データの安全性は？</summary>
@@ -374,12 +513,12 @@
   </div>
 </section>
 
-<section class="cta" id="cta">
+<section class="band-ink" id="cta">
   <div class="wrap">
     <h2>まずは14日間、無料でお試しください</h2>
     <p>登録してCSVを取り込むだけで、今日からKPIを可視化できます。トライアル中の解約で料金はかかりません。</p>
-    <a class="btn-primary js-signup" href="https://app.ureshiru.com/billing?signup=1">まずは14日間、無料で試す</a>
-    <p class="cta-sub"><a class="js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">導入前に無料デモ（30分）を予約する</a></p>
+    <a class="btn js-signup" href="https://app.ureshiru.com/billing?signup=1">14日間、無料で試す</a>
+    <p class="band-sub"><a class="js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">導入前に無料デモ（30分）を予約する</a></p>
   </div>
 </section>
 
@@ -387,17 +526,21 @@
 
 <footer>
   <div class="wrap">
-    <div class="links">
+    <div class="foot-mast">
+      <span class="wordmark">ウレシル<span class="dot">.</span></span>
+      <span class="foot-tagline">楽天市場の売上とRPP広告を、次の一手に変える。</span>
+    </div>
+    <nav class="foot-links" aria-label="フッター">
+      <a href="#how">機能</a>
+      <a href="#pricing">料金</a>
+      <a href="#faq">よくある質問</a>
       <a href="help.html">ヘルプ・使い方ガイド</a>
       <a href="tokushoho.html">特定商取引法に基づく表記</a>
       <a href="privacy.html">プライバシーポリシー</a>
       <a href="terms.html">利用規約</a>
       <a href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E3%81%AB%E3%81%A4%E3%81%84%E3%81%A6%E3%81%AE%E3%81%8A%E5%95%8F%E3%81%84%E5%90%88%E3%82%8F%E3%81%9B">お問い合わせ</a>
-    </div>
-    <div class="footer-brand">
-      <span class="logo-badge-invert">ウレシル<span class="dot">.</span></span>
-      <span>© 2026 ウレシル</span>
-    </div>
+    </nav>
+    <p class="foot-legal">© 2026 ウレシル</p>
   </div>
 </footer>
 
@@ -411,8 +554,7 @@
   //   フォームが最初から表示される。
   const CONFIG = {
     bookingUrl: "",
-    signupUrl: "https://app.ureshiru.com/billing?signup=1",
-    showHeroAlert: true
+    signupUrl: "https://app.ureshiru.com/billing?signup=1"
   };
 
   const ctaHref = CONFIG.bookingUrl || "mailto:shoichiro.nakamura.0601@gmail.com?subject=ウレシル無料デモ希望";
@@ -423,12 +565,6 @@
   document.querySelectorAll('.js-signup').forEach(function (a) {
     a.href = CONFIG.signupUrl;
   });
-  if (!CONFIG.showHeroAlert) {
-    var el = document.querySelector('.js-hero-alert');
-    if (el) el.style.display = 'none';
-  }
 </script>
-
-
 
 </body></html>
