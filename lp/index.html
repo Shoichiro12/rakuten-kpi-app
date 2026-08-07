@@ -231,11 +231,25 @@
   .stage h3 { font-size: clamp(21px, 2.6vw, 29px); line-height: 1.45; margin: 0 0 var(--space-sm); max-width: 22em; }
   .stage p { color: var(--sub); margin: 0; max-width: var(--measure); font-size: 15.5px; }
   .stage .shot { margin-top: var(--space-lg); max-width: var(--shot-max); }
-  .stage-note {
-    margin-top: var(--space-md); padding: var(--space-sm) var(--space-md);
-    background: var(--sage-soft); border-radius: 8px;
-    font-size: 14px; color: var(--sage-deep); max-width: var(--measure);
-  }
+  /* ── 導入事例（実績1件・単独ケース） ──────────────────────────
+     指標が1つしかないため、3〜5個並べる stat strip 型は使わない。
+     打消し表示（免責）は景表法の指針に従い、主張の直下・同等の可読性で置く。
+     小さすぎる灰色文字にしないこと。 */
+  .case { padding: clamp(48px, 7vw, 84px) 0; }
+  .case h2 { font-size: clamp(21px, 2.4vw, 27px); margin-bottom: var(--space-xs); }
+  .case .lede { color: var(--muted); font-size: 15px; margin: 0 0 var(--space-lg); max-width: var(--measure); }
+  .case-card { border: 2px solid var(--sage); border-radius: 14px; background: var(--surface); padding: clamp(24px, 3.5vw, 40px); max-width: 720px; }
+  .case-label { font-size: 14px; color: var(--muted); display: block; margin-bottom: var(--space-xs); }
+  .case-metric { display: flex; align-items: baseline; flex-wrap: wrap; gap: var(--space-sm) var(--space-md); margin-bottom: var(--space-lg); }
+  .case-val { font-family: var(--font-num); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.2; }
+  .case-before { font-size: clamp(24px, 3.4vw, 32px); color: var(--muted); }
+  .case-arrow { font-size: clamp(20px, 2.6vw, 26px); color: var(--sage-deep); }
+  .case-after { font-size: clamp(32px, 5vw, 46px); color: var(--up); }
+  .case-cond { margin: 0 0 var(--space-lg); padding: var(--space-md) 0 0; border-top: 1px solid var(--line); font-size: 14.5px; }
+  .case-cond dt { font-weight: 700; color: var(--ink); margin-top: var(--space-sm); }
+  .case-cond dt:first-of-type { margin-top: 0; }
+  .case-cond dd { margin: 2px 0 0; color: var(--sub); }
+  .case-note { font-size: 13.5px; line-height: 1.75; color: var(--sub); margin: 0; padding-top: var(--space-md); border-top: 1px solid var(--line); }
 
   /* ── 補助画面（F3 · Tabular spec sheet。カードを増やさない） ── */
   .also { background: var(--bg-alt); border-block: 1px solid var(--line); padding: clamp(48px, 7vw, 84px) 0; }
@@ -414,14 +428,41 @@
            比較対象の翌月実績がまだ存在せず全件「測定待ち」になる（構造上の制約）。
            backend/sample_data.py に過去月の施策＋翌月実績を仕込んだうえで撮り直し、
            ここに <figure class="shot"> を差し込む。詳細は docs/LP_redesign_sekkei_2026-08-07.md §8 -->
-      <p class="stage-note">この工程は現在も改善を続けている段階です。実施記録と翌月実績の突き合わせまでが動いています。</p>
     </div>
   </div>
 </section>
 
-<!-- お客様の声はここに差し込む。アイズコーポレーションのトライアルは 2026-08-07 時点で
-     運用テストの段階かつ許諾未取得のため、今回は掲載しない（書けば捏造になる）。
-     許諾が取れた段階でこの位置にセクションを追加する。判断は docs/LP_redesign_sekkei_2026-08-07.md §5 -->
+<!-- 導入事例（2026-08-07 追加）。
+     ⚠️ ここに書ける数値は「オーナーが実際の顧客実績として提示し、かつ掲載許可を得たもの」だけ。
+     推測・丸め上げ・範囲の拡大解釈をしないこと。開示範囲は「200%台 → 300%以上」で確定しており、
+     正確な%は出さない（オーナー判断）。
+     免責（打消し表示）は景品表示法の指針に従い、主張の直下・同等の可読性で置くこと。
+     小さい灰色文字に落とすと打消し表示として機能しない。
+     アイズコーポレーションのトライアル実績は許諾未取得のため、ここには含めない。
+     判断の経緯は docs/LP_redesign_sekkei_2026-08-07.md §5 -->
+<section class="case" id="case">
+  <div class="wrap">
+    <h2>導入事例</h2>
+    <p class="lede">ウレシルの診断結果をもとに広告運用を見直した店舗の実績です。</p>
+    <div class="case-card">
+      <span class="case-label">RPP広告のROAS</span>
+      <p class="case-metric">
+        <span class="case-val case-before">200%台</span>
+        <span class="case-val case-arrow" aria-hidden="true">→</span>
+        <span class="case-val case-after">300%以上</span>
+      </p>
+      <dl class="case-cond">
+        <dt>店舗</dt>
+        <dd>靴ジャンルのショップ（A社・匿名）</dd>
+        <dt>期間</dt>
+        <dd>2026年6月〜7月</dd>
+        <dt>実施したこと</dt>
+        <dd>ウレシルを導入し、診断結果に基づいて広告運用を見直し</dd>
+      </dl>
+      <p class="case-note">※ 掲載については当該企業の許可を得ています。上記は特定の店舗・特定の期間における実績であり、効果を保証するものではありません。成果は商材・価格帯・競合状況・広告予算などによって変わります。</p>
+    </div>
+  </div>
+</section>
 
 <section class="also">
   <div class="wrap">
