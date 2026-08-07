@@ -1,0 +1,14 @@
+[
+  {
+    "date": "2026-08-07",
+    "target": "lp/index.html",
+    "macrostructure": "Narrative Workflow",
+    "theme": "C案トーン（既存資産を維持。カタログ外）",
+    "theme_axes": "light / rounded-sans(Zen Maru Gothic) / chromatic-other(sage)",
+    "nav": "N9 Edge-aligned minimal",
+    "footer": "Ft1 Mast-headed",
+    "enrichment": "none（実画面5枚を配置）",
+    "brief": "ウレシル LP全面リニューアル — 楽天EC向けKPI管理。工程スパイン1.0〜5.0でVISIONの意思決定OSを表現し、Hallmark critical 3件（テンプレ骨格・AIナビ・3カラムグリッド×2）を解消",
+    "notes": "設計は docs/LP_redesign_sekkei_2026-08-07.md。5.0の実画面は sample_data 調整後に追加予定（B案）"
+  }
+]
