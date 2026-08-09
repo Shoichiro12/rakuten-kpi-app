@@ -22,13 +22,21 @@ GitHubリポジトリもローカルフォルダも存在しない状態だっ�
 
 ```
 lp/
-├── index.html        トップ（CSSはインライン）
+├── index.html        トップ（CSSはインライン。トークンの単一の真実はここの :root）
+├── about.html        私たちについて（style.css + C案トーンの上書き）
+├── help.html         ヘルプ・使い方ガイド（同上）
 ├── tokushoho.html    特定商取引法に基づく表記
 ├── privacy.html      プライバシーポリシー
 ├── terms.html        利用規約
 ├── style.css         下層ページ用のスタイル（index.html は使わない）
-└── screenshot-*.jpg  トップで使うスクリーンショット3枚
+├── shot-hero.jpg     トップのヒーローで使う実画面
+└── shot-1〜5-*.jpg   工程スパイン(1.0〜5.0)で使う実画面。5.0 は未撮影のため未掲載
 ```
+
+`about.html` には**顔写真・実名・会社名を載せない**（匿名性を保つ・2026-08-09 オーナー決定）。
+JSON-LD の `Person` も意図的に入れていない。
+※ 実名そのものは特商法・プライバシーポリシー・`index.html` の JSON-LD で開示済み
+（法令上の要請）。匿名なのは about.html の中だけ。
 
 ## 守ること
 
