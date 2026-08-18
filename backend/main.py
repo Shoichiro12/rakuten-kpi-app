@@ -69,6 +69,53 @@ app = FastAPI(
 )
 
 
+# Content-Security-Policy の connect-src に足す先。フロントが実際にfetch/XHR/WSする
+# 外部オリジンは Supabase（認証API・Realtime）のみ（棚卸し済み: Stripeはリダイレクト
+# のみでscript-src不要、Google Fontsはstyle-src/font-srcで別途許可）。
+# バックエンド専用の SUPABASE_URL があればそれを、無ければフロント用の VITE_SUPABASE_URL を
+# 使う（auth.py / routers/account.py と同じ優先順位）。ローカル開発（Supabase未設定）でも
+# 空文字列を除外するので壊れない。
+def _supabase_connect_src() -> list[str]:
+    raw = (os.environ.get("SUPABASE_URL") or os.environ.get("VITE_SUPABASE_URL") or "").strip()
+    if not raw:
+        return []
+    from urllib.parse import urlparse
+
+    parsed = urlparse(raw)
+    if not parsed.scheme or not parsed.netloc:
+        return []
+    return [f"https://{parsed.netloc}", f"wss://{parsed.netloc}"]
+
+
+# 棚卸しで想定していない追加の接続先が後から必要になった場合の逃げ道（カンマ区切り）。
+# 既定は未設定＝追加なし。
+_CSP_EXTRA_CONNECT = [
+    o.strip() for o in os.environ.get("CSP_CONNECT_SRC", "").split(",") if o.strip()
+]
+
+_CSP_CONNECT_SRC = " ".join(["'self'"] + _supabase_connect_src() + _CSP_EXTRA_CONNECT)
+
+_CONTENT_SECURITY_POLICY = "; ".join(
+    [
+        "default-src 'self'",
+        "script-src 'self'",
+        # Google Fonts のスタイルシートを読むためだけに許可（フォント本体は font-src 側）。
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "img-src 'self' data:",
+        "font-src 'self' https://fonts.gstatic.com",
+        f"connect-src {_CSP_CONNECT_SRC}",
+        "frame-ancestors 'none'",
+        "base-uri 'self'",
+        "form-action 'self'",
+    ]
+)
+
+# ENABLE_DOCS=1 時の /docs /redoc はSwagger UI/ReDocをCDN（jsdelivr等）から読み込むため、
+# 上記の自己ホスト前提ポリシーとは相容れない。ドキュメント経路だけCSPを外す
+# （既定でドキュメント自体が無効なので実害は無い。有効化はローカル/デバッグ限定の運用）。
+_CSP_EXEMPT_PATHS = {"/docs", "/redoc", "/openapi.json"}
+
+
 # 全レスポンスにセキュリティヘッダーを付与する。
 # クリックジャッキング・MIMEスニッフィング・リファラ漏洩・旧来のXSS等を緩和し、
 # HTTPS を強制する。Stripe 審査の「セキュアコーディング」項目のエビデンスにもなる。
@@ -81,6 +128,8 @@ async def security_headers(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    if request.url.path not in _CSP_EXEMPT_PATHS:
+        response.headers["Content-Security-Policy"] = _CONTENT_SECURITY_POLICY
     return response
 
 # 同一サービスでフロントを配信する構成では本来CORS不要だが、フロントを別ドメインに
