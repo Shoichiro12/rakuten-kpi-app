@@ -120,7 +120,7 @@ export default function App() {
   }
 
   return (
-    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+    <BrowserRouter>
       {/* relative は必須。外すとページ自体にスクロールバーが出る。
           `sr-only`（Tailwind）は position:absolute なので、包含ブロックを持つ
           位置指定の祖先が無いと ICB（＝ビューポート）基準になり、この
