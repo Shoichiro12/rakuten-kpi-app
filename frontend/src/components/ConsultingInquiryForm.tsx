@@ -94,11 +94,11 @@ export default function ConsultingInquiryForm({ onClose }: { onClose?: () => voi
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
             <label className={label}>お名前 <span className="text-rakuten-red">*</span></label>
-            <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="山田 太郎" />
+            <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="山田 太郎" maxLength={200} />
           </div>
           <div>
             <label className={label}>会社名 <span className="text-rakuten-red">*</span></label>
-            <input className={input} value={company} onChange={(e) => setCompany(e.target.value)} placeholder="株式会社〇〇" />
+            <input className={input} value={company} onChange={(e) => setCompany(e.target.value)} placeholder="株式会社〇〇" maxLength={200} />
           </div>
         </div>
 
@@ -109,6 +109,7 @@ export default function ConsultingInquiryForm({ onClose }: { onClose?: () => voi
             value={scaleHint}
             onChange={(e) => setScaleHint(e.target.value)}
             placeholder="例: 月商300万円、3店舗運営、スタッフ2名"
+            maxLength={100}
           />
           <p className="text-[11px] text-gray-400 mt-1">月商の目安や店舗数など、わかる範囲で構いません。</p>
         </div>
@@ -126,7 +127,7 @@ export default function ConsultingInquiryForm({ onClose }: { onClose?: () => voi
           </div>
           <div>
             <label className={label}>連絡先電話（任意）</label>
-            <input className={input} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09012345678" />
+            <input className={input} value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="09012345678" maxLength={100} />
           </div>
         </div>
 
@@ -137,6 +138,7 @@ export default function ConsultingInquiryForm({ onClose }: { onClose?: () => voi
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             placeholder="今お困りのこと、相談したい内容があればご記入ください。"
+            maxLength={5000}
           />
         </div>
 

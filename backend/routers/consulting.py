@@ -25,6 +25,11 @@ logger = logging.getLogger("consulting")
 
 router = APIRouter(prefix="/api/consulting", tags=["consulting"])
 
+_MAX_NAME_LEN = 200
+_MAX_MESSAGE_LEN = 5000
+_MAX_SCALE_HINT_LEN = 100
+_MAX_PHONE_LEN = 100
+
 
 class InquiryPayload(BaseModel):
     name: str
@@ -59,13 +64,34 @@ def create_inquiry(payload: InquiryPayload, db: Session = Depends(get_db)):
     if "@" not in (email or ""):
         raise HTTPException(status_code=400, detail="連絡先メールの形式が正しくありません。")
 
+    scale_hint = _clean(payload.scale_hint)
+    contact_phone = _clean(payload.contact_phone)
+    message = _clean(payload.message)
+
+    too_long = [
+        label
+        for label, value, limit in (
+            ("お名前", name, _MAX_NAME_LEN),
+            ("会社名", company, _MAX_NAME_LEN),
+            ("目安（月商・店舗数など）", scale_hint, _MAX_SCALE_HINT_LEN),
+            ("連絡先電話番号", contact_phone, _MAX_PHONE_LEN),
+            ("お問い合わせ内容", message, _MAX_MESSAGE_LEN),
+        )
+        if value and len(value) > limit
+    ]
+    if too_long:
+        raise HTTPException(
+            status_code=400,
+            detail=f"{'・'.join(too_long)}が長すぎます。",
+        )
+
     inquiry = ConsultingInquiry(
         name=name,
         company_name=company,
-        scale_hint=_clean(payload.scale_hint),
+        scale_hint=scale_hint,
         contact_email=email,
-        contact_phone=_clean(payload.contact_phone),
-        message=_clean(payload.message),
+        contact_phone=contact_phone,
+        message=message,
         status="new",
     )
     db.add(inquiry)
