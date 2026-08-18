@@ -27,14 +27,14 @@ CLAUDE.md 申し送り表のルール4「調査・監査・設計の成果物は
 |---|---|---|---|
 | npm audit: nanoid / postcss / vite（high 3件） | 2026-08-17（推定） | ✅ 解決（2026-08-18） | `npm audit fix`（--forceなし）で解消。package.json変更なし、package-lock.jsonのみ更新 |
 | npm audit: react-router / react-router-dom（moderate 2件） | 2026-08-17（推定） | **未解決（見送り）** | 脆弱性range `>=6.0.0 <7.18.0`＝v6系にパッチが存在せず、修正には7.18.0以降へのメジャー移行が必須。SSR不使用・遷移先は全て固定内部パスのため悪用経路は無いと判断し、今回は見送り。移行には別途まとまった動作検証の時間が必要（v7移行チケットとして起票を推奨） |
-| `backend/main.py` の `security_headers` にCSPが無い | 2026-08-17（推定） | ✅ 解決（2026-08-18） | 外部依存を棚卸しのうえ追加。ポリシー全文は作業報告書参照 |
+| `backend/main.py` の `security_headers` にCSPが無い | 2026-08-17（推定） | ✅ 解決（2026-08-18、本番デプロイ・実測確認済み） | 外部依存を棚卸しのうえ追加。ポリシー全文・本番検証結果は作業報告書参照 |
 | `backend/routers/consulting.py` の `InquiryPayload` に文字数上限が無い | 2026-08-17（推定） | ✅ 解決（2026-08-18） | `feedback.py` と同じ方式（サーバ側手動チェック＋400）に統一。name/company_name=200、scale_hint/contact_phone=100、message=5000 |
 
 ## 実施記録
 
 | 日付 | 内容 | 詳細 |
 |---|---|---|
-| 2026-08-18 | npm audit / CSP / consulting.py上限の3件対応 | 作業報告書: `docs/`配下（sagyou-houkoku）参照。コミット: フロント依存更新・CSPヘッダー追加・consulting.py上限追加（3コミットに分割） |
+| 2026-08-18 | npm audit / CSP / consulting.py上限の3件対応 | 作業報告書: `docs/作業報告_2026-08-18.md` 参照。[PR #16](https://github.com/Shoichiro12/rakuten-kpi-app/pull/16) マージ（`61346e3`）で本番反映済み。コミット: フロント依存更新・CSPヘッダー追加・consulting.py上限追加・ドキュメント（4コミットに分割） |
 
 ## RLS（行レベルセキュリティ）について
 
