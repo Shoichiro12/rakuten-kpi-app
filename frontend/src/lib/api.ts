@@ -581,6 +581,9 @@ export const api = {
   },
   sampleData: () =>
     request('/sample-data', { method: 'POST' }),
+  /** サンプルデータ（is_sample行）だけを削除する。実データ・設定は保持 */
+  sampleDataDelete: () =>
+    request('/sample-data', { method: 'DELETE' }),
   dataStatus: () => request('/data-status'),
   resetData: () => request('/reset-data', { method: 'POST' }),
   actions: {

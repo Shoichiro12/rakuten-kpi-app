@@ -17,6 +17,9 @@ function categoryPath(c: Category): string {
   return [c.genre_u1, c.genre_u2, c.genre_u3].filter(Boolean).join(' > ') || '（空カテゴリ）'
 }
 
+/** 商品マスタ一覧の1ページあたりの表示件数（縦スクロール対策・2026-08-20） */
+const MASTER_PAGE_SIZE = 50
+
 export default function MasterSettings() {
   const [rows, setRows] = useState<Row[]>([])
   const masterSort = useTableSort<Row>()
@@ -24,9 +27,14 @@ export default function MasterSettings() {
   const [loading, setLoading] = useState(false)
   const [savedMsg, setSavedMsg] = useState<string | null>(null)
   const [showInactive, setShowInactive] = useState(true)
+  // 一覧の検索・ページング（2026-08-20）
+  const [masterKw, setMasterKw] = useState('')
+  const [masterPage, setMasterPage] = useState(1)
 
   // 提案キュー（マスタ入力支援）
   const [suggestions, setSuggestions] = useState<SuggestionItem[]>([])
+  // 提案の取得中フラグ（一覧とは別に取得するため。「計算中」の表示に使う）
+  const [suggestLoading, setSuggestLoading] = useState(false)
   const [suggestOpen, setSuggestOpen] = useState(true)
   const [editingSuggestId, setEditingSuggestId] = useState<string | null>(null)
   const [editSuggest, setEditSuggest] = useState<{ genre: GenreValue; cost_pct: number }>({ genre: { genre_u1: '', genre_u2: '', genre_u3: '' }, cost_pct: 60 })
@@ -58,13 +66,20 @@ export default function MasterSettings() {
 
   const load = useCallback(async () => {
     setLoading(true)
+    // 自動提案は本体と切り離して並行取得する（2026-08-20 オーナー指摘）。
+    // 従来は Promise.all に含めていたため、提案の計算が終わるまで商品一覧ごと
+    // 表示されなかった。提案は「計算中」プレースホルダを先に出し、届き次第差し込む。
+    setSuggestLoading(true)
+    api.master.suggestions()
+      .then((sugRes) => setSuggestions(sugRes.items))
+      .catch((e: unknown) => { console.error('[MasterSettings] 提案取得エラー:', e); setSuggestions([]) })
+      .finally(() => setSuggestLoading(false))
     try {
-      const [prodRes, costRes, shopRes, catRes, sugRes, treeRes, benchRes] = await Promise.all([
+      const [prodRes, costRes, shopRes, catRes, treeRes, benchRes] = await Promise.all([
         api.master.products(),
         api.costs.list(),
         api.shops.me(),
         api.master.categories(),
-        api.master.suggestions(),
         api.master.genreTree(),
         api.master.benchmarks(),
       ])
@@ -81,7 +96,6 @@ export default function MasterSettings() {
       merged.sort((a, b) => a.management_no.localeCompare(b.management_no))
       setRows(merged)
       setCategories(catRes.items)
-      setSuggestions(sugRes.items)
       setGenreTree(treeRes)
       setBenchmarks(benchRes.items)
       setShopName(shopRes.name)
@@ -357,7 +371,23 @@ export default function MasterSettings() {
     </span>
   )
 
-  const visibleRows = showInactive ? rows : rows.filter((r) => r.is_active)
+  // 一覧の検索・ページング（2026-08-20 オーナー指摘: SKUが増えると縦スクロールが長すぎる）。
+  // 全件描画はDOMも重くなるので、絞り込み → 列ソート → ページ切り出しの順で適用する。
+  const activeFiltered = showInactive ? rows : rows.filter((r) => r.is_active)
+  const visibleRows = masterKw
+    ? activeFiltered.filter((r) => {
+        const kw = masterKw.toLowerCase()
+        return (
+          r.management_no.toLowerCase().includes(kw) ||
+          (r.product_name ?? '').toLowerCase().includes(kw) ||
+          [r.genre_u1, r.genre_u2, r.genre_u3].filter(Boolean).join(' > ').toLowerCase().includes(kw)
+        )
+      })
+    : activeFiltered
+  const totalPages = Math.max(1, Math.ceil(visibleRows.length / MASTER_PAGE_SIZE))
+  const safePage = Math.min(masterPage, totalPages)
+  const sortedRows = masterSort.apply(visibleRows)
+  const pagedRows = sortedRows.slice((safePage - 1) * MASTER_PAGE_SIZE, safePage * MASTER_PAGE_SIZE)
   const inactiveCount = rows.filter((r) => !r.is_active).length
 
   return (
@@ -384,6 +414,13 @@ export default function MasterSettings() {
             列数の多いテーブルが画面幅を使い切れるようにするため。max-w-* を戻さないこと */}
         <div className="space-y-6">
           {/* 未確認の提案（マスタ入力支援） */}
+          {/* 提案の計算中は先にプレースホルダを出す（機能があること自体に気付けるように） */}
+          {suggestLoading && suggestions.length === 0 && (
+            <div className="bg-white rounded-xl border border-amber-200 shadow-sm max-w-5xl px-4 py-3 flex items-center gap-2 text-sm text-amber-800">
+              <RefreshCw size={14} className="animate-spin text-amber-500" />
+              カテゴリ・原価率の自動提案を計算しています…（一覧は先に操作できます）
+            </div>
+          )}
           {suggestions.length > 0 && (
             // ボタンを ml-auto で右端に寄せる作りなので、全幅だと本文とボタンが極端に離れる（CLAUDE.md「画面幅の規約」）
             <div className="bg-white rounded-xl border border-amber-200 shadow-sm overflow-hidden max-w-5xl">
@@ -546,7 +583,20 @@ export default function MasterSettings() {
           {/* 商品マスタ一覧 */}
           <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b flex items-center justify-between gap-3 flex-wrap">
-              <h3 className="text-sm font-semibold text-gray-700">商品マスタ</h3>
+              <div className="flex items-center gap-3 flex-wrap">
+                <h3 className="text-sm font-semibold text-gray-700">商品マスタ</h3>
+                {/* 検索＋ページング（2026-08-20）。SKUが多い店舗で縦に伸びすぎないようにする */}
+                <input
+                  type="text"
+                  value={masterKw}
+                  onChange={(e) => { setMasterKw(e.target.value); setMasterPage(1) }}
+                  placeholder="管理番号・商品名・ジャンルで検索"
+                  className="w-64 text-sm border border-gray-200 rounded px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <span className="text-xs text-gray-400 tabular-nums">
+                  {visibleRows.length.toLocaleString()}件{masterKw ? `（全${activeFiltered.length.toLocaleString()}件から絞り込み）` : ''}
+                </span>
+              </div>
               <div className="flex items-center gap-3">
                 <button
                   onClick={exportCsv}
@@ -572,7 +622,9 @@ export default function MasterSettings() {
 
             {!loading && visibleRows.length === 0 && (
               <div className="py-12 text-center text-sm text-gray-400">
-                商品マスタがまだありません。CSVを取込むか backfill スクリプトで生成してください。
+                {masterKw
+                  ? '検索条件に一致する商品がありません。'
+                  : '商品マスタがまだありません。CSVを取込むか backfill スクリプトで生成してください。'}
               </div>
             )}
 
@@ -590,7 +642,7 @@ export default function MasterSettings() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {masterSort.apply(visibleRows).map((r) => (
+                    {pagedRows.map((r) => (
                       <tr key={r.management_no} className={r.is_active ? '' : 'bg-gray-50/60'}>
                         <td className="px-4 py-2 text-gray-500 font-mono text-xs whitespace-nowrap">{r.management_no}</td>
                         <td className="px-3 py-2">
@@ -692,6 +744,32 @@ export default function MasterSettings() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {/* ページャ（50件/ページ）。1ページに収まるときは出さない */}
+            {visibleRows.length > MASTER_PAGE_SIZE && (
+              <div className="px-4 py-2.5 border-t bg-gray-50/60 flex items-center justify-between gap-3 flex-wrap">
+                <span className="text-xs text-gray-500 tabular-nums">
+                  {((safePage - 1) * MASTER_PAGE_SIZE + 1).toLocaleString()}〜{Math.min(safePage * MASTER_PAGE_SIZE, visibleRows.length).toLocaleString()}件 / 全{visibleRows.length.toLocaleString()}件
+                </span>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setMasterPage((p) => Math.max(1, p - 1))}
+                    disabled={safePage <= 1}
+                    className="px-2.5 py-1 text-xs border border-gray-200 rounded bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    ← 前へ
+                  </button>
+                  <span className="text-xs text-gray-500 tabular-nums px-1">{safePage} / {totalPages}</span>
+                  <button
+                    onClick={() => setMasterPage((p) => Math.min(totalPages, p + 1))}
+                    disabled={safePage >= totalPages}
+                    className="px-2.5 py-1 text-xs border border-gray-200 rounded bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    次へ →
+                  </button>
+                </div>
               </div>
             )}
           </div>

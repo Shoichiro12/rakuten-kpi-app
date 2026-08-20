@@ -30,7 +30,7 @@ from sqlalchemy import func
 from database import engine, get_db, SessionLocal
 import models
 from models import RppWeekly, MonthlyItemSales, MonthlyAnalysis, Target, RppSales, InventoryStatus, Shop
-from sample_data import generate_sample_data
+from sample_data import generate_sample_data, delete_sample_data
 from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account, rpp_diagnosis, recommendations, costs, masters, inventory, billing, consulting, feedback, item_targets, revenue_plan
 from auth import get_current_user, AuthUser, UserContextMiddleware
 from subscription_guard import require_active_subscription
@@ -208,8 +208,28 @@ def api_root():
 @app.post("/api/sample-data")
 def create_sample_data(db: Session = Depends(get_db), _user: AuthUser = Depends(get_current_user),
         _sub: None = Depends(require_active_subscription)):
-    generate_sample_data(db)
-    return {"message": "サンプルデータを生成しました（10商品 × 8週間、RPP診断デモ付き）"}
+    """サンプルデータの生成。サンプル分（is_sample=True）だけを入れ替え、実データは触らない。"""
+    result = generate_sample_data(db) or {}
+    skipped = result.get("skipped_mnos") or []
+    msg = "サンプルデータを生成しました（10商品 × 8週間、RPP診断デモ付き）。実データはそのままです"
+    if skipped:
+        msg += f"。実データと管理番号が重複する {len(skipped)}件（{', '.join(skipped)}）は生成をスキップしました"
+    return {"message": msg, "skipped_mnos": skipped}
+
+
+@app.delete("/api/sample-data")
+def remove_sample_data(db: Session = Depends(get_db), _user: AuthUser = Depends(get_current_user),
+        _sub: None = Depends(require_active_subscription)):
+    """サンプルデータ（is_sample=True の行）だけを削除する。実データ・利用者の設定は触らない。
+
+    2026-08-20 オーナー指摘: 従来の全削除しかない状態だと、実データ取込み後に
+    サンプルを消したいだけで実データまで消える。アイテム別目標・商品マスタの
+    サンプル残骸（重複の原因）もここで一緒に消える。
+    """
+    deleted = delete_sample_data(db)
+    total = sum(deleted.values())
+    return {"message": f"サンプルデータを削除しました（{total}行）。実データと設定は保持しています",
+            "deleted": deleted, "total": total}
 
 
 @app.get("/api/security-status")
@@ -260,6 +280,12 @@ def data_status(db: Session = Depends(get_db), _user: AuthUser = Depends(get_cur
     has_monthly = monthly_rows > 0 or monthly_legacy > 0
     has_data = has_rpp or has_monthly
 
+    # サンプルデータの有無（「サンプルだけ削除」ボタンの表示制御に使う）
+    has_sample = (
+        db.query(RppWeekly.id).filter(RppWeekly.is_sample.is_(True)).first() is not None
+        or db.query(MonthlyItemSales.id).filter(MonthlyItemSales.is_sample.is_(True)).first() is not None
+    )
+
     # オンボーディングのチェックリスト（順番に達成させたい3ステップ）
     steps = [
         {"key": "rpp", "done": has_rpp},
@@ -274,6 +300,7 @@ def data_status(db: Session = Depends(get_db), _user: AuthUser = Depends(get_cur
         "has_goal": targets_count > 0,
         # フロントの詳細表示用（後方互換）
         "has_data": has_data,
+        "has_sample": has_sample,
         "rpp": {
             "rows": rpp_rows,
             "weeks": rpp_weeks,
@@ -292,15 +319,22 @@ def data_status(db: Session = Depends(get_db), _user: AuthUser = Depends(get_cur
 @app.post("/api/reset-data")
 def reset_data(db: Session = Depends(get_db), _user: AuthUser = Depends(get_current_user),
         _sub: None = Depends(require_active_subscription)):
-    """登録済みデータを削除してまっさらな状態に戻す（サンプル→実データ切替などで使用）。
+    """登録済みの実績データを全削除してまっさらな状態に戻す。
 
-    目標（Target）はユーザー設定のため保持する。
+    - 目標（Target）・アイテム別目標・商品マスタは、**実データ分は保持**する（ユーザー設定のため）
+    - サンプル由来（is_sample=True）の行は目標・マスタ含めて一掃する
+      （従来はサンプルのアイテム別目標・商品マスタが残り、重複の原因になっていた。2026-08-20）
+    - サンプルだけ消したい場合は DELETE /api/sample-data を使う（実績データも保持される）
     """
     deleted = 0
     for model in (RppWeekly, RppSales, MonthlyItemSales, MonthlyAnalysis, InventoryStatus):
         deleted += db.query(model).delete()
+    sample_deleted = delete_sample_data(db, commit=False)
     db.commit()
-    return {"message": "登録済みデータを削除しました（目標設定は保持）", "deleted": deleted}
+    return {
+        "message": "登録済みデータを削除しました（実データの目標設定・商品マスタは保持、サンプル残骸は一掃）",
+        "deleted": deleted + sum(sample_deleted.values()),
+    }
 
 
 @app.get("/api/health")

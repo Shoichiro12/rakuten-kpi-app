@@ -286,7 +286,16 @@ def suggest_cost_rate(db: Session, shop_id: int, management_no: str) -> dict:
 def get_review_queue(db: Session, shop_id: int) -> list[dict]:
     """category_id 未設定 または ProductCost 未登録の稼働中商品（廃盤は除外）に、
     カテゴリ・原価率の提案を付けて返す。
+
+    ⚠️ 性能規約（2026-08-20）: **商品ループの中で db.query を呼ばないこと。**
+    旧実装は商品1件ごとに suggest_category / suggest_cost_rate（各2〜3クエリ）を
+    呼んでおり、SKUが数千件あると数千〜1万クエリ超＝画面表示に1分かかっていた
+    （オーナー報告・実測）。revenue_plan.py と同じプリフェッチ方式に統一する。
+    必要なクエリは固定本数（商品・原価・カテゴリ・月次ジャンル・RPPジャンル・店舗の6本）。
+    suggest_category / suggest_cost_rate（単品版）は承認エンドポイント用に残してある。
+    提案結果は同一入力に対して単品版と同じになるよう、判定順序を揃えること。
     """
+    # ── プリフェッチ（固定6クエリ）──────────────────────────────
     cost_map = {
         pc.management_no: pc.cost_rate
         for pc in db.query(ProductCost).all()
@@ -298,12 +307,99 @@ def get_review_queue(db: Session, shop_id: int) -> list[dict]:
         .order_by(Product.management_no)
         .all()
     )
-    items: list[dict] = []
+    cats = db.query(ProductCategory).all()
+
+    # キュー対象（カテゴリか原価が未確定）だけを対象にジャンルを一括取得
+    queue_prods = [
+        p for p in prods
+        if p.management_no and (p.category_id is None or p.management_no not in cost_map)
+    ]
+    need_genre_mnos = [p.management_no for p in queue_prods if p.category_id is None]
+
+    # 商品ごとの生ジャンル: MonthlyItemSales（直近月を優先）→ RppWeekly の順（単品版と同じ優先）
+    genre_map: dict[str, tuple] = {}
+    if need_genre_mnos:
+        rows = (
+            db.query(
+                MonthlyItemSales.management_no,
+                MonthlyItemSales.year_month,
+                MonthlyItemSales.genre_u1,
+                MonthlyItemSales.genre_u2,
+                MonthlyItemSales.genre_u3,
+            )
+            .filter(MonthlyItemSales.management_no.in_(need_genre_mnos))
+            .all()
+        )
+        latest: dict[str, tuple] = {}
+        for mno, ym, u1, u2, u3 in rows:
+            if not any([u1, u2, u3]):
+                continue
+            if mno not in latest or ym > latest[mno][0]:
+                latest[mno] = (ym, (u1 or None, u2 or None, u3 or None))
+        genre_map = {mno: g for mno, (_, g) in latest.items()}
+
+        missing = [m for m in need_genre_mnos if m not in genre_map]
+        if missing:
+            for mno, genre in (
+                db.query(RppWeekly.management_no, RppWeekly.genre)
+                .filter(RppWeekly.management_no.in_(missing), RppWeekly.genre.isnot(None))
+                .distinct()
+                .all()
+            ):
+                if mno in genre_map or not genre:
+                    continue
+                parts = [x.strip() for x in str(genre).split("/") if x.strip()]
+                genre_map[mno] = (
+                    parts[0] if len(parts) > 0 else None,
+                    parts[1] if len(parts) > 1 else None,
+                    parts[2] if len(parts) > 2 else None,
+                )
+
+    # カテゴリ→所属商品の原価率一覧（同カテゴリ平均の提案用）
+    rates_by_cat: dict[int, dict[str, float]] = {}
     for p in prods:
+        if p.category_id is not None and p.management_no in cost_map:
+            rates_by_cat.setdefault(p.category_id, {})[p.management_no] = cost_map[p.management_no]
+
+    shop = db.query(Shop).filter(Shop.id == shop_id).first()
+    default_rate = shop.default_cost_rate if shop and shop.default_cost_rate is not None else DEFAULT_COST_RATE
+
+    # ── メモリ上で提案を組み立てる（単品版と同じ判定順序）────────────
+    def _suggest_category_mem(mno: str) -> Optional[dict]:
+        g = genre_map.get(mno)
+        if not g or not any(g):
+            return None
+        u1, u2, u3 = g
+        for c in cats:  # 1) 完全一致
+            if (c.genre_u1, c.genre_u2, c.genre_u3) == (u1, u2, u3):
+                return {"category_id": c.id, "label": _category_label(c),
+                        "basis": "既存カテゴリと完全一致", "confidence": "high"}
+        if u1 and u2:   # 2) 大+中一致
+            for c in cats:
+                if c.genre_u1 == u1 and c.genre_u2 == u2:
+                    return {"category_id": c.id, "label": _category_label(c),
+                            "basis": "大・中分類が一致", "confidence": "low"}
+        if u1:          # 3) 大のみ一致
+            for c in cats:
+                if c.genre_u1 == u1:
+                    return {"category_id": c.id, "label": _category_label(c),
+                            "basis": "大分類が一致", "confidence": "low"}
+        return None
+
+    def _suggest_cost_rate_mem(p: Product) -> dict:
+        if p.category_id is not None:
+            rates = [r for m, r in rates_by_cat.get(p.category_id, {}).items() if m != p.management_no]
+            n = len(rates)
+            if n > 0:
+                avg = round(sum(rates) / n, 4)
+                if n >= 3:
+                    return {"suggested_rate": avg, "basis": f"同カテゴリ{n}件の平均", "confidence": "high"}
+                return {"suggested_rate": avg, "basis": f"同カテゴリ{n}件の平均（少数）", "confidence": "low"}
+        return {"suggested_rate": round(default_rate, 4), "basis": "店舗デフォルト", "confidence": "low"}
+
+    items: list[dict] = []
+    for p in queue_prods:
         has_cat = p.category_id is not None
-        has_cost = p.management_no in cost_map
-        if has_cat and has_cost:
-            continue  # 両方確定済みはキューに出さない
         items.append({
             "management_no": p.management_no,
             "product_name": p.product_name,
@@ -312,8 +408,8 @@ def get_review_queue(db: Session, shop_id: int) -> list[dict]:
                 "cost_rate": cost_map.get(p.management_no),
             },
             "suggested": {
-                "category": None if has_cat else suggest_category(db, shop_id, p.management_no),
-                "cost_rate": suggest_cost_rate(db, shop_id, p.management_no),
+                "category": None if has_cat else _suggest_category_mem(p.management_no),
+                "cost_rate": _suggest_cost_rate_mem(p),
             },
         })
     return items

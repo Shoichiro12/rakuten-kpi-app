@@ -70,6 +70,16 @@ _EXTRA_COLUMNS = {
     ],
 }
 
+# サンプルデータ識別フラグ（2026-08-20）。サンプル生成・削除がこの列だけを対象にし、
+# 実データを巻き込まないようにする。既存行は DEFAULT FALSE（=実データ扱い）で埋まる。
+_IS_SAMPLE_TABLES = (
+    "rpp_weekly", "rpp_sales", "monthly_analysis", "monthly_item_sales",
+    "targets", "products", "product_categories", "product_costs",
+    "item_targets", "genre_benchmarks",
+)
+for _t in _IS_SAMPLE_TABLES:
+    _EXTRA_COLUMNS.setdefault(_t, []).append(("is_sample", "BOOLEAN DEFAULT FALSE"))
+
 
 def _add_extra_columns(conn, inspector):
     """モデルに後から追加した通常カラムを、無ければ ALTER TABLE で足す（冪等）。"""
