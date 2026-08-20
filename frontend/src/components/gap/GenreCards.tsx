@@ -5,13 +5,13 @@ import Stat from '../kpi/Stat'
 import Delta, { type DeltaState } from '../kpi/Delta'
 import { FOCUS_RING } from '../../lib/a11y'
 import {
-  orderBySalesGap,
-  salesGapDelta,
+  orderByKpiGap,
+  gapDeltaFor,
   gapKpiDelta,
   gapKpiValue,
   gapKpiLabel,
   gapMetricKey,
-  SALES_ORDER_NOTE,
+  orderNote,
   type GapKpi,
 } from './kpiGap'
 
@@ -42,10 +42,13 @@ export default function GenreCards({ genres, selectedGenre, selectedKPI, onSelec
   const kpi: GapKpi | null =
     selectedKPI === 'access' || selectedKPI === 'cvr' || selectedKPI === 'av' ? selectedKPI : null
 
-  // 並び順は常に売上の落ち込みが大きい順（選択KPIでは切り替えない）
-  const ordered = orderBySalesGap(genres)
-  // 「最大GAP」も同じ基準＝並びの先頭（前期比が取れる行のうち最も落ちているもの）
-  const worstGenre = ordered.find((g) => salesGapDelta(g) != null) ?? null
+  // 並び順は選択KPIのGAPが大きい順（未選択時は売上基準。2026-08-20 オーナー再決定）
+  const ordered = orderByKpiGap(genres, kpi)
+  // 「最大GAP」も並び順と同じ基準＝並びの先頭（前期比が取れる行のうち最も落ちているもの）。
+  // 見出し（選択KPI）とバッジ（売上）で基準が食い違う状態には戻さないこと。
+  const worstGenre = ordered.find((g) => gapDeltaFor(g, kpi) != null) ?? null
+  // GAPが悪化していないのに「最大GAP」と出すと誤読を招くため、悪化している場合のみ強調する
+  const worstIsDeclining = worstGenre != null && (gapDeltaFor(worstGenre, kpi) ?? 0) < 0
 
   return (
     <div>
@@ -62,12 +65,12 @@ export default function GenreCards({ genres, selectedGenre, selectedKPI, onSelec
 
       {/* 並び順の根拠。基準を書かない並べ替えは読み手に伝わらない */}
       <p className="text-xs text-gray-500 mb-3">
-        並び順: {SALES_ORDER_NOTE}（ジャンルには目標値が無いため前期比で比較しています）
+        並び順: {orderNote(kpi, axis)}（ジャンルには目標値が無いため前期比で比較しています）
       </p>
 
       <div className="flex gap-3 overflow-x-auto pb-2">
         {ordered.map((g) => {
-          const isWorst = worstGenre != null && g.genre === worstGenre.genre
+          const isWorst = worstIsDeclining && worstGenre != null && g.genre === worstGenre.genre
           const isSelected = g.genre === selectedGenre
           const hasAlert = isWarning(g.changes.gross) || isWarning(g.changes.cvr) || isWarning(g.changes.av)
 
@@ -116,8 +119,9 @@ export default function GenreCards({ genres, selectedGenre, selectedKPI, onSelec
                 <p className="text-xs font-semibold text-gray-700 leading-tight pr-1">{g.genre}</p>
                 <div className="flex gap-1 shrink-0">
                   {isWorst && !isSelected && (
-                    <span className="text-[10px] bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 font-medium">
-                      最大GAP
+                    <span className="text-xs bg-amber-100 text-amber-700 rounded px-1.5 py-0.5 font-medium whitespace-nowrap">
+                      {/* バッジの基準は並び順と同じ＝選択KPI（未選択時は売上） */}
+                      {kpi ? `${gapKpiLabel(kpi, axis).replace(/（.+）/, '')}GAP最大` : '売上GAP最大'}
                     </span>
                   )}
                   {hasAlert && <AlertTriangle size={13} className="text-amber-500" />}
@@ -146,7 +150,7 @@ export default function GenreCards({ genres, selectedGenre, selectedKPI, onSelec
                 ))}
               </div>
 
-              <p className="mt-3 text-[10px] text-blue-500 text-right font-medium">
+              <p className="mt-3 text-xs text-blue-500 text-right font-medium">
                 {isSelected ? '✓ 選択中' : '商品を見る →'}
               </p>
             </button>

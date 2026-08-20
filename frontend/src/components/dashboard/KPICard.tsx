@@ -75,7 +75,7 @@ export default function KPICard({
     return (
       <div className={`rounded-lg border p-3 ${bg}`}>
         <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] font-medium text-gray-400 leading-tight truncate">{label}</p>
+          <p className="text-xs font-medium text-gray-400 leading-tight truncate">{label}</p>
           <div className="flex items-center gap-1 shrink-0">
             {helpMetric && <KPIHelp metric={helpMetric} />}
             {alert && <AlertTriangle size={13} className="text-amber-500" />}
@@ -87,7 +87,7 @@ export default function KPICard({
             {suffix && <span className="ml-0.5 text-xs text-gray-400">{suffix}</span>}
           </span>
           {change != null && (
-            <span className={`flex items-center gap-0.5 text-[11px] ${changeColor}`}>
+            <span className={`flex items-center gap-0.5 text-xs ${changeColor}`}>
               <ChangeIcon size={11} />
               {fmt(change)}
             </span>
@@ -132,7 +132,7 @@ export default function KPICard({
       )}
       {yoy != null && (
         <div className={`mt-1 flex items-center gap-1 ${isHero ? 'text-sm' : 'text-xs'} ${yoyColor}`}>
-          <span className={`text-gray-400 ${isHero ? 'text-xs' : 'text-[10px]'}`}>YoY</span>
+          <span className={`text-gray-400 ${isHero ? 'text-xs' : 'text-xs'}`}>YoY</span>
           <span>{fmt(yoy)}</span>
         </div>
       )}

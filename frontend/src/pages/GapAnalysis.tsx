@@ -8,7 +8,7 @@ import GenreCards from '../components/gap/GenreCards'
 import ActionSummary from '../components/gap/ActionSummary'
 import ActionPanel from '../components/gap/ActionPanel'
 import AccessAxisBadge from '../components/gap/AccessAxisBadge'
-import { orderBySalesGap, SALES_ORDER_NOTE } from '../components/gap/kpiGap'
+import { orderByKpiGap, orderNote } from '../components/gap/kpiGap'
 import EvaluationMatrix from '../components/EvaluationMatrix'
 import ReliabilityNote from '../components/ReliabilityNote'
 import { useTableSort } from '../components/table/useTableSort'
@@ -190,10 +190,10 @@ export default function GapAnalysis() {
 
   const weekKey = period === 'monthly' ? dateValue.slice(0, 7) : dateValue
 
-  // 商品テーブルの既定順は「売上の前期比が悪い順」で固定（選択KPIでは切り替えない）。
+  // 商品テーブルの既定順は選択KPIのGAPが悪い順（未選択時は売上基準。2026-08-20 再決定）。
   // 列見出しクリックのソート（useTableSort）は既定順の上に乗るので、
   // ユーザーが列を選べばそちらが勝つ。適用順は 既定順 → 列ソート。
-  const orderedProducts = orderBySalesGap(productData)
+  const orderedProducts = orderByKpiGap(productData, selectedKPI)
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -330,7 +330,7 @@ export default function GapAnalysis() {
                   <p className="text-xs text-gray-500">
                     {selectedGenre} — {productData.length}件
                     {!productSort.key && (
-                      <span className="ml-1.5 text-gray-400">／ 並び順: {SALES_ORDER_NOTE}</span>
+                      <span className="ml-1.5 text-gray-400">／ 並び順: {orderNote(selectedKPI, productAxis)}</span>
                     )}
                   </p>
                 </div>

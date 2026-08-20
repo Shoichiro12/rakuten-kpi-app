@@ -350,7 +350,7 @@ export default function MasterSettings() {
   }
 
   const confidenceBadge = (c: 'high' | 'low') => (
-    <span className={`ml-1 text-[10px] px-1 py-0.5 rounded font-medium ${
+    <span className={`ml-1 text-xs px-1 py-0.5 rounded font-medium ${
       c === 'high' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'
     }`}>
       {c === 'high' ? '高信頼' : '要確認'}
@@ -617,7 +617,7 @@ export default function MasterSettings() {
                               className="w-16 text-right tabular-nums border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                             <span className="text-gray-400 text-xs">%</span>
-                            <span className={`text-[10px] px-1 py-0.5 rounded ${r.cost_source === 'product' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                            <span className={`text-xs px-1 py-0.5 rounded ${r.cost_source === 'product' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
                               {r.cost_source === 'product' ? '個別' : '既定'}
                             </span>
                           </span>
@@ -626,7 +626,7 @@ export default function MasterSettings() {
                           {/* ゲート用状態（診断・提案の前提。設計ドキュメント2-A / 3-A） */}
                           <div className="flex flex-col gap-1 min-w-[180px]">
                             <span className="inline-flex items-center gap-1.5">
-                              <span className="text-[10px] text-gray-400 w-14 shrink-0">フェーズ</span>
+                              <span className="text-xs text-gray-400 w-14 shrink-0">フェーズ</span>
                               <select
                                 value={r.phase_override ?? 'auto'}
                                 onChange={(e) => {
@@ -649,7 +649,7 @@ export default function MasterSettings() {
                               />
                             </span>
                             <span className="inline-flex items-center gap-1.5">
-                              <span className="text-[10px] text-gray-400 w-14 shrink-0">ページ</span>
+                              <span className="text-xs text-gray-400 w-14 shrink-0">ページ</span>
                               <select
                                 value={r.page_ready === null ? 'unknown' : r.page_ready ? 'ready' : 'not_ready'}
                                 onChange={(e) => {
@@ -664,7 +664,7 @@ export default function MasterSettings() {
                                 <option value="not_ready">未完成</option>
                               </select>
                               <label
-                                className="inline-flex items-center gap-1 text-[10px] text-gray-500 cursor-pointer select-none"
+                                className="inline-flex items-center gap-1 text-xs text-gray-500 cursor-pointer select-none"
                                 title="新商品の低ROASを意図的な投資として許容する場合にチェック。診断の数値は変わらず、表示が注記付きになります"
                               >
                                 <input

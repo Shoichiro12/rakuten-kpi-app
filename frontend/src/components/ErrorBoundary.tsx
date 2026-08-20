@@ -66,8 +66,8 @@ export default class ErrorBoundary extends Component<Props, State> {
           </button>
         </div>
         <details className="mt-3">
-          <summary className="text-[11px] text-gray-400 cursor-pointer">技術的な詳細</summary>
-          <pre className="mt-1 text-[11px] text-gray-500 whitespace-pre-wrap break-all">
+          <summary className="text-xs text-gray-400 cursor-pointer">技術的な詳細</summary>
+          <pre className="mt-1 text-xs text-gray-500 whitespace-pre-wrap break-all">
             {error.message}
           </pre>
         </details>

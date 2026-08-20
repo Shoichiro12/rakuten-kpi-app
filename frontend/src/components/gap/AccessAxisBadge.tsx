@@ -16,7 +16,7 @@ export default function AccessAxisBadge({ axis }: { axis?: AccessAxis }) {
   const isShop = axis === 'site_uu'
   return (
     <span
-      className={`text-[11px] px-2 py-1 rounded-lg font-medium whitespace-nowrap ${
+      className={`text-xs px-2 py-1 rounded-lg font-medium whitespace-nowrap ${
         isShop ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
       }`}
       title={ACCESS_AXIS_HINT[axis]}

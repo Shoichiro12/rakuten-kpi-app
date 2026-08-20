@@ -40,7 +40,7 @@ export default function GenrePicker({ tree, value, onChange, compact = false }: 
         <input value={value.genre_u2} onChange={(e) => onChange({ ...value, genre_u2: e.target.value })} placeholder="中分類" className={fieldClass} />
         <span className="text-gray-300 text-xs">&gt;</span>
         <input value={value.genre_u3} onChange={(e) => onChange({ ...value, genre_u3: e.target.value })} placeholder="小分類" className={fieldClass} />
-        <button type="button" onClick={() => setCustom(false)} className="text-[11px] text-blue-600 hover:underline whitespace-nowrap">
+        <button type="button" onClick={() => setCustom(false)} className="text-xs text-blue-600 hover:underline whitespace-nowrap">
           マスタから選ぶ
         </button>
       </div>
@@ -81,7 +81,7 @@ export default function GenrePicker({ tree, value, onChange, compact = false }: 
         <option value="">（小分類）</option>
         {u3Options.map((u) => <option key={u} value={u}>{u}</option>)}
       </select>
-      <button type="button" onClick={() => setCustom(true)} className="text-[11px] text-gray-500 hover:underline whitespace-nowrap">
+      <button type="button" onClick={() => setCustom(true)} className="text-xs text-gray-500 hover:underline whitespace-nowrap">
         マスタに無い→自由入力
       </button>
     </div>

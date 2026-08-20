@@ -127,7 +127,7 @@ export default function Login() {
             </button>
             <div className="flex items-center gap-3 my-4">
               <span className="flex-1 h-px bg-gray-200" />
-              <span className="text-[11px] text-gray-400">または</span>
+              <span className="text-xs text-gray-400">または</span>
               <span className="flex-1 h-px bg-gray-200" />
             </div>
           </>
@@ -212,7 +212,7 @@ export default function Login() {
       {/* サービス紹介と法的ページはLP側が正。ログイン画面しか見えない状態だと
           サービス内容が分からないので、LPへの導線もここに置いておく
           （Stripeの審査担当者がアプリURLから来た場合にも辿れるようにする）。 */}
-      <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center mt-5 text-[11px] text-gray-400">
+      <div className="flex flex-wrap gap-x-3 gap-y-1 justify-center mt-5 text-xs text-gray-400">
         <a href={LP_BASE_URL} {...EXTERNAL_LINK_PROPS} className="hover:text-gray-600 hover:underline">サービス紹介</a>
         <a href={LEGAL_LINKS.tokushoho} {...EXTERNAL_LINK_PROPS} className="hover:text-gray-600 hover:underline">特定商取引法に基づく表記</a>
         <a href={LEGAL_LINKS.privacy} {...EXTERNAL_LINK_PROPS} className="hover:text-gray-600 hover:underline">プライバシーポリシー</a>

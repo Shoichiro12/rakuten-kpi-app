@@ -67,7 +67,7 @@ export default function TodayActions({ data, onChanged }: Props) {
     return (
       <div key={item.key} className="bg-gray-50 rounded-lg p-3">
         <div className="flex items-start gap-2.5">
-          <span className={`text-[11px] px-2 py-0.5 rounded font-medium whitespace-nowrap ${style.cls}`}>
+          <span className={`text-xs px-2 py-0.5 rounded font-medium whitespace-nowrap ${style.cls}`}>
             {style.label}
           </span>
           <div className="flex-1 min-w-0">
@@ -75,15 +75,15 @@ export default function TodayActions({ data, onChanged }: Props) {
             <p className="text-xs text-gray-600 mt-1 leading-relaxed">{item.reason}</p>
             <div className="flex flex-wrap gap-1.5 mt-2">
               {item.impact && (
-                <span className="text-[11px] px-2 py-0.5 rounded bg-green-100 text-green-700">
+                <span className="text-xs px-2 py-0.5 rounded bg-green-100 text-green-700">
                   {item.impact}
                 </span>
               )}
-              <span className="text-[11px] px-2 py-0.5 rounded bg-white text-gray-500 border">
+              <span className="text-xs px-2 py-0.5 rounded bg-white text-gray-500 border">
                 所要 {item.effort}
               </span>
               {item.badges?.map((b) => (
-                <span key={b} className="text-[11px] px-2 py-0.5 rounded bg-white text-gray-500 border">
+                <span key={b} className="text-xs px-2 py-0.5 rounded bg-white text-gray-500 border">
                   {b}
                 </span>
               ))}
@@ -144,11 +144,11 @@ export default function TodayActions({ data, onChanged }: Props) {
       <div className="flex items-center gap-2 mb-1">
         <ListChecks size={18} className="text-blue-600" />
         <span className="text-base font-bold text-gray-900">今日やるべきこと</span>
-        <span className="text-[11px] px-2 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
+        <span className="text-xs px-2 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">
           {totalCount}件
         </span>
         {data.done_count > 0 && (
-          <span className="text-[11px] text-gray-400">実施済み {data.done_count}件</span>
+          <span className="text-xs text-gray-400">実施済み {data.done_count}件</span>
         )}
       </div>
 
@@ -178,7 +178,7 @@ export default function TodayActions({ data, onChanged }: Props) {
           <div className="flex items-center gap-2 mb-2">
             <Package size={14} className="text-gray-500" />
             <span className="text-xs font-semibold text-gray-700">商品別のアクション</span>
-            <span className="text-[10px] text-gray-400">機会損失の大きい順</span>
+            <span className="text-xs text-gray-400">機会損失の大きい順</span>
           </div>
           <div className="space-y-2.5">
             {productItems.map(renderCard)}

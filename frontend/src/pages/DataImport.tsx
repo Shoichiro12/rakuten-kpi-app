@@ -805,7 +805,15 @@ export default function DataImport() {
           )}
         </div>
 
-        {/* 個別に取り込む（種類ごと） */}
+        {/* 個別に取り込む（種類ごと）。初回利用者の主役は上の「まとめて取込み」なので、
+            種類を指定する取込みは折りたたみに格納する（2026-08-20 レビュー採用） */}
+        <details className="bg-white rounded-xl border shadow-sm group">
+          <summary className="px-5 py-3.5 text-sm font-semibold text-gray-600 cursor-pointer select-none list-none flex items-center justify-between hover:bg-gray-50 rounded-xl group-open:rounded-b-none">
+            <span>個別に取り込む（種類を指定・テキスト貼り付け）</span>
+            <span className="text-xs text-gray-400 group-open:hidden">クリックで展開</span>
+            <span className="text-xs text-gray-400 hidden group-open:inline">閉じる</span>
+          </summary>
+          <div className="border-t p-5">
         <div className="grid lg:grid-cols-2 gap-5">
           {/* RPP広告レポート */}
           <div className="bg-white rounded-xl border shadow-sm p-5 space-y-3">
@@ -923,10 +931,23 @@ export default function DataImport() {
             </Collapsible>
           </div>
         </div>
+          </div>
+        </details>
+
+        {/* 取込み済みデータの管理（履歴・個別削除）。日常の取込みでは開く必要が無いため
+            折りたたみに格納する（削除という危険操作を初期表示から遠ざける意図もある） */}
+        {((rppPeriods && (rppPeriods.weekly.length > 0 || rppPeriods.monthly.length > 0)) || monthlyPeriods.length > 0) && (
+        <details className="bg-white rounded-xl border shadow-sm group">
+          <summary className="px-5 py-3.5 text-sm font-semibold text-gray-600 cursor-pointer select-none list-none flex items-center justify-between hover:bg-gray-50 rounded-xl group-open:rounded-b-none">
+            <span>取込み済みデータの管理（履歴・個別削除）</span>
+            <span className="text-xs text-gray-400 group-open:hidden">クリックで展開</span>
+            <span className="text-xs text-gray-400 hidden group-open:inline">閉じる</span>
+          </summary>
+          <div className="border-t p-5 space-y-5">
 
         {/* インポート済みRPP期間一覧 */}
         {rppPeriods && (rppPeriods.weekly.length > 0 || rppPeriods.monthly.length > 0) && (
-          <div className="bg-white rounded-xl border shadow-sm p-5 space-y-3">
+          <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Megaphone size={15} className="text-blue-600" />
@@ -987,7 +1008,7 @@ export default function DataImport() {
 
         {/* インポート済み商品分析データ一覧（個別削除対応） */}
         {monthlyPeriods.length > 0 && (
-          <div className="bg-white rounded-xl border shadow-sm p-5 space-y-3">
+          <div className="space-y-3">
             <div className="flex items-center gap-2">
               <BarChart3 size={15} className="text-violet-600" />
               <h3 className="text-sm font-bold text-gray-900">インポート済み商品分析データ（月次）</h3>
@@ -1010,13 +1031,25 @@ export default function DataImport() {
             </div>
           </div>
         )}
+          </div>
+        </details>
+        )}
 
-        {/* お試し / リセット */}
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-          <Sparkles size={18} className="text-amber-600 shrink-0" />
+        {/* お試し / リセット。データ未取込のときだけ初期表示で開く
+            （key の切替で hasData の変化時に開閉状態をリセットする） */}
+        <details
+          key={hasData ? 'sample-closed' : 'sample-open'}
+          open={!hasData}
+          className="bg-amber-50 border border-amber-200 rounded-xl group"
+        >
+          <summary className="px-4 py-3 text-sm font-semibold text-amber-800 cursor-pointer select-none list-none flex items-center justify-between hover:bg-amber-100/60 rounded-xl group-open:rounded-b-none">
+            <span className="flex items-center gap-2"><Sparkles size={16} className="text-amber-600" /> まずは試してみたい方へ（サンプルデータ）</span>
+            <span className="text-xs text-amber-600 group-open:hidden">クリックで展開</span>
+            <span className="text-xs text-amber-600 hidden group-open:inline">閉じる</span>
+          </summary>
+        <div className="border-t border-amber-200 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex-1">
-            <p className="text-sm font-semibold text-amber-800">まずは試してみたい方へ</p>
-            <p className="text-xs text-amber-700 mt-0.5">
+            <p className="text-xs text-amber-700">
               実データがなくても、サンプルデータ（10商品×8週間）で全機能を体験できます。あとから実データに差し替え可能です。
             </p>
           </div>
@@ -1039,6 +1072,7 @@ export default function DataImport() {
             )}
           </div>
         </div>
+        </details>
       </div>
     </div>
   )

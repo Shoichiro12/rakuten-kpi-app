@@ -97,12 +97,12 @@ export default function KPIHelp({ metric, size = 13 }: KPIHelpProps) {
           <div className="space-y-2">
             <p className="text-xs font-bold text-white">{metric}</p>
             <div className="bg-gray-800 rounded-lg px-2.5 py-1.5">
-              <p className="text-[10px] text-gray-400 mb-0.5">計算式</p>
+              <p className="text-xs text-gray-400 mb-0.5">計算式</p>
               <p className="text-xs font-mono text-blue-300">{def.formula}</p>
             </div>
             <p className="text-xs text-gray-300 leading-relaxed">{def.desc}</p>
             {def.good && (
-              <p className="text-[10px] text-green-400 font-medium">{def.good}</p>
+              <p className="text-xs text-green-400 font-medium">{def.good}</p>
             )}
           </div>
           {/* 矢印 */}

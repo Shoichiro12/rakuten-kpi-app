@@ -111,7 +111,7 @@ export default function ConsultingInquiryForm({ onClose }: { onClose?: () => voi
             placeholder="例: 月商300万円、3店舗運営、スタッフ2名"
             maxLength={100}
           />
-          <p className="text-[11px] text-gray-400 mt-1">月商の目安や店舗数など、わかる範囲で構いません。</p>
+          <p className="text-xs text-gray-400 mt-1">月商の目安や店舗数など、わかる範囲で構いません。</p>
         </div>
 
         <div className="grid sm:grid-cols-2 gap-3">
