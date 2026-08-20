@@ -198,6 +198,76 @@ def _enforce_rls_pg(conn):
         )
 
 
+def _mark_legacy_sample_rows(conn):
+    """is_sample 列の導入（2026-08-20）より前に生成された旧サンプルデータへ、
+    フラグを遡って付与する（冪等）。
+
+    これが無いと、既存環境（demoアカウント等）の旧サンプルは「実データ扱い」のまま残り、
+    ①「サンプルだけ削除」で消えない ②商品マスタに残った旧サンプル商品が管理番号の
+    衝突判定に当たり、サンプル再生成が全件スキップされる（PR #21 検証で実際に再現）。
+
+    誤認定を避けるための判定基準（**緩めないこと**）:
+    - 商品名を持つテーブル … 管理番号がサンプルカタログと一致し、**かつ**商品名または
+      商品URLがカタログの値と完全一致する行だけ。実店舗が偶然同じ管理番号を使っていても、
+      架空の商品名・URLまで一致することは実質ない
+    - product_costs / item_targets（名前を持たない）… **同一ユーザーの products で
+      サンプル認定済み**の管理番号に紐づく行だけ
+    - genre_benchmarks … デモ行の memo「RMS表示値（デモデータ）」と階層・指標の完全一致のみ
+    - **targets と product_categories は対象外**。目標値（500万等）は実データと区別できず、
+      カテゴリは実データ商品が使っている可能性があるため。旧サンプル由来のこれらは
+      無害な残置とし、必要なら画面から個別に消してもらう
+    """
+    from sample_data import PRODUCTS  # 循環import回避のため関数内で読む
+
+    catalog = [(p["management_no"], p["product_name"], p["product_url"]) for p in PRODUCTS]
+    catalog.append(("NEW-001", "新商品サンプル（実績データなし）", None))
+    not_sample = "(is_sample IS NULL OR is_sample = FALSE)"
+    total = 0
+
+    # 商品名（＋URL）を持つテーブル
+    name_tables = [
+        ("products", "management_no", "product_name", "product_url"),
+        ("rpp_weekly", "management_no", "product_name", "product_url"),
+        ("monthly_analysis", "management_no", "product_name", "product_url"),
+        ("monthly_item_sales", "management_no", "product_name", "product_url"),
+        ("rpp_sales", "item_code", "product_name", "item_url"),
+    ]
+    for table, mno_col, name_col, url_col in name_tables:
+        for mno, name, url in catalog:
+            cond = f"{name_col} = :name"
+            params = {"mno": mno, "name": name}
+            if url:
+                cond = f"({cond} OR {url_col} = :url)"
+                params["url"] = url
+            res = conn.execute(text(
+                f"UPDATE {table} SET is_sample = TRUE "
+                f"WHERE {not_sample} AND {mno_col} = :mno AND {cond}"
+            ), params)
+            total += res.rowcount or 0
+
+    # 名前を持たないテーブル: 同一ユーザーのサンプル認定済み products に紐づく行だけ
+    for table in ("product_costs", "item_targets"):
+        res = conn.execute(text(
+            f"UPDATE {table} SET is_sample = TRUE "
+            f"WHERE {not_sample} AND EXISTS ("
+            f"  SELECT 1 FROM products p WHERE p.is_sample = TRUE"
+            f"  AND p.management_no = {table}.management_no"
+            f"  AND (p.user_id = {table}.user_id OR (p.user_id IS NULL AND {table}.user_id IS NULL))"
+            f")"
+        ))
+        total += res.rowcount or 0
+
+    res = conn.execute(text(
+        "UPDATE genre_benchmarks SET is_sample = TRUE "
+        f"WHERE {not_sample} AND genre_u1 = 'スポーツ' AND genre_u2 = 'シューズ' "
+        "AND genre_u3 IS NULL AND metric = 'ctr' AND memo = 'RMS表示値（デモデータ）'"
+    ))
+    total += res.rowcount or 0
+
+    if total:
+        logger.info("migrations: 旧サンプルデータ %s 行に is_sample を遡及付与しました", total)
+
+
 def run_migrations(engine):
     dialect = engine.dialect.name  # 'sqlite' / 'postgresql'
     try:
@@ -210,6 +280,7 @@ def run_migrations(engine):
                 inspector = inspect(conn)
                 _rebuild_unique_constraints_pg(conn, inspector)
             _assign_legacy_data(conn)
+            _mark_legacy_sample_rows(conn)
     except Exception:
         # マイグレーション失敗でアプリを止めない（ログに残して継続）
         logger.exception("migrations: 実行中にエラーが発生しました")
