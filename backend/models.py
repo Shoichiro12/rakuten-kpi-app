@@ -11,6 +11,9 @@ class RppWeekly(Base, UserScopedMixin):
     __tablename__ = "rpp_weekly"
 
     id = Column(Integer, primary_key=True, index=True)
+    # サンプルデータ由来の行か（2026-08-20）。サンプル生成が付け、サンプル削除がこの行だけを消す。
+    # 実データは False/NULL。削除系の判定は必ず is_(True) で行う（NULL を巻き込まない）
+    is_sample = Column(Boolean, default=False)
     week_start = Column(Date, nullable=False)  # 週開始日（日曜）
     product_url = Column(String, nullable=False)
     management_no = Column(String)
@@ -30,6 +33,9 @@ class MonthlyAnalysis(Base, UserScopedMixin):
     __tablename__ = "monthly_analysis"
 
     id = Column(Integer, primary_key=True, index=True)
+    # サンプルデータ由来の行か（2026-08-20）。サンプル生成が付け、サンプル削除がこの行だけを消す。
+    # 実データは False/NULL。削除系の判定は必ず is_(True) で行う（NULL を巻き込まない）
+    is_sample = Column(Boolean, default=False)
     year_month = Column(String, nullable=False)  # YYYY-MM
     product_url = Column(String, nullable=False)
     management_no = Column(String)
@@ -45,6 +51,9 @@ class Target(Base, UserScopedMixin):
     __tablename__ = "targets"
 
     id = Column(Integer, primary_key=True, index=True)
+    # サンプルデータ由来の行か（2026-08-20）。サンプル生成が付け、サンプル削除がこの行だけを消す。
+    # 実データは False/NULL。削除系の判定は必ず is_(True) で行う（NULL を巻き込まない）
+    is_sample = Column(Boolean, default=False)
     year_month = Column(String, nullable=False)  # YYYY-MM
     target_sales = Column(Float, default=0)    # KGI売上目標
     target_access = Column(Integer, default=0) # アクセス目標
@@ -118,6 +127,9 @@ class MonthlyItemSales(Base, UserScopedMixin):
     __tablename__ = "monthly_item_sales"
 
     id = Column(Integer, primary_key=True, index=True)
+    # サンプルデータ由来の行か（2026-08-20）。サンプル生成が付け、サンプル削除がこの行だけを消す。
+    # 実データは False/NULL。削除系の判定は必ず is_(True) で行う（NULL を巻き込まない）
+    is_sample = Column(Boolean, default=False)
     year_month = Column(String, nullable=False)   # YYYY-MM (from file header)
     management_no = Column(String, nullable=False)
     product_url = Column(String)
@@ -157,6 +169,9 @@ class RppSales(Base, UserScopedMixin):
     __tablename__ = "rpp_sales"
 
     id = Column(Integer, primary_key=True, index=True)
+    # サンプルデータ由来の行か（2026-08-20）。サンプル生成が付け、サンプル削除がこの行だけを消す。
+    # 実データは False/NULL。削除系の判定は必ず is_(True) で行う（NULL を巻き込まない）
+    is_sample = Column(Boolean, default=False)
     period_type = Column(String, nullable=False)  # 'weekly' or 'monthly'
     year_month = Column(String, nullable=False)   # YYYY-MM
     date_from = Column(String, nullable=False)    # YYYY-MM-DD
@@ -255,6 +270,9 @@ class ProductCategory(Base, UserScopedMixin):
     __tablename__ = "product_categories"
 
     id = Column(Integer, primary_key=True, index=True)
+    # サンプルデータ由来の行か（2026-08-20）。サンプル生成が付け、サンプル削除がこの行だけを消す。
+    # 実データは False/NULL。削除系の判定は必ず is_(True) で行う（NULL を巻き込まない）
+    is_sample = Column(Boolean, default=False)
     genre_u1 = Column(String)
     genre_u2 = Column(String)
     genre_u3 = Column(String)
@@ -269,6 +287,9 @@ class Product(Base, UserScopedMixin):
     __tablename__ = "products"
 
     id = Column(Integer, primary_key=True, index=True)
+    # サンプルデータ由来の行か（2026-08-20）。サンプル生成が付け、サンプル削除がこの行だけを消す。
+    # 実データは False/NULL。削除系の判定は必ず is_(True) で行う（NULL を巻き込まない）
+    is_sample = Column(Boolean, default=False)
     shop_id = Column(Integer, ForeignKey("shops.id"), nullable=True)
     management_no = Column(String, nullable=False)
     product_name = Column(String)
@@ -300,6 +321,9 @@ class ProductCost(Base, UserScopedMixin):
     __tablename__ = "product_costs"
 
     id = Column(Integer, primary_key=True, index=True)
+    # サンプルデータ由来の行か（2026-08-20）。サンプル生成が付け、サンプル削除がこの行だけを消す。
+    # 実データは False/NULL。削除系の判定は必ず is_(True) で行う（NULL を巻き込まない）
+    is_sample = Column(Boolean, default=False)
     management_no = Column(String, nullable=False)
     cost_rate = Column(Float, nullable=False)   # 0〜1
     memo = Column(String)
@@ -330,6 +354,9 @@ class ItemTarget(Base, UserScopedMixin):
     __tablename__ = "item_targets"
 
     id = Column(Integer, primary_key=True, index=True)
+    # サンプルデータ由来の行か（2026-08-20）。サンプル生成が付け、サンプル削除がこの行だけを消す。
+    # 実データは False/NULL。削除系の判定は必ず is_(True) で行う（NULL を巻き込まない）
+    is_sample = Column(Boolean, default=False)
     management_no = Column(String, nullable=False)
     year_month = Column(String, nullable=False)      # YYYY-MM
     target_sales = Column(Float, nullable=False)     # 利用者が唯一手入力する値
@@ -364,6 +391,9 @@ class GenreBenchmark(Base, UserScopedMixin):
     __tablename__ = "genre_benchmarks"
 
     id = Column(Integer, primary_key=True, index=True)
+    # サンプルデータ由来の行か（2026-08-20）。サンプル生成が付け、サンプル削除がこの行だけを消す。
+    # 実データは False/NULL。削除系の判定は必ず is_(True) で行う（NULL を巻き込まない）
+    is_sample = Column(Boolean, default=False)
     genre_u1 = Column(String, nullable=False)
     genre_u2 = Column(String, nullable=True)
     genre_u3 = Column(String, nullable=True)

@@ -619,6 +619,8 @@ export interface InventoryInfo {
 
 export interface DataStatus {
   has_data: boolean
+  /** サンプルデータ（is_sample=True）が存在するか。「サンプルだけ削除」ボタンの表示制御用 */
+  has_sample?: boolean
   rpp: { rows: number; weeks: number; latest: string | null }
   monthly: { rows: number; months: number; latest: string | null }
   targets: number

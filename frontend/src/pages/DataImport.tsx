@@ -568,8 +568,22 @@ export default function DataImport() {
     }
   }
 
+  /** サンプルだけ削除（実データ・設定は保持）。全削除とは別の安全な導線 */
+  const handleSampleDelete = async () => {
+    if (!window.confirm('サンプルデータだけを削除します（取り込んだ実データ・目標設定は残ります）。よろしいですか？')) return
+    setLoading(true); setStatus(null)
+    try {
+      const result = await api.sampleDataDelete() as { message: string }
+      flash({ type: 'success', message: result.message })
+    } catch (e: unknown) {
+      flash({ type: 'error', message: e instanceof Error ? e.message : 'サンプルデータの削除に失敗しました' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleReset = async () => {
-    if (!window.confirm('登録済みのデータをすべて削除します。よろしいですか？')) return
+    if (!window.confirm('登録済みの実績データをすべて削除します（サンプルだけでなく、取り込んだ実データも消えます）。サンプルだけ消したい場合はキャンセルして「サンプルだけ削除」を使ってください。よろしいですか？')) return
     setLoading(true); setStatus(null)
     try {
       const result = await api.resetData() as { message: string }
@@ -1050,10 +1064,11 @@ export default function DataImport() {
         <div className="border-t border-amber-200 p-4 flex flex-col sm:flex-row sm:items-center gap-3">
           <div className="flex-1">
             <p className="text-xs text-amber-700">
-              実データがなくても、サンプルデータ（10商品×8週間）で全機能を体験できます。あとから実データに差し替え可能です。
+              実データがなくても、サンプルデータ（10商品×8週間）で全機能を体験できます。
+              サンプルは実データと別管理なので、生成・削除しても取り込んだ実データや目標設定には影響しません。
             </p>
           </div>
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 shrink-0 flex-wrap">
             <button
               onClick={handleSampleData}
               disabled={loading}
@@ -1061,13 +1076,24 @@ export default function DataImport() {
             >
               {loading ? '処理中...' : 'サンプルを生成'}
             </button>
+            {/* サンプルだけ削除（実データ保持）。全削除より先＝安全な選択肢を目立たせる */}
+            {dataStatus?.has_sample && (
+              <button
+                onClick={handleSampleDelete}
+                disabled={loading}
+                className="flex items-center gap-1.5 px-3 py-2 border border-amber-300 text-amber-700 hover:bg-amber-100 disabled:opacity-50 text-sm rounded-lg transition-colors"
+              >
+                <Trash2 size={14} /> サンプルだけ削除
+              </button>
+            )}
             {hasData && (
               <button
                 onClick={handleReset}
                 disabled={loading}
+                title="サンプルだけでなく、取り込んだ実データも削除されます"
                 className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-600 text-sm rounded-lg transition-colors"
               >
-                <Trash2 size={14} /> 全削除
+                <Trash2 size={14} /> 実績データを全削除
               </button>
             )}
           </div>

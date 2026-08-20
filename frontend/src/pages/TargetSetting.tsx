@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Save, CheckCircle, Check, RefreshCw } from 'lucide-react'
+import { Save, CheckCircle, Check, RefreshCw, Trash2 } from 'lucide-react'
 import Header from '../components/layout/Header'
 import { useTableSort } from '../components/table/useTableSort'
 import SortableTh from '../components/table/SortableTh'
@@ -193,6 +193,18 @@ export default function TargetSetting() {
       flashItem(`${mno} を最新の実績で再計算しました`)
     } catch (e) {
       console.error('[TargetSetting] 再計算エラー:', e)
+    }
+  }
+
+  /** アイテム別目標の削除（2026-08-20 オーナー要望）。設定済みの目標行だけが対象 */
+  const deleteItemTarget = async (mno: string) => {
+    if (!window.confirm(`${mno} の ${yearMonth} のアイテム別目標を削除します。よろしいですか？`)) return
+    try {
+      await api.itemTargets.remove(mno, yearMonth)
+      await loadItemTargets(yearMonth)
+      flashItem(`${mno} の目標を削除しました`)
+    } catch (e) {
+      console.error('[TargetSetting] アイテム別目標の削除エラー:', e)
     }
   }
 
@@ -691,12 +703,13 @@ export default function TargetSetting() {
                       <SortableTh label="目標客単価（円）" sortKey="target_av" sort={itemSort} />
                       <SortableTh label="必要アクセス（UU）" sortKey="required_access" sort={itemSort} />
                       <th className="px-3 py-2.5 text-left">根拠</th>
+                      <th className="px-3 py-2.5 text-center whitespace-nowrap">操作</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="py-8 text-center text-sm text-gray-400">
+                        <td colSpan={7} className="py-8 text-center text-sm text-gray-400">
                           絞り込み条件に一致する商品がありません。
                         </td>
                       </tr>
@@ -771,6 +784,21 @@ export default function TargetSetting() {
                               <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500" title={t.basis_detail ?? undefined}>
                                 算出不能（データ待ち）
                               </span>
+                            )}
+                          </td>
+                          {/* 操作: 設定済みの目標だけ削除できる（2026-08-20 オーナー要望。
+                              消せないと不要な目標が溜まり、逆算・診断の重複の原因になる） */}
+                          <td className="px-3 py-2 text-center">
+                            {t ? (
+                              <button
+                                onClick={() => deleteItemTarget(r.management_no)}
+                                className="inline-flex items-center gap-1 px-2 py-1 border border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-300 hover:bg-red-50 text-xs rounded transition-colors"
+                                title="この商品のこの月の目標を削除します"
+                              >
+                                <Trash2 size={11} />削除
+                              </button>
+                            ) : (
+                              <span className="text-xs text-gray-300">—</span>
                             )}
                           </td>
                         </tr>

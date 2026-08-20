@@ -171,23 +171,102 @@ def _week_metrics(rng: random.Random, mgmt_no: str, week_offset: int) -> dict:
     }
 
 
+def delete_sample_data(db: Session, *, commit: bool = True) -> dict:
+    """サンプルデータ（is_sample=True の行）だけを削除する。実データは触らない。
+
+    2026-08-20 オーナー指摘への対応: 従来は生成時・全削除時に実データごと消していた。
+    判定は必ず is_(True)（NULL=実データを巻き込まない）。
+    削除順は参照の向きに合わせる: 明細・目標 → 商品 → カテゴリ。
+    実データの商品がサンプルカテゴリを参照していた場合は未分類に戻してから消す。
+    """
+    deleted: dict[str, int] = {}
+    for model, name in (
+        (RppWeekly, "rpp_weekly"),
+        (RppSales, "rpp_sales"),
+        (MonthlyAnalysis, "monthly_analysis"),
+        (MonthlyItemSales, "monthly_item_sales"),
+        (Target, "targets"),
+        (ItemTarget, "item_targets"),
+        (GenreBenchmark, "genre_benchmarks"),
+        (ProductCost, "product_costs"),
+        (Product, "products"),
+    ):
+        deleted[name] = db.query(model).filter(model.is_sample.is_(True)).delete(
+            synchronize_session=False
+        )
+    # サンプルカテゴリを参照している実データ商品は未分類へ戻す（外部参照を残さない）
+    sample_cat_ids = [c.id for c in db.query(ProductCategory).filter(ProductCategory.is_sample.is_(True)).all()]
+    if sample_cat_ids:
+        db.query(Product).filter(Product.category_id.in_(sample_cat_ids)).update(
+            {Product.category_id: None}, synchronize_session=False
+        )
+    deleted["product_categories"] = db.query(ProductCategory).filter(
+        ProductCategory.is_sample.is_(True)
+    ).delete(synchronize_session=False)
+    # synchronize_session=False で消した行のORMオブジェクトがセッションに残ると、
+    # 直後の再生成で同じ主キーを再利用したときに identity map の警告が出るため破棄する
+    db.expire_all()
+    if commit:
+        db.commit()
+    return deleted
+
+
+def _get_or_create_sample_category(db: Session, u1, u2, u3):
+    """カテゴリの find-or-create。**新規作成したときだけ** is_sample を立てる。
+
+    既存カテゴリ（実データ由来）に is_sample を立てると、サンプル削除で
+    利用者のカテゴリごと消えてしまうため。
+    """
+    u1n = (u1 or None) or None
+    u2n = (u2 or None) or None
+    u3n = (u3 or None) or None
+    if not any([u1n, u2n, u3n]):
+        return None
+    existing = (
+        db.query(ProductCategory)
+        .filter(
+            ProductCategory.genre_u1 == u1n,
+            ProductCategory.genre_u2 == u2n,
+            ProductCategory.genre_u3 == u3n,
+        )
+        .first()
+    )
+    if existing is not None:
+        return existing
+    cat = get_or_create_category(db, u1n, u2n, u3n)
+    if cat is not None:
+        cat.is_sample = True
+    return cat
+
+
 def generate_sample_data(db: Session):
     # 意図的に対象外のテーブル:
     #   subscriptions          … 実際のStripe契約状態。ダミーを入れると課金画面が嘘をつく。
     #   consulting_inquiries   … 問い合わせの受信記録。アプリ内に閲覧画面が無く（通知メールが
     #                            一次チャネル）、ダミーを足してもデモ・動作確認に寄与しない。
     #   feedbacks              … フィードバックの受信記録。理由は consulting_inquiries と同じ。
-    db.query(RppWeekly).delete()
-    db.query(RppSales).delete()
-    db.query(MonthlyAnalysis).delete()
-    db.query(MonthlyItemSales).delete()
-    db.query(Target).delete()
-    # マスタも毎回リセットして提案キュー・廃盤デモを決定的にする（Shopは起動時に別途投入）。
-    db.query(ProductCost).delete()
-    db.query(Product).delete()
-    db.query(ProductCategory).delete()
-    db.query(GenreBenchmark).delete()
-    db.query(ItemTarget).delete()
+    #
+    # 2026-08-20: 実データを消す db.query(...).delete() の一括削除をやめ、
+    # 「サンプル分（is_sample=True）だけを消してから作り直す」方式に変更した。
+    # 実データ取込み後でも安心してサンプルを再生成・削除できる。
+    # **無条件の全削除に戻さないこと**（実データが消える事故報告あり・2026-08-20）。
+    delete_sample_data(db, commit=False)
+
+    # 実データと管理番号が衝突する場合（同じ管理番号の実績・商品が既にある）、
+    # その商品はユニーク制約に当たるため生成をスキップする（実データ優先）。
+    sample_mnos = [p["management_no"] for p in PRODUCTS] + ["NEW-001"]
+    conflict_mnos: set[str] = set()
+    for model, col in ((MonthlyItemSales, MonthlyItemSales.management_no),
+                       (RppSales, RppSales.item_code),
+                       (Product, Product.management_no)):
+        for (mno,) in (
+            db.query(col)
+            .filter(col.in_(sample_mnos), model.is_sample.isnot(True))
+            .distinct()
+            .all()
+        ):
+            if mno:
+                conflict_mnos.add(mno)
 
     today = date.today()
     current_week_start = get_week_start(today)
@@ -202,10 +281,13 @@ def generate_sample_data(db: Session):
 
         for product in PRODUCTS:
             mgmt_no = product["management_no"]
+            if mgmt_no in conflict_mnos:
+                continue
             _, cost_rate = PRICE_RANGES[mgmt_no]
             m = _week_metrics(rng, mgmt_no, week_offset)
 
             db.add(RppWeekly(
+                is_sample=True,
                 week_start=week_start,
                 product_url=product["product_url"],
                 management_no=mgmt_no,
@@ -224,6 +306,7 @@ def generate_sample_data(db: Session):
             cv_12 = round(m["cv"] * 0.7)
             gross_12 = round(m["gross"] * 0.7, 0)
             row = {
+                "is_sample": True,
                 "period_type": "weekly",
                 "year_month": week_start.strftime("%Y-%m"),
                 "date_from": week_start.isoformat(),
@@ -267,6 +350,7 @@ def generate_sample_data(db: Session):
         cv_12 = sum(r["cv_12"] for r in rows)
         first = rows[0]
         db.add(RppSales(
+            is_sample=True,
             period_type="monthly",
             year_month=ym,
             date_from=f"{ym}-01",
@@ -303,6 +387,8 @@ def generate_sample_data(db: Session):
 
         for product in PRODUCTS:
             mgmt_no = product["management_no"]
+            if mgmt_no in conflict_mnos:
+                continue
             unit_price, _ = PRICE_RANGES[mgmt_no]
             factor = 1.0 if month_offset == 0 else 0.9
 
@@ -311,6 +397,7 @@ def generate_sample_data(db: Session):
             access = int(cv_monthly / rng.uniform(0.008, 0.02))
 
             db.add(MonthlyAnalysis(
+                is_sample=True,
                 year_month=year_month,
                 product_url=product["product_url"],
                 management_no=mgmt_no,
@@ -347,6 +434,8 @@ def generate_sample_data(db: Session):
 
         for product in PRODUCTS:
             mgmt_no = product["management_no"]
+            if mgmt_no in conflict_mnos:
+                continue
             unit_price, cost_rate = PRICE_RANGES[mgmt_no]
             cfg = MONTHLY_ITEM_CONFIG[mgmt_no]
 
@@ -368,6 +457,7 @@ def generate_sample_data(db: Session):
             zero_days = cfg["zero_days"]
 
             db.add(MonthlyItemSales(
+                is_sample=True,
                 year_month=year_month,
                 management_no=mgmt_no,
                 product_url=product["product_url"],
@@ -398,7 +488,12 @@ def generate_sample_data(db: Session):
                 month_date = date(month_date.year, month_date.month - 1, 1)
         year_month = month_date.strftime("%Y-%m")
 
+        # 実データの目標が既にある月はスキップ（unique制約 uq_target_user_month を守る。
+        # 利用者が設定した目標をサンプルで潰さない）
+        if db.query(Target.id).filter(Target.year_month == year_month).first() is not None:
+            continue
         db.add(Target(
+            is_sample=True,
             year_month=year_month,
             target_sales=5_000_000,
             target_access=50000,
@@ -431,10 +526,13 @@ def generate_sample_data(db: Session):
         shop.budget_year_start_month = 1
     for product in PRODUCTS:
         mno = product["management_no"]
+        if mno in conflict_mnos:
+            continue
         g_parts = product["genre"].split("/")
         u1 = g_parts[0] if len(g_parts) > 0 else None
         u2 = g_parts[1] if len(g_parts) > 1 else None
-        cat = None if mno in CATEGORY_UNSET else get_or_create_category(db, u1, u2, None)
+        # カテゴリは「新規作成分だけ」is_sample を立てる（既存＝実データ由来は消さない）
+        cat = None if mno in CATEGORY_UNSET else _get_or_create_sample_category(db, u1, u2, None)
         prod = upsert_product(
             db, mno, shop_id=shop.id,
             product_name=product["product_name"],
@@ -443,6 +541,8 @@ def generate_sample_data(db: Session):
         )
         if prod is None:
             continue
+        # conflict_mnos で実データ商品を除外済みなので、ここに来る商品は必ずサンプル
+        prod.is_sample = True
         # 未分類で残したい商品は明示的に None（upsert は値があるときだけ更新するため）。
         if mno in CATEGORY_UNSET:
             prod.category_id = None
@@ -465,7 +565,7 @@ def generate_sample_data(db: Session):
             rate = PRICE_RANGES[mno][1]
             pc = db.query(ProductCost).filter(ProductCost.management_no == mno).first()
             if pc is None:
-                db.add(ProductCost(management_no=mno, cost_rate=rate))
+                db.add(ProductCost(management_no=mno, cost_rate=rate, is_sample=True))
             else:
                 pc.cost_rate = rate
 
@@ -475,7 +575,7 @@ def generate_sample_data(db: Session):
         pdef = next((p for p in PRODUCTS if p["management_no"] == mno), None)
         if pdef is not None:
             gp = pdef["genre"].split("/")
-            get_or_create_category(
+            _get_or_create_sample_category(
                 db,
                 gp[0] if len(gp) > 0 else None,
                 gp[1] if len(gp) > 1 else None,
@@ -485,28 +585,47 @@ def generate_sample_data(db: Session):
     # ── アイテム別目標（item_targets / 3-B''）のデモ ──
     #   RUN-001 … 実績あり → 確定公式(rule)。前年実績は無いため「現状値のみ採用」の注記付き
     #   NEW-001 … 実績データが無い新商品 → 自店平均からの推定(estimated)＋承認フローを検証
-    upsert_product(db, "NEW-001", shop_id=shop.id, product_name="新商品サンプル（実績データなし）")
-    prod_new = db.query(Product).filter(Product.management_no == "NEW-001").first()
-    if prod_new is not None:
-        prod_new.launch_month = today.strftime("%Y-%m")
+    if "NEW-001" not in conflict_mnos:
+        # ⚠️ upsert_product の戻り値を直接使うこと。このセッションは autoflush=False のため、
+        # add 直後に db.query で引き直すと未フラッシュの行が見えず None になる
+        # （旧実装はこれで launch_month が設定されない潜在バグだった。2026-08-20 修正）
+        prod_new = upsert_product(db, "NEW-001", shop_id=shop.id, product_name="新商品サンプル（実績データなし）")
+        if prod_new is not None:
+            prod_new.launch_month = today.strftime("%Y-%m")
+            prod_new.is_sample = True
     db.flush()
 
     from target_calc import calc_item_target
     cur_ym = today.strftime("%Y-%m")
     for mno, sales_target in (("RUN-001", 1_500_000), ("NEW-001", 300_000)):
+        if mno in conflict_mnos:
+            continue
+        # 実データのアイテム別目標が同キーに残っている場合はスキップ（潰さない）
+        if db.query(ItemTarget.id).filter(
+            ItemTarget.management_no == mno, ItemTarget.year_month == cur_ym,
+        ).first() is not None:
+            continue
         calc = calc_item_target(db, mno, cur_ym, sales_target)
         db.add(ItemTarget(
+            is_sample=True,
             management_no=mno, year_month=cur_ym, target_sales=sales_target, **calc,
         ))
 
     # ── ジャンル別ベンチマーク手入力のデモ（benchmarks.py の①を検証）──
     # RMS画面で見た値を入力した想定。RPP診断のベースライン解決が
     # manual_genre → shop_avg → default とフォールバックする様子を確認できる。
-    db.add(GenreBenchmark(
-        genre_u1="スポーツ", genre_u2="シューズ", genre_u3=None,
-        metric="ctr", value=1.8, memo="RMS表示値（デモデータ）",
-    ))
+    # 同じ階層×指標の実データが既にあれば追加しない（重複行を作らない）
+    if db.query(GenreBenchmark.id).filter(
+        GenreBenchmark.genre_u1 == "スポーツ", GenreBenchmark.genre_u2 == "シューズ",
+        GenreBenchmark.genre_u3.is_(None), GenreBenchmark.metric == "ctr",
+    ).first() is None:
+        db.add(GenreBenchmark(
+            is_sample=True,
+            genre_u1="スポーツ", genre_u2="シューズ", genre_u3=None,
+            metric="ctr", value=1.8, memo="RMS表示値（デモデータ）",
+        ))
 
     db.flush()
     recalc_rpp_cost_of_sales(db)  # 個別原価率を RppWeekly に反映
     db.commit()
+    return {"skipped_mnos": sorted(conflict_mnos)}
