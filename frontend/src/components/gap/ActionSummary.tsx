@@ -50,7 +50,7 @@ export default function ActionSummary({ scope, genre, period, date }: Props) {
         <p className="text-sm font-semibold text-gray-700">
           アクションサマリ — {scope === 'genre' && genre ? `${genre} の課題集中度` : '店舗全体の課題集中度'}
         </p>
-        <span className="text-[11px] text-gray-400">影響額の大きい順</span>
+        <span className="text-xs text-gray-400">影響額の大きい順</span>
       </div>
       <ul className="divide-y divide-gray-100">
         {top.map((it) => (
@@ -59,7 +59,7 @@ export default function ActionSummary({ scope, genre, period, date }: Props) {
               onClick={() => setExpanded(expanded === it.action_key ? null : it.action_key)}
               className="w-full flex items-center gap-2 text-left"
             >
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${PRIORITY_STYLE[it.priority] ?? ''}`}>
+              <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${PRIORITY_STYLE[it.priority] ?? ''}`}>
                 {PRIORITY_LABEL[it.priority] ?? it.priority}
               </span>
               <span className="text-sm text-gray-800 font-medium">{it.label}</span>
@@ -72,12 +72,12 @@ export default function ActionSummary({ scope, genre, period, date }: Props) {
             {expanded === it.action_key && (
               <div className="mt-1.5 pl-9 flex flex-wrap gap-1.5">
                 {it.sample_products.map((p, i) => (
-                  <span key={i} className="text-[11px] bg-gray-50 border rounded px-1.5 py-0.5 text-gray-600">
+                  <span key={i} className="text-xs bg-gray-50 border rounded px-1.5 py-0.5 text-gray-600">
                     {p.product_name || p.management_no}
                   </span>
                 ))}
                 {it.affected_count > it.sample_products.length && (
-                  <span className="text-[11px] text-gray-400 self-center">
+                  <span className="text-xs text-gray-400 self-center">
                     他 {it.affected_count - it.sample_products.length}件
                   </span>
                 )}

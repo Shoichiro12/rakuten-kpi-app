@@ -32,17 +32,17 @@ export default function ActionOutcomes({ data }: Props) {
         <History size={16} className="text-gray-500" />
         <span className="text-sm font-semibold text-gray-900">実施した施策のその後</span>
         {measured.length > 0 && (
-          <span className="text-[11px] px-2 py-0.5 rounded bg-gray-100 text-gray-600">
+          <span className="text-xs px-2 py-0.5 rounded bg-gray-100 text-gray-600">
             測定済み {measured.length}件
           </span>
         )}
         {pending.length > 0 && (
-          <span className="text-[11px] px-2 py-0.5 rounded bg-gray-50 text-gray-400">
+          <span className="text-xs px-2 py-0.5 rounded bg-gray-50 text-gray-400">
             測定待ち {pending.length}件
           </span>
         )}
       </div>
-      <p className="text-[11px] text-gray-400 mb-3">
+      <p className="text-xs text-gray-400 mb-3">
         実施した月と翌月の実績を比較しています。季節要因や他の施策の影響も含むため、
         この施策だけの効果とは限りません。
       </p>
@@ -57,12 +57,12 @@ export default function ActionOutcomes({ data }: Props) {
             >
               <div className="min-w-0">
                 <p className="text-xs font-medium text-gray-800 truncate">{r.title}</p>
-                <p className="text-[11px] text-gray-500">
+                <p className="text-xs text-gray-500">
                   {r.period_key} 実施 → {r.next_period} 時点の{r.metric_label}
                 </p>
               </div>
               <div className="flex items-center gap-2 whitespace-nowrap">
-                <span className="text-[11px] text-gray-500">
+                <span className="text-xs text-gray-500">
                   {r.before?.toLocaleString()} → {r.after?.toLocaleString()}
                 </span>
                 <span
@@ -85,7 +85,7 @@ export default function ActionOutcomes({ data }: Props) {
             className="flex items-center justify-between gap-3 rounded-lg px-3 py-2 border border-dashed border-gray-200"
           >
             <p className="text-xs text-gray-500 truncate">{r.title}</p>
-            <span className="text-[11px] text-gray-400 flex items-center gap-1 whitespace-nowrap">
+            <span className="text-xs text-gray-400 flex items-center gap-1 whitespace-nowrap">
               <Clock size={11} />
               {r.next_period} の実績待ち
             </span>
@@ -95,12 +95,12 @@ export default function ActionOutcomes({ data }: Props) {
 
       {Object.keys(data.summary ?? {}).length > 0 && (
         <div className="mt-3 pt-3 border-t border-gray-100">
-          <p className="text-[11px] font-medium text-gray-600 mb-1.5">施策タイプ別の傾向</p>
+          <p className="text-xs font-medium text-gray-600 mb-1.5">施策タイプ別の傾向</p>
           <div className="flex flex-wrap gap-1.5">
             {Object.entries(data.summary).map(([rule, s]) => (
               <span
                 key={rule}
-                className="text-[11px] px-2 py-0.5 rounded bg-gray-50 border text-gray-600"
+                className="text-xs px-2 py-0.5 rounded bg-gray-50 border text-gray-600"
                 title={`${s.count}件の実施結果にもとづく平均`}
               >
                 {s.metric_label ?? rule} 平均 {(s.avg_delta_pct ?? 0) > 0 ? '+' : ''}
@@ -109,7 +109,7 @@ export default function ActionOutcomes({ data }: Props) {
               </span>
             ))}
           </div>
-          <p className="text-[10px] text-gray-400 mt-1.5">
+          <p className="text-xs text-gray-400 mt-1.5">
             ※参考値 = {data.min_sample_for_weight}件未満のため、提案の優先順位には反映していません。
           </p>
         </div>

@@ -20,12 +20,12 @@ export default function AccessPlanner({ plan }: { plan: AccessPlan }) {
         </div>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-gray-900">アクセス逆算 — 最速レバーの現在地</p>
-          <p className="text-[11px] text-gray-500">
+          <p className="text-xs text-gray-500">
             CVR {plan.cvr.toFixed(2)}%・客単価 ¥{Math.round(plan.av).toLocaleString()} を現状値で固定した場合の必要アクセス
           </p>
         </div>
         {plan.achieved && (
-          <span className="text-[10px] px-2 py-0.5 rounded-full font-bold bg-green-100 text-green-700 shrink-0">
+          <span className="text-xs px-2 py-0.5 rounded-full font-bold bg-green-100 text-green-700 shrink-0">
             必要アクセス充足
           </span>
         )}
@@ -55,14 +55,14 @@ export default function AccessPlanner({ plan }: { plan: AccessPlan }) {
         {/* 数値カード */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
           <div className={`rounded-lg p-2.5 text-center ${plan.achieved ? 'bg-green-50' : 'bg-red-50 border border-red-100'}`}>
-            <p className="text-[11px] text-gray-500">不足アクセス</p>
+            <p className="text-xs text-gray-500">不足アクセス</p>
             <p className={`text-sm font-bold ${plan.achieved ? 'text-green-700' : 'text-red-600'}`}>
               {plan.achieved ? '0' : Math.round(plan.shortfall_ct).toLocaleString()}
-              <span className="text-[10px] font-normal ml-0.5">CT</span>
+              <span className="text-xs font-normal ml-0.5">CT</span>
             </p>
           </div>
           <div className={`rounded-lg p-2.5 text-center ${plan.achieved ? 'bg-green-50' : 'bg-amber-50 border border-amber-100'}`}>
-            <p className="text-[11px] text-gray-500">想定追加広告費</p>
+            <p className="text-xs text-gray-500">想定追加広告費</p>
             <p className={`text-sm font-bold ${plan.achieved ? 'text-green-700' : 'text-amber-700'}`}>
               {plan.achieved
                 ? '¥0'
@@ -70,18 +70,18 @@ export default function AccessPlanner({ plan }: { plan: AccessPlan }) {
                 ? `¥${Math.round(plan.est_additional_ad_cost).toLocaleString()}`
                 : '算出不可'}
             </p>
-            <p className="text-[9px] text-gray-400">現在CPC ¥{plan.cpc.toLocaleString()} 基準</p>
+            <p className="text-xs text-gray-400">現在CPC ¥{plan.cpc.toLocaleString()} 基準</p>
           </div>
           <div className="rounded-lg p-2.5 text-center bg-gray-50">
-            <p className="text-[11px] text-gray-500">現在の広告費</p>
+            <p className="text-xs text-gray-500">現在の広告費</p>
             <p className="text-sm font-bold text-gray-900">¥{Math.round(plan.ad_cost).toLocaleString()}</p>
           </div>
           <div className="rounded-lg p-2.5 text-center bg-gray-50">
-            <p className="text-[11px] text-gray-500">売上（目標比）</p>
+            <p className="text-xs text-gray-500">売上（目標比）</p>
             <p className="text-sm font-bold text-gray-900">
               ¥{Math.round(plan.actual_gross).toLocaleString()}
             </p>
-            <p className="text-[9px] text-gray-400">目標 ¥{Math.round(plan.target_sales).toLocaleString()}</p>
+            <p className="text-xs text-gray-400">目標 ¥{Math.round(plan.target_sales).toLocaleString()}</p>
           </div>
         </div>
 

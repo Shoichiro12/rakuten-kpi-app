@@ -109,7 +109,7 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
           <p className="text-xs text-gray-400">{item.management_no}</p>
           {item.phase?.phase === 'new' && (
             <span
-              className="inline-block mt-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-sky-100 text-sky-700"
+              className="inline-block mt-1 px-1.5 py-0.5 rounded text-xs font-medium bg-sky-100 text-sky-700"
               title={`発売月 ${item.phase.launch_month ?? '不明'}。新商品は最初の3ヶ月を様子見期間とし、判定基準を緩めます（商品マスタで変更可）`}
             >
               {item.phase.label}
@@ -140,11 +140,11 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
               </div>
             ))}
           </div>
-          <p className="mt-2 text-[10px] text-gray-400">
+          <p className="mt-2 text-xs text-gray-400">
             クリック数 {m.ct.toLocaleString()} ／ 広告費 {formatCurrency(m.ad_cost)} ／ 売上(720h) {formatCurrency(m.gross_720)}
           </p>
           {(b.baseline_ad_cvr || b.baseline_ctr) && (
-            <p className="mt-1 text-[10px] text-gray-400 leading-snug">
+            <p className="mt-1 text-xs text-gray-400 leading-snug">
               基準値の根拠:{' '}
               {b.baseline_ctr && `CTR ${formatPercent(b.baseline_ctr.value, 2)}（${b.baseline_ctr.source_label}）`}
               {b.baseline_ctr && b.baseline_ad_cvr && ' ／ '}
@@ -160,10 +160,10 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
               <PackageX size={14} className="text-orange-500 mt-0.5 shrink-0" />
               <div>
                 <p className="text-xs font-bold text-orange-700">{item.gate.label}</p>
-                <p className="text-[11px] font-semibold text-gray-800 mt-1.5">
+                <p className="text-xs font-semibold text-gray-800 mt-1.5">
                   {item.gate.proposal.title}
                 </p>
-                <p className="text-[11px] text-gray-600 leading-snug mt-1">
+                <p className="text-xs text-gray-600 leading-snug mt-1">
                   {item.gate.proposal.reason}
                 </p>
               </div>
@@ -178,7 +178,7 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
               <Info size={14} className="text-gray-400 mt-0.5 shrink-0" />
               <div>
                 <p className="text-xs font-bold text-gray-700">データ不足</p>
-                <p className="text-[11px] text-gray-500 leading-snug mt-1">
+                <p className="text-xs text-gray-500 leading-snug mt-1">
                   クリック数が{item.min_ct ?? diagnosis.min_ct}件未満のため判定をスキップしました。
                   {item.phase?.phase === 'new' && ' 新商品フェーズのため、基準を通常の10件から50件に引き上げています。'}
                   母数が少ない状態では各指標がぶれやすく、誤った対策につながるため、
@@ -210,12 +210,12 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
                 <div className={`rounded-xl border overflow-hidden ${tone.border}`}>
                   <div className={`px-3 py-2.5 ${tone.bg}`}>
                     <p className={`text-xs font-bold ${tone.text}`}>診断分類: {cls.label}</p>
-                    <p className="text-[11px] text-gray-600 leading-snug mt-1">{cls.summary}</p>
+                    <p className="text-xs text-gray-600 leading-snug mt-1">{cls.summary}</p>
                   </div>
                   {cls.proposals.map((p, i) => (
                     <div key={i} className={`px-3 py-2.5 ${i > 0 ? 'border-t border-gray-100' : ''}`}>
                       <p className="text-xs text-gray-800">
-                        <span className={`inline-block mr-1.5 px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                        <span className={`inline-block mr-1.5 px-1.5 py-0.5 rounded text-xs font-medium ${
                           p.kind === 'primary' ? 'bg-gray-900 text-white'
                             : p.kind === 'second_best' ? 'bg-gray-200 text-gray-700'
                             : 'bg-gray-100 text-gray-500'
@@ -224,9 +224,9 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
                         </span>
                         <span className="font-semibold">{p.title}</span>
                       </p>
-                      <p className="text-[11px] text-gray-500 leading-snug mt-1">{p.detail}</p>
+                      <p className="text-xs text-gray-500 leading-snug mt-1">{p.detail}</p>
                       {p.estimate && (
-                        <p className="text-[11px] font-medium text-gray-700 mt-1 bg-gray-50 rounded px-2 py-1">
+                        <p className="text-xs font-medium text-gray-700 mt-1 bg-gray-50 rounded px-2 py-1">
                           試算: {p.estimate}
                         </p>
                       )}
@@ -234,7 +234,7 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
                   ))}
                   {/* 影響の大きい提案（停止候補）は実行を強制しない原則の明示（2-C / 3-F） */}
                   {cls.type === 'bleeding' && (
-                    <p className="px-3 py-2 text-[10px] text-gray-400 border-t border-gray-100 leading-snug">
+                    <p className="px-3 py-2 text-xs text-gray-400 border-t border-gray-100 leading-snug">
                       どちらを実行するかは店舗責任者の判断に委ねられます。アプリが自動で配信を止めることはありません。
                     </p>
                   )}
@@ -249,10 +249,10 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
           <div className="px-4 pt-3">
             <div className="rounded-xl border border-sky-200 bg-sky-50 p-3 flex items-start gap-2">
               <HelpCircle size={14} className="text-sky-500 mt-0.5 shrink-0" />
-              <p className="text-[11px] text-sky-800 leading-snug">
+              <p className="text-xs text-sky-800 leading-snug">
                 {item.intent_check.ask ? item.intent_check.question : item.intent_check.note}
                 {item.intent_check.ask && (
-                  <span className="block mt-1 text-[10px] text-sky-600">
+                  <span className="block mt-1 text-xs text-sky-600">
                     回答は商品マスタ設定の「投資として許容」から登録できます。
                   </span>
                 )}
@@ -268,7 +268,7 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
               <CheckCircle2 size={14} className="text-green-600 mt-0.5 shrink-0" />
               <div>
                 <p className="text-xs font-bold text-green-700">良好</p>
-                <p className="text-[11px] text-green-700/80 leading-snug mt-1">
+                <p className="text-xs text-green-700/80 leading-snug mt-1">
                   現時点で明確な課題は検出されていません。この調子で運用を継続してください。
                 </p>
               </div>
@@ -286,7 +286,7 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   検出された課題と改善アクション
                 </p>
-                <p className="text-[10px] text-gray-400 mt-0.5">
+                <p className="text-xs text-gray-400 mt-0.5">
                   <span className="inline-block px-1 rounded bg-red-100 text-red-700 font-medium">確定</span>
                   =データで原因まで特定済み ／{' '}
                   <span className="inline-block px-1 rounded bg-amber-100 text-amber-700 font-medium">要確認</span>
@@ -312,7 +312,7 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
                         />
                         <p className="text-xs font-bold text-gray-800 truncate">{issue.label}</p>
                       </div>
-                      <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium shrink-0 ${badge.className}`}>
+                      <span className={`text-xs px-1.5 py-0.5 rounded font-medium shrink-0 ${badge.className}`}>
                         {badge.label}
                       </span>
                     </div>
@@ -334,11 +334,11 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
                             {issue.action.text}
                           </p>
                           {issue.action.detail && !isChecked && (
-                            <p className="text-[10px] text-gray-400 leading-snug mt-0.5">
+                            <p className="text-xs text-gray-400 leading-snug mt-0.5">
                               {issue.action.detail}
                             </p>
                           )}
-                          <span className={`inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium ${CATEGORY_COLOR[issue.action.category] ?? 'bg-gray-100 text-gray-600'}`}>
+                          <span className={`inline-block mt-0.5 text-xs px-1.5 py-0.5 rounded font-medium ${CATEGORY_COLOR[issue.action.category] ?? 'bg-gray-100 text-gray-600'}`}>
                             {issue.action.category}
                           </span>
                         </div>
@@ -350,7 +350,7 @@ export default function RppDiagnosisPanel({ item, diagnosis, onClose }: RppDiagn
 
               {/* CPO判定スキップの注記（ROAS/CPO系の課題があるときのみ表示） */}
               {!diagnosis.cpo_evaluable && item.issues.some((i) => i.issue === 'roas_low' || i.issue === 'cpo_over') && (
-                <p className="text-[10px] text-gray-400 leading-snug bg-gray-50 rounded p-2">
+                <p className="text-xs text-gray-400 leading-snug bg-gray-50 rounded p-2">
                   ℹ️ {diagnosis.cpo_skip_reason}
                 </p>
               )}

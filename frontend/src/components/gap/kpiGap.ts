@@ -1,11 +1,15 @@
 /**
  * GAP分析の「選択したKPIを主役にする」表示と、ジャンル・商品の並べ替えの共通ロジック。
  *
- * ■ 並び順は**選択KPIに関係なく「売上の前期比が悪い順」で固定**（2026-08-04 オーナー決定）
- *   選んだKPIごとに並び替え軸を切り替える作りは**採らない**。
- *   売上が主で、アクセス・CVR・客単価はその分解でしかないため、
- *   「どこを直すと売上に効くか」を探す順番は常に売上の落ち込みで決める。
- *   **この方針を「選択KPI基準に戻したほうが親切では」と後から変えないこと。**
+ * ■ 並び順は**選択KPIのGAP（前期比）が悪い順**（2026-08-20 オーナー再決定）
+ *   KPI未選択のときは従来どおり「売上の前期比が悪い順」。
+ *   経緯: 2026-08-04 に一度「売上固定・KPIでは切り替えない」と決めたが、
+ *   顧客の実利用フィードバックで「選んだKPIの基準で並んでほしい」と確認されたため
+ *   正式に上書きした（単なる蒸し返しではなく顧客検証を経た再決定。
+ *   計画書 docs/jisso_keikaku_design_review_2026-08-20.md §0-1）。
+ *   「最大GAP」の強調も並び順と同じ基準＝選択KPI基準で判定する
+ *   （見出しは選択KPI・バッジは売上基準、という基準の食い違いがレビューで
+ *   Critical 指摘された。**強調と並び順の基準は必ず一致させること**）。
  *
  * ■ 基準は「前期比」であって「目標比」ではない
  *   ジャンル・商品の階層には目標値が無い（`/api/gap/genre` `/api/gap/product` は
@@ -96,18 +100,26 @@ export function salesGapDelta(row: GapRow): number | null {
 }
 
 /**
- * **売上の落ち込みが大きい順**（悪化 → 改善）に並べ替える。ジャンルカードと商品テーブル共通。
- *
- * 選択KPIでは切り替えない（この関数に KPI を渡さないのは意図的。冒頭のコメント参照）。
+ * 並べ替え・強調の基準になるGAP値。
+ * kpi が null（未選択）のときは売上の前期比、選択時はそのKPIの前期比
+ * （CVRは pt、アクセス・客単価は変化率%。単位が違っても「悪い順」の比較はそのまま成立する）。
+ */
+export function gapDeltaFor(row: GapRow, kpi: GapKpi | null): number | null {
+  return kpi ? gapKpiDelta(row, kpi) : salesGapDelta(row)
+}
+
+/**
+ * **選択KPIのGAPが大きい順**（悪化 → 改善）に並べ替える。ジャンルカードと商品テーブル共通。
+ * kpi が null のときは売上の前期比基準（2026-08-20 オーナー再決定。冒頭のコメント参照）。
  *
  * - 前期比が取れない行は方向に関係なく末尾（「データ無し」を上位に出さない。
  *   `useTableSort` の空値ルールと同じ考え方）
  * - 破壊的ソートを避けるため必ずコピーしてから並べ替える
  */
-export function orderBySalesGap<T extends GapRow>(rows: T[]): T[] {
+export function orderByKpiGap<T extends GapRow>(rows: T[], kpi: GapKpi | null): T[] {
   return [...rows].sort((a, b) => {
-    const da = salesGapDelta(a)
-    const db = salesGapDelta(b)
+    const da = gapDeltaFor(a, kpi)
+    const db = gapDeltaFor(b, kpi)
     const aEmpty = da == null || !Number.isFinite(da)
     const bEmpty = db == null || !Number.isFinite(db)
     if (aEmpty && bEmpty) return 0
@@ -117,5 +129,17 @@ export function orderBySalesGap<T extends GapRow>(rows: T[]): T[] {
   })
 }
 
+/** 旧名の互換（KPI未選択＝売上基準）。新規コードは orderByKpiGap を使うこと */
+export function orderBySalesGap<T extends GapRow>(rows: T[]): T[] {
+  return orderByKpiGap(rows, null)
+}
+
 /** 並び順の根拠を画面に出すための文言（基準を書かない数字は出さない） */
 export const SALES_ORDER_NOTE = '売上の前期比が悪い順'
+
+/** 選択KPIに応じた並び順注記。CVRだけ差の単位が pt になることも明記する */
+export function orderNote(kpi: GapKpi | null, axis?: string | null): string {
+  if (!kpi) return SALES_ORDER_NOTE
+  const unit = kpi === 'cvr' ? '（差はpt）' : ''
+  return `${gapKpiLabel(kpi, axis)}の前期比が悪い順${unit}`
+}

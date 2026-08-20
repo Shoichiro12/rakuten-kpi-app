@@ -29,31 +29,38 @@ const rppNum = (v: number | null | undefined) =>
 const rppPct = (v: number | null | undefined, digits = 1) =>
   v == null || !Number.isFinite(v) ? '—' : v.toFixed(digits)
 
-/* ─── KPIミニカード（720h / 12h 併記） ─────────────────────── */
+/* ─── 計測基準（アトリビューション期間）───────────────────────
+   720h/12h を全カード・全列で併記すると同じ数値系が3回繰り返される、という
+   レビュー指摘（2026-08-20）を受けて、基準は画面で1つ選ぶ方式にした。
+   既定は720h（集計・KPI計算の正は720hのまま不変。CLAUDE.mdのCSV仕様参照）。
+   もう一方は各カードの比較値として小さく残す＝情報は消さない。 */
+export type RppBasis = '720' | '12'
+const BASIS_LABEL: Record<RppBasis, string> = { '720': '720h', '12': '12h' }
+
+/* ─── KPIミニカード（選択基準を主・もう一方を比較で併記） ────── */
 function MiniKpiCard({
   label,
-  value720,
-  value12,
-  label720 = '720h',
-  label12 = '12h',
+  primary,
+  secondary,
+  basis,
 }: {
   label: string
-  value720: string
-  value12: string
-  label720?: string
-  label12?: string
+  primary: string
+  secondary: string
+  basis: RppBasis
 }) {
+  const other: RppBasis = basis === '720' ? '12' : '720'
   return (
     <div className="bg-white rounded-xl border shadow-sm p-4 space-y-2">
       <p className="text-xs font-medium text-gray-500">{label}</p>
       <div className="flex items-end gap-3">
         <div>
-          <p className="text-2xl font-bold text-gray-900">{value720}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{label720}</p>
+          <p className="text-2xl font-bold text-gray-900">{primary}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{BASIS_LABEL[basis]}</p>
         </div>
         <div className="pb-1">
-          <p className="text-base font-semibold text-gray-500">{value12}</p>
-          <p className="text-xs text-gray-400">{label12}</p>
+          <p className="text-base font-semibold text-gray-500">{secondary}</p>
+          <p className="text-xs text-gray-400">{BASIS_LABEL[other]}</p>
         </div>
       </div>
     </div>
@@ -120,7 +127,7 @@ function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
     const short = diag.gate?.gate === 'stock' ? '在庫なし' : 'ページ未完成'
     return (
       <span
-        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-orange-100 text-orange-700"
+        className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-orange-100 text-orange-700"
         title={diag.gate?.label}
       >
         {short}
@@ -130,7 +137,7 @@ function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
   if (diag.status === 'insufficient_data') {
     return (
       <span
-        className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-500"
+        className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500"
         title={diag.phase?.phase === 'new' ? '新商品フェーズのため基準50クリックで判定' : undefined}
       >
         データ不足{diag.phase?.phase === 'new' ? '（新商品）' : ''}
@@ -147,7 +154,7 @@ function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
   }
   const clsBadge = cls && cls.type !== 'good' ? (
     <span
-      className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${TONE_BADGE[cls.tone] ?? 'bg-gray-100 text-gray-600'}`}
+      className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap ${TONE_BADGE[cls.tone] ?? 'bg-gray-100 text-gray-600'}`}
       title={cls.summary}
     >
       {cls.label}
@@ -156,7 +163,7 @@ function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
 
   if (diag.status === 'good') {
     return clsBadge ?? (
-      <span className="inline-block px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-700">
+      <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700">
         良好
       </span>
     )
@@ -169,7 +176,7 @@ function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
       {shown.map((i) => (
         <span
           key={i.issue}
-          className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium whitespace-nowrap ${
+          className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap ${
             i.confidence === 'confirmed'
               ? 'bg-red-100 text-red-700'
               : 'bg-amber-100 text-amber-700'
@@ -179,7 +186,7 @@ function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
           {ISSUE_SHORT[i.issue] ?? i.issue}
         </span>
       ))}
-      {rest > 0 && <span className="text-[10px] text-gray-400">+{rest}</span>}
+      {rest > 0 && <span className="text-xs text-gray-400">+{rest}</span>}
     </span>
   )
 }
@@ -187,6 +194,8 @@ function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
 /* ─── メインページ ────────────────────────────────────────── */
 export default function RppAnalysis() {
   const [periodType, setPeriodType] = useState<PeriodType>('weekly')
+  // 表示基準（アトリビューション期間）。既定=720h。切替はフロント表示のみで集計は変えない
+  const [basis, setBasis] = useState<RppBasis>('720')
   const [periods, setPeriods] = useState<RppPeriods>({ weekly: [], monthly: [] })
   const [selectedWeekly, setSelectedWeekly] = useState<RppWeeklyPeriod | null>(null)
   const [selectedMonthly, setSelectedMonthly] = useState<RppMonthlyPeriod | null>(null)
@@ -267,7 +276,19 @@ export default function RppAnalysis() {
   )
   const selectedDiag = selectedCode ? diagByCode.get(selectedCode) : undefined
 
-  /* Recharts用データ（広告費上位10件） */
+  /* 選択基準で商品行の値を引くヘルパー（表・グラフ共通） */
+  const pick = useCallback((item: RppSalesItem, field: 'gross' | 'cv' | 'roas' | 'cpo' | 'cvr') =>
+    basis === '720' ? item[`${field}_720`] : item[`${field}_12`], [basis])
+
+  /* サマリの主値・比較値を選択基準で振り分ける（カード用） */
+  const pair = (v720: number | null | undefined, v12: number | null | undefined) =>
+    basis === '720' ? { main: v720, sub: v12 } : { main: v12, sub: v720 }
+  const roasV = pair(s?.roas_720, s?.roas_12)
+  const cpoV = pair(s?.cpo_720, s?.cpo_12)
+  const cvrV = pair(s?.cvr_720, s?.cvr_12)
+  const grossV = pair(s?.total_gross_720, s?.total_gross_12)
+
+  /* Recharts用データ（広告費上位10件）。売上は選択基準に追従する */
   const chartData = salesItems
     .filter((i) => (i.ad_cost ?? 0) > 0)
     .sort((a, b) => (b.ad_cost ?? 0) - (a.ad_cost ?? 0))
@@ -277,7 +298,7 @@ export default function RppAnalysis() {
         ? (i.product_name.length > 12 ? i.product_name.slice(0, 12) + '…' : i.product_name)
         : (i.item_code ?? '—'),
       adCost: i.ad_cost ?? 0,
-      gross720: i.gross_720 ?? 0,
+      gross: pick(i, 'gross') ?? 0,
     }))
 
   const hasPeriodData =
@@ -340,6 +361,30 @@ export default function RppAnalysis() {
             />
           )}
 
+          {/* 表示基準の切替。720h/12hの併記を全カード・全列で繰り返さないための単一の切替点 */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500">表示基準</span>
+            <div className="flex bg-white border border-gray-200 rounded-lg p-0.5">
+              {(['720', '12'] as const).map((b) => (
+                <button
+                  key={b}
+                  onClick={() => setBasis(b)}
+                  aria-pressed={basis === b}
+                  className={`px-3 text-sm font-medium rounded-md transition-colors ${TAP_TARGET} ${FOCUS_RING} ${
+                    basis === b
+                      ? 'bg-gray-900 text-white shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  {BASIS_LABEL[b]}
+                </button>
+              ))}
+            </div>
+            <span className="text-xs text-gray-400 hidden lg:inline">
+              クリック後{basis === '720' ? '720時間（30日）' : '12時間'}以内の売上で集計
+            </span>
+          </div>
+
           {summary && (
             <span className="text-xs text-gray-400 ml-auto">
               {summary.count.toLocaleString()}件のデータ
@@ -380,40 +425,36 @@ export default function RppAnalysis() {
                 )}
               </div>
               <MiniKpiCard
+                basis={basis}
                 label="ROAS"
-                value720={s?.roas_720 != null ? `${s.roas_720.toFixed(1)}%` : 'データなし'}
-                value12={s?.roas_12 != null ? `${s.roas_12.toFixed(1)}%` : '—'}
+                primary={roasV.main != null ? `${roasV.main.toFixed(1)}%` : 'データなし'}
+                secondary={roasV.sub != null ? `${roasV.sub.toFixed(1)}%` : '—'}
               />
               <MiniKpiCard
+                basis={basis}
                 label="CPO"
-                value720={s?.cpo_720 != null ? formatCurrency(s.cpo_720) : 'データなし'}
-                value12={s?.cpo_12 != null ? formatCurrency(s.cpo_12) : '—'}
+                primary={cpoV.main != null ? formatCurrency(cpoV.main) : 'データなし'}
+                secondary={cpoV.sub != null ? formatCurrency(cpoV.sub) : '—'}
               />
               <MiniKpiCard
+                basis={basis}
                 label="CVR"
-                value720={s?.cvr_720 != null ? formatPercent(s.cvr_720, 2) : 'データなし'}
-                value12={s?.cvr_12 != null ? formatPercent(s.cvr_12, 2) : '—'}
+                primary={cvrV.main != null ? formatPercent(cvrV.main, 2) : 'データなし'}
+                secondary={cvrV.sub != null ? formatPercent(cvrV.sub, 2) : '—'}
               />
             </div>
 
-            {/* 売上カード */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-white rounded-xl border shadow-sm p-4">
-                <p className="text-xs font-medium text-gray-500">
-                  売上（720h基準）
-                </p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">
-                  {s?.total_gross_720 != null ? formatCurrency(s.total_gross_720) : 'データなし'}
-                </p>
-              </div>
-              <div className="bg-white rounded-xl border shadow-sm p-4">
-                <p className="text-xs font-medium text-gray-500">
-                  売上（12h基準）
-                </p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">
-                  {s?.total_gross_12 != null ? formatCurrency(s.total_gross_12) : 'データなし'}
-                </p>
-              </div>
+            {/* 売上カード（選択基準を主・もう一方は比較行に退避。同格2枚には戻さない） */}
+            <div className="bg-white rounded-xl border shadow-sm p-4 max-w-md">
+              <p className="text-xs font-medium text-gray-500">
+                売上（{BASIS_LABEL[basis]}基準）
+              </p>
+              <p className="text-2xl font-bold text-gray-900 mt-2">
+                {grossV.main != null ? formatCurrency(grossV.main) : 'データなし'}
+              </p>
+              <p className="text-xs text-gray-400 mt-1">
+                {BASIS_LABEL[basis === '720' ? '12' : '720']}基準: {grossV.sub != null ? formatCurrency(grossV.sub) : '—'}
+              </p>
             </div>
 
             {/* 棒グラフ（広告費上位10件） */}
@@ -446,8 +487,8 @@ export default function RppAnalysis() {
                         エンコードすることになり、色という自由なチャンネルを無駄に使う（規約 3-1） */}
                     <Bar dataKey="adCost" name="広告費" fill={SERIES[0]} radius={[3, 3, 0, 0]} />
                     <Bar
-                      dataKey="gross720"
-                      name="売上(720h)"
+                      dataKey="gross"
+                      name={`売上(${BASIS_LABEL[basis]})`}
                       fill={SERIES[2]}
                       radius={[4, 4, 0, 0]}
                       opacity={0.75}
@@ -479,17 +520,18 @@ export default function RppAnalysis() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
                     <thead>
+                      {/* 列は選択基準のみ表示する（720h/12hの二重列には戻さない。
+                          もう一方の基準は上の切替で見る）。診断列は商品名の直後＝判断に使う列を
+                          識別列の直後に置く規約（4章） */}
                       <tr className="bg-gray-50 text-left text-gray-500 font-medium">
                         <SortableTh label="商品名" sortKey="product_name" sort={sort} align="left" className="px-1" />
                         <th className="px-4 py-2.5 whitespace-nowrap">診断</th>
                         <SortableTh label="広告費（円）" sortKey="ad_cost" sort={sort} className="px-1" />
-                        <SortableTh label="売上 720h（円）" sortKey="gross_720" sort={sort} className="px-1" />
-                        <SortableTh label="ROAS 720h（%）" sortKey="roas_720" sort={sort} className="px-1" />
-                        <SortableTh label="CPO 720h（円）" sortKey="cpo_720" sort={sort} className="px-1" />
-                        <SortableTh label="CVR 720h（%）" sortKey="cvr_720" sort={sort} className="px-1" />
-                        <SortableTh label="CV 720h（件）" sortKey="cv_720" sort={sort} className="px-1" />
-                        <SortableTh label="売上 12h（円）" sortKey="gross_12" sort={sort} className="px-1" />
-                        <SortableTh label="ROAS 12h（%）" sortKey="roas_12" sort={sort} className="px-1" />
+                        <SortableTh label={`売上 ${BASIS_LABEL[basis]}（円）`} sortKey={`gross_${basis}`} sort={sort} className="px-1" />
+                        <SortableTh label={`ROAS ${BASIS_LABEL[basis]}（%）`} sortKey={`roas_${basis}`} sort={sort} className="px-1" />
+                        <SortableTh label={`CPO ${BASIS_LABEL[basis]}（円）`} sortKey={`cpo_${basis}`} sort={sort} className="px-1" />
+                        <SortableTh label={`CVR ${BASIS_LABEL[basis]}（%）`} sortKey={`cvr_${basis}`} sort={sort} className="px-1" />
+                        <SortableTh label={`CV ${BASIS_LABEL[basis]}（件）`} sortKey={`cv_${basis}`} sort={sort} className="px-1" />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
@@ -533,43 +575,29 @@ export default function RppAnalysis() {
                             {rppNum(item.ad_cost)}
                           </td>
                           <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap tabular-nums">
-                            {rppNum(item.gross_720)}
+                            {rppNum(pick(item, 'gross'))}
                           </td>
                           <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums">
-                            {item.roas_720 != null ? (
+                            {pick(item, 'roas') != null ? (
                               <span
                                 className={
                                   // 色を付けるのはしきい値を割った行だけ。300%以上を緑にすると
                                   // 全行が色付きになり、何も目立たなくなる（規約 4）
-                                  item.roas_720 < 100 ? 'text-danger' : 'text-gray-700'
+                                  (pick(item, 'roas') ?? 0) < 100 ? 'text-danger' : 'text-gray-700'
                                 }
                               >
-                                {item.roas_720.toFixed(1)}
+                                {pick(item, 'roas')!.toFixed(1)}
                               </span>
                             ) : '—'}
                           </td>
                           <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap tabular-nums">
-                            {rppNum(item.cpo_720)}
+                            {rppNum(pick(item, 'cpo'))}
                           </td>
                           <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap tabular-nums">
-                            {rppPct(item.cvr_720, 2)}
+                            {rppPct(pick(item, 'cvr'), 2)}
                           </td>
                           <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap tabular-nums">
-                            {rppNum(item.cv_720)}
-                          </td>
-                          <td className="px-4 py-2.5 text-right text-gray-600 whitespace-nowrap tabular-nums">
-                            {rppNum(item.gross_12)}
-                          </td>
-                          <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums">
-                            {item.roas_12 != null ? (
-                              <span
-                                className={
-                                  item.roas_12 < 100 ? 'text-danger' : 'text-gray-600'
-                                }
-                              >
-                                {item.roas_12.toFixed(1)}
-                              </span>
-                            ) : '—'}
+                            {rppNum(pick(item, 'cv'))}
                           </td>
                         </tr>
                         )

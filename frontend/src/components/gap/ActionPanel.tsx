@@ -198,7 +198,7 @@ export default function ActionPanel({ product, shopKpis, weekKey, onClose }: Act
             )}
           </div>
           {inventoryInfo?.source === 'auto' && (
-            <p className="mt-1 text-[10px] text-gray-400">
+            <p className="mt-1 text-xs text-gray-400">
               🔗 月次商品分析データ（{inventoryInfo.year_month}）と自動連携中
               {(inventoryInfo.zero_stock_days ?? 0) > 0 && (
                 <span className="text-amber-600"> ／ 在庫0日数: {inventoryInfo.zero_stock_days}日</span>
@@ -225,11 +225,11 @@ export default function ActionPanel({ product, shopKpis, weekKey, onClose }: Act
               <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                 検出された課題と改善アクション
               </p>
-              <p className="text-[10px] text-gray-400 mt-0.5">
+              <p className="text-xs text-gray-400 mt-0.5">
                 優先度: 在庫 &gt; アクセス &gt; 客単価・CVR の順に表示
               </p>
               {hasInventory && product.current.ct < MIN_ACCESS_FOR_CVR_EVAL && (
-                <p className="mt-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 leading-snug">
+                <p className="mt-1.5 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded p-2 leading-snug">
                   アクセスが{MIN_ACCESS_FOR_CVR_EVAL}未満のため、CVR・客単価は評価していません。
                   まずアクセス対策で母数を確保しましょう。
                 </p>
@@ -258,7 +258,7 @@ export default function ActionPanel({ product, shopKpis, weekKey, onClose }: Act
                       <p className="text-xs font-bold text-gray-800">{ISSUE_LABEL[issue]}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-gray-400">{doneCount}/{issueActions.length} 完了</span>
+                      <span className="text-xs text-gray-400">{doneCount}/{issueActions.length} 完了</span>
                       {expanded ? <ChevronUp size={12} className="text-gray-400" /> : <ChevronDown size={12} className="text-gray-400" />}
                     </div>
                   </button>
@@ -285,11 +285,11 @@ export default function ActionPanel({ product, shopKpis, weekKey, onClose }: Act
                                   {action.text}
                                 </p>
                                 {action.detail && !isChecked && (
-                                  <p className="text-[10px] text-gray-400 leading-snug mt-0.5">
+                                  <p className="text-xs text-gray-400 leading-snug mt-0.5">
                                     {action.detail}
                                   </p>
                                 )}
-                                <span className={`inline-block mt-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium ${CATEGORY_COLOR[action.category]}`}>
+                                <span className={`inline-block mt-0.5 text-xs px-1.5 py-0.5 rounded font-medium ${CATEGORY_COLOR[action.category]}`}>
                                   {action.category}
                                 </span>
                               </div>

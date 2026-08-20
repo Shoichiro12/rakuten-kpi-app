@@ -31,14 +31,14 @@ function fmtValue(j: EvaluationJudge): string {
 function RateChip({ label, rate, ok }: { label: string; rate: number | null; ok: boolean | null }) {
   if (rate == null) {
     return (
-      <span className="inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded bg-gray-100 text-gray-400">
+      <span className="inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-400">
         {label} −
       </span>
     )
   }
   return (
     <span
-      className={`inline-flex items-center gap-0.5 text-[10px] px-1.5 py-0.5 rounded font-medium ${
+      className={`inline-flex items-center gap-0.5 text-xs px-1.5 py-0.5 rounded font-medium ${
         ok ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
       }`}
     >
@@ -68,8 +68,8 @@ function MetricCell({ judge, focused }: { judge: EvaluationJudge; focused: boole
       }`}
     >
       <div className="flex items-center justify-between gap-1">
-        <p className="text-[11px] text-gray-500 truncate">{judge.label}</p>
-        <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold shrink-0 ${markStyle}`}>
+        <p className="text-xs text-gray-500 truncate">{judge.label}</p>
+        <span className={`text-xs px-1.5 py-0.5 rounded-full font-bold shrink-0 ${markStyle}`}>
           {mark}
         </span>
       </div>
@@ -79,10 +79,10 @@ function MetricCell({ judge, focused }: { judge: EvaluationJudge; focused: boole
         <RateChip label="YoY" rate={judge.yoy_rate} ok={judge.yoy_ok} />
       </div>
       {focused && (
-        <p className="text-[10px] text-red-600 font-medium">⚠️ 深掘り対象</p>
+        <p className="text-xs text-red-600 font-medium">⚠️ 深掘り対象</p>
       )}
       {judge.excluded && (
-        <p className="text-[10px] text-amber-600 leading-snug">母数不足のため参考値</p>
+        <p className="text-xs text-amber-600 leading-snug">母数不足のため参考値</p>
       )}
     </div>
   )
@@ -107,15 +107,15 @@ export default function EvaluationMatrix({ evaluation, axis }: EvaluationMatrixP
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="text-sm font-bold text-gray-900">KPI評価マトリクス</p>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${PRIORITY_STYLE[evaluation.priority]}`}>
+            <span className={`text-xs px-2 py-0.5 rounded-full font-bold ${PRIORITY_STYLE[evaluation.priority]}`}>
               対策優先度: {evaluation.priority}
             </span>
             {evaluation.pattern_no <= 16 && (
-              <span className="text-[10px] text-gray-400">パターン No.{evaluation.pattern_no}/17</span>
+              <span className="text-xs text-gray-400">パターン No.{evaluation.pattern_no}/17</span>
             )}
             {axis && (
               <span
-                className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+                className={`text-xs px-1.5 py-0.5 rounded font-medium ${
                   axis === 'shop' ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
                 }`}
                 title={
@@ -128,7 +128,7 @@ export default function EvaluationMatrix({ evaluation, axis }: EvaluationMatrixP
               </span>
             )}
             {evaluation.low_sample && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-700">
+              <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-700">
                 ⚠️ 母数不足（{evaluation.min_access ?? 100}未満）
               </span>
             )}
@@ -146,7 +146,7 @@ export default function EvaluationMatrix({ evaluation, axis }: EvaluationMatrixP
       </div>
 
       {evaluation.undetermined.length > 0 && evaluation.rank !== '−' && (
-        <p className="px-4 pb-3 text-[10px] text-amber-600 bg-white">
+        <p className="px-4 pb-3 text-xs text-amber-600 bg-white">
           ※ 目標もYoYデータも無い指標（{evaluation.undetermined.length}件）は未達扱いで評価しています。目標設定で精度が上がります。
         </p>
       )}
@@ -159,7 +159,7 @@ export default function EvaluationMatrix({ evaluation, axis }: EvaluationMatrixP
           </p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div>
-              <p className="text-[11px] font-semibold text-gray-500 mb-1">店舗全体の打ち手</p>
+              <p className="text-xs font-semibold text-gray-500 mb-1">店舗全体の打ち手</p>
               <ul className="space-y-1">
                 {evaluation.actions.shop.map((a, i) => (
                   <li key={i} className="text-xs text-gray-700 leading-snug flex gap-1.5">
@@ -170,7 +170,7 @@ export default function EvaluationMatrix({ evaluation, axis }: EvaluationMatrixP
               </ul>
             </div>
             <div>
-              <p className="text-[11px] font-semibold text-gray-500 mb-1">商品ページの打ち手</p>
+              <p className="text-xs font-semibold text-gray-500 mb-1">商品ページの打ち手</p>
               <ul className="space-y-1">
                 {evaluation.actions.product.map((a, i) => (
                   <li key={i} className="text-xs text-gray-700 leading-snug flex gap-1.5">
@@ -182,7 +182,7 @@ export default function EvaluationMatrix({ evaluation, axis }: EvaluationMatrixP
             </div>
           </div>
           {evaluation.actions.note && (
-            <p className="mt-2 text-[10px] text-gray-400 leading-snug">{evaluation.actions.note}</p>
+            <p className="mt-2 text-xs text-gray-400 leading-snug">{evaluation.actions.note}</p>
           )}
         </div>
       )}

@@ -179,7 +179,7 @@ function StepKPIChain() {
             <div key={label} className="flex items-center gap-2">
               <div className={`${color} text-white rounded-xl px-3 py-2 text-center`}>
                 <p className="text-xs font-bold">{label}</p>
-                <p className="text-[10px] opacity-80 mt-0.5">{sub}</p>
+                <p className="text-xs opacity-80 mt-0.5">{sub}</p>
               </div>
               {i < KPI_CHAIN.length - 1 && (
                 <ArrowRight size={14} className="text-gray-400 shrink-0" />
@@ -267,7 +267,7 @@ function StepScreens() {
       </div>
 
       <div>
-        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-1 mb-1">毎日見る画面</p>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider px-1 mb-1">毎日見る画面</p>
         <div className="space-y-0.5">
           {SCREENS_DAILY.map(({ icon: Icon, label, desc }) => (
             <div key={label} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
@@ -276,7 +276,7 @@ function StepScreens() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-gray-900">{label}</p>
-                <p className="text-[11px] text-gray-500">{desc}</p>
+                <p className="text-xs text-gray-500">{desc}</p>
               </div>
             </div>
           ))}
@@ -284,7 +284,7 @@ function StepScreens() {
       </div>
 
       <div>
-        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider px-1 mb-1">設定・取込み</p>
+        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider px-1 mb-1">設定・取込み</p>
         <div className="space-y-0.5">
           {SCREENS_SETUP.map(({ icon: Icon, label, desc }) => (
             <div key={label} className="flex items-center gap-3 px-2 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
@@ -293,7 +293,7 @@ function StepScreens() {
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-xs font-semibold text-gray-900">{label}</p>
-                <p className="text-[11px] text-gray-500">{desc}</p>
+                <p className="text-xs text-gray-500">{desc}</p>
               </div>
             </div>
           ))}

@@ -39,7 +39,7 @@ export default function Sparkline({
 }: Props) {
   const pts = values.filter((v): v is number => v != null && Number.isFinite(v))
   if (pts.length < 2) {
-    return <span className="text-[11px] text-gray-300">—</span>
+    return <span className="text-xs text-gray-300">—</span>
   }
 
   const lo = sharedMin ?? Math.min(...pts, band?.min ?? Infinity)

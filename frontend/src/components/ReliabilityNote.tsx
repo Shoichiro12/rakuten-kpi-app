@@ -30,7 +30,7 @@ export default function ReliabilityNote({
   if (variant === 'badge') {
     return (
       <span
-        className={`inline-flex items-center text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-700 ${className}`}
+        className={`inline-flex items-center text-xs px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-700 ${className}`}
         title={title}
       >
         ⚠️ 母数不足・参考値
@@ -39,7 +39,7 @@ export default function ReliabilityNote({
   }
 
   return (
-    <p className={`text-[10px] text-amber-600 leading-snug ${className}`} title={title}>
+    <p className={`text-xs text-amber-600 leading-snug ${className}`} title={title}>
       ※ 母数不足のため参考値（CVR・客単価は信用できません）
     </p>
   )

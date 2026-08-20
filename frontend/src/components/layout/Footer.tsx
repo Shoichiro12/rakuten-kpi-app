@@ -11,7 +11,7 @@ export default function Footer() {
   const linkClass = 'hover:text-gray-800 hover:underline'
   return (
     <footer className="shrink-0 border-t bg-white px-6 py-3">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
         <span className="text-gray-400">© {new Date().getFullYear()} ウレシル</span>
         <a href={LEGAL_LINKS.tokushoho} {...EXTERNAL_LINK_PROPS} className={linkClass}>
           特定商取引法に基づく表記

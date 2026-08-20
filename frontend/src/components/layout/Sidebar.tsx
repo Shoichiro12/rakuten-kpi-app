@@ -257,7 +257,7 @@ export default function Sidebar({ onOpenHelp, onOpenFeedback, userEmail, onSignO
           </button>
         )}
         {!collapsed && userEmail && (
-          <p className="text-[11px] text-gray-600 px-3 truncate" title={maskEmail(userEmail)}>
+          <p className="text-xs text-gray-600 px-3 truncate" title={maskEmail(userEmail)}>
             {maskEmail(userEmail)}
           </p>
         )}

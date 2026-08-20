@@ -1,14 +1,18 @@
+/* 下層ページ（privacy/terms/tokushoho/help/about）の共通スタイル。
+   2026-08-20: 旧ネイビー/赤トーンをLP本体（index.html）のC案トーン（紙色・墨色・セージ）へ
+   統一した。変数名は互換のため残しているが、値はC案トークンを指す。
+   ⚠️ index.html の :root と値がズレたら index.html 側が正（トークンの単一の真実はあちら） */
 :root {
-  --navy: #16324f;
-  --navy-dark: #0e2136;
-  --accent: #e8443a;
-  --text: #22303e;
-  --muted: #64748b;
-  --border: #e2e8f0;
-  --bg-alt: #f5f7fa;
+  --navy: #2e2d29;        /* 旧ネイビー → 墨色(ink-strong) */
+  --navy-dark: #2e2d29;
+  --accent: #4c6850;      /* 旧赤 → セージ濃(sage-deep)。赤はアラート専用に空ける */
+  --text: #383731;        /* ink */
+  --muted: #6b6559;
+  --border: #e5dfd4;      /* line */
+  --bg-alt: #f4f1ea;
 }
 * { box-sizing: border-box; }
-body { margin: 0; font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif; color: var(--text); background: #fff; line-height: 1.9; }
+body { margin: 0; font-family: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif; color: var(--text); background: #fdfcf9; line-height: 1.9; }
 a { color: var(--navy); }
 a:hover { color: var(--accent); }
 /* キーボード操作時のフォーカスリング（LP本体 index.html / help.html と同仕様。2026-07-30 Hallmark audit対応） */
@@ -24,7 +28,7 @@ header { position: sticky; top: 0; background: rgba(253,252,249,.95); backdrop-f
 main { padding: 72px 0 96px; }
 h1 { font-size: clamp(24px, 3vw, 32px); color: var(--navy); font-weight: 800; letter-spacing: -0.01em; margin: 0 0 8px; }
 .updated { color: var(--muted); font-size: 13px; margin: 0 0 40px; }
-h2 { font-size: 19px; color: var(--navy); font-weight: 800; margin: 40px 0 12px; padding-left: 12px; border-left: 4px solid var(--accent); }
+h2 { font-size: 19px; color: var(--navy); font-weight: 800; margin: 40px 0 12px; padding-left: 12px; border-left: 4px solid #78927b; }
 p, li { font-size: 14.5px; }
 table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
 th, td { text-align: left; padding: 14px 16px; border: 1px solid var(--border); vertical-align: top; }

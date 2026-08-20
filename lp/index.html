@@ -49,9 +49,11 @@
 
 <style>
 /* Hallmark · macrostructure: Narrative Workflow · tone: 実務的・穏やか · anchor hue: sage (chromatic-other)
- * nav: N9 Edge-aligned minimal · footer: Ft1 Mast-headed · enrichment: none（実画面5枚を配置）
- * theme: C案トーン（2026-07-30 の既存資産を維持。骨格のみ入れ替え）
- * 設計: docs/LP_redesign_sekkei_2026-08-07.md
+ * nav: N9 Edge-aligned minimal · footer: Ft1 Mast-headed · enrichment: none（実画面を配置）
+ * theme: C案トーンの配色を維持。見出し書体のみ 2026-08-20 オーナー決定で
+ *        丸ゴシック→角ゴシック（Zen Kaku Gothic New）に変更（収益管理ツールの緊張感を優先。
+ *        ワードマーク「ウレシル.」だけブランド表記として丸ゴシックを残す）
+ * 設計: docs/LP_redesign_sekkei_2026-08-07.md ＋ docs/jisso_keikaku_design_review_2026-08-20.md
  * pre-emit critique: P5 H5 E4 S5 R5 V4
  *
  * トークンはこのファイル内の :root が単一の真実。tokens.css へ切り出していないのは、
@@ -82,7 +84,9 @@
     --on-ink-faint: #8d8880;
     --line-on-ink: #4a473f;
 
-    --font-display: "Zen Maru Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
+    /* 見出しは本文と同系統の角ゴシック（2026-08-20 決定）。丸ゴシックはワードマーク専用 */
+    --font-display: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
+    --font-wordmark: "Zen Maru Gothic", "Hiragino Kaku Gothic ProN", sans-serif;
     --font-body: "Zen Kaku Gothic New", "Hiragino Kaku Gothic ProN", "Yu Gothic", Meiryo, sans-serif;
     --font-num: Quicksand, "Zen Kaku Gothic New", sans-serif;
 
@@ -174,7 +178,7 @@
   .nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: var(--space-md); min-height: 72px; }
   .wordmark {
     display: inline-block; padding-block: 4px;
-    font-family: var(--font-display); font-weight: 700; font-size: 23px;
+    font-family: var(--font-wordmark); font-weight: 700; font-size: 23px;
     letter-spacing: .06em; text-decoration: none; color: var(--ink);
   }
   .wordmark .dot { color: var(--sage); }
@@ -182,6 +186,12 @@
 
   /* ── Hero ────────────────────────────────────────────────── */
   .hero { padding: clamp(56px, 9vw, 104px) 0 clamp(48px, 7vw, 88px); }
+  /* 誰に向けたプロダクトかを冒頭で固有化する（2026-08-20 レビュー採用）。
+     数値の主張は置かない（捏造しない・打消し表示を発生させない） */
+  .hero-eyebrow {
+    font-weight: 700; font-size: clamp(14px, 1.6vw, 16px); color: var(--sage-deep);
+    margin: 0 0 var(--space-sm); letter-spacing: .02em;
+  }
   .hero h1 {
     font-size: clamp(34px, 6vw, 60px); line-height: 1.35;
     margin: 0 0 var(--space-md);
@@ -231,6 +241,15 @@
   .stage h3 { font-size: clamp(21px, 2.6vw, 29px); line-height: 1.45; margin: 0 0 var(--space-sm); max-width: 22em; }
   .stage p { color: var(--sub); margin: 0; max-width: var(--measure); font-size: 15.5px; }
   .stage .shot { margin-top: var(--space-lg); max-width: var(--shot-max); }
+  /* 補助工程（1.0 取込・3.0 年間計画・5.0 効果測定）。
+     5工程が同じリズムで4回続き「生成された説明資料」に見える、というレビュー指摘
+     （2026-08-20）への対応。主役は 2.0 診断と 4.0 今日やること＝購入判断に直結する工程。
+     補助工程は画像を置かず、罫線・見出し・余白を一段弱くする。
+     「5番目だけ画像が無い」未完成感も、補助3工程を揃って画像なしにすることで解消 */
+  .stage-sub { border-top: 1px solid var(--rule); margin-bottom: var(--space-xl); }
+  .stage-sub .stage-no { color: var(--muted); font-size: 13.5px; }
+  .stage-sub h3 { font-size: clamp(17px, 1.9vw, 20px); }
+  .stage-sub p { font-size: 14.5px; }
   /* ── 導入事例（実績1件・単独ケース） ──────────────────────────
      指標が1つしかないため、3〜5個並べる stat strip 型は使わない。
      打消し表示（免責）は景表法の指針に従い、主張の直下・同等の可読性で置く。
@@ -346,7 +365,7 @@
 <header class="nav">
   <div class="wrap">
     <a class="wordmark" href="./">ウレシル<span class="dot">.</span></a>
-    <a class="btn js-signup" href="https://app.ureshiru.com/billing?signup=1">無料で試す</a>
+    <a class="btn js-signup" href="https://app.ureshiru.com/billing?signup=1">14日間無料で試す</a>
   </div>
 </header>
 
@@ -354,17 +373,19 @@
 
 <section class="hero">
   <div class="wrap">
-    <h1>次の一手が、<u>毎週決まる</u>。</h1>
-    <p class="hero-lede">楽天RMSのCSVを取り込むと、売上を「アクセス × 転換率 × 客単価」に分解し、どのKPIが足を引っ張っているかを判定して、今週やることまで出します。</p>
+    <p class="hero-eyebrow">RPP広告を運用している楽天店舗の店長・運営担当へ</p>
+    <h1>広告費と原価を引いて、<br>利益が残ったかが<u>毎週わかる</u>。</h1>
+    <p class="hero-lede">ROASが良くても、利益が出ているとは限りません。ウレシルは楽天RMSのCSVを取り込むと、売上を「アクセス × 転換率 × 客単価」に分解して弱いKPIを判定し、今週やることまで出します。</p>
     <div class="hero-cta">
-      <a class="btn js-signup" href="https://app.ureshiru.com/billing?signup=1">14日間、無料で試す</a>
+      <a class="btn js-signup" href="https://app.ureshiru.com/billing?signup=1">14日間無料で試す</a>
       <a class="btn-quiet" href="#pricing">料金を見る</a>
     </div>
     <p class="hero-note">トライアル中の解約で料金はかかりません。導入前に相談したい方は <a class="js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">無料デモ（30分）</a> もご利用いただけます。</p>
 
     <div class="hero-shot">
       <figure class="shot">
-        <img src="shot-hero.jpg" width="1568" height="706" alt="ウレシルのダッシュボード。売上と目標を比べる弾丸グラフ、達成率、着地見込み、アクセス・転換率・客単価の3指標が並んでいる" decoding="async" fetchpriority="high">
+        <img src="shot-hero.jpg" width="1568" height="706" alt="ウレシルのダッシュボード冒頭。売上と目標を比べる弾丸グラフ、達成率、着地見込み、アクセス・転換率・客単価の3指標、今日やることが並んでいる" decoding="async" fetchpriority="high">
+        <figcaption>ダッシュボードの冒頭。売上目標に対する今の位置と「今日やること」が最初に出ます。</figcaption>
       </figure>
     </div>
   </div>
@@ -381,16 +402,15 @@
   <div class="wrap">
     <div class="spine-intro">
       <h2>ウレシルが回す5つの工程</h2>
-      <p>数字を並べて終わりにしません。取り込んでから、次の打ち手が決まって、その効果を確かめるところまでを1本の流れにしています。</p>
+      <p>数字を並べて終わりにしません。中心にあるのは「原因がわかる」「今日やることが決まる」の2つ。取込みと計画・効果測定がその前後を支えます。</p>
     </div>
 
-    <div class="stage">
+    <!-- 工程の強弱（2026-08-20 決定）: 主役=2.0・4.0（画像つき・大見出し）、
+         補助=1.0・3.0・5.0（stage-sub・画像なし）。5工程を同格に並べる形に戻さないこと -->
+    <div class="stage stage-sub">
       <span class="stage-no">1.0 — 取り込む</span>
-      <h3>RMSのCSVを、ダウンロードしたまま放り込む</h3>
-      <p>RPP広告レポート（週次）と商品分析レポート（月次）を、そのまま取り込めます。API連携の申請も、列の並べ替えも、文字コードの変換も要りません。zipのままでも、複数ファイル同時でも受け付けます。</p>
-      <figure class="shot">
-        <img src="shot-1-intake.jpg" width="1568" height="706" alt="データ取込み画面。CSVのドラッグ&amp;ドロップ枠と、取り込み済みの週次・月次データの一覧" loading="lazy" decoding="async">
-      </figure>
+      <h3>RMSのCSVを、ダウンロードしたまま放り込むだけ</h3>
+      <p>RPP広告レポート（週次）と商品分析レポート（月次）をそのまま取り込めます。API連携の申請も、列の並べ替えも、文字コードの変換も要りません。zipのまま・複数ファイル同時でも受け付けます。</p>
     </div>
 
     <div class="stage">
@@ -399,16 +419,14 @@
       <p>売上を「アクセス × 転換率 × 客単価」に分解し、店舗全体 → ジャンル → 商品の順に辿ります。17のパターンで現状を判定し、どのKPIがボトルネックかを名指しします。週次・月次・年次のどれでも見られます。</p>
       <figure class="shot">
         <img src="shot-2-diagnose.jpg" width="1568" height="706" alt="GAP分析画面。KGI売上目標を頂点に、アクセス人数・転換率・客単価の3つのKPIが弾丸グラフで枝分かれするロジックツリー" loading="lazy" decoding="async">
+        <figcaption>GAP分析。選んだKPIの課題が大きい順にジャンル・商品が並び、原因まで一本道で辿れます。</figcaption>
       </figure>
     </div>
 
-    <div class="stage">
+    <div class="stage stage-sub">
       <span class="stage-no">3.0 — 決める</span>
       <h3>年間予算から、今月の必要数字を逆算する</h3>
-      <p>年間の売上予算を、過去実績の季節性で月次に按分します。そのうえで各月に必要なアクセス数・転換率・客単価を逆算するので、「今月あと何人集めればいいか」が数字で出ます。商品ごとの目標も、過去実績から同じ考え方で算出できます。</p>
-      <figure class="shot">
-        <img src="shot-3-plan.jpg" width="1568" height="706" alt="目標設定画面の年間目標プランナー。月ごとの季節指数、売上予算、必要アクセス、目標CVR、目標客単価、想定追加広告費、達成率が並ぶ表" loading="lazy" decoding="async">
-      </figure>
+      <p>年間の売上予算を過去実績の季節性で月次に按分し、各月に必要なアクセス数・転換率・客単価を逆算します。「今月あと何人集めればいいか」が数字で出ます。</p>
     </div>
 
     <div class="stage">
@@ -417,17 +435,18 @@
       <p>CPOが限界注文獲得単価（Limit CPO）を超えたとき、ROIが100%を割ったときに警告します。そのうえで、店舗全体の打ち手と商品ページの打ち手を分けて提示します。「気づいたら広告で利益が溶けていた」を防ぐための工程です。</p>
       <figure class="shot">
         <img src="shot-4-act.jpg" width="1568" height="706" alt="ダッシュボードの改善重要アラートとKPI評価マトリクス。売上・アクセス・転換率・客単価の達成状況と、店舗全体および商品ページの具体的な打ち手が一覧で並ぶ" loading="lazy" decoding="async">
+        <figcaption>改善アラートと評価マトリクス。警告だけでなく、店舗全体と商品ページの打ち手まで出ます。</figcaption>
       </figure>
     </div>
 
-    <div class="stage">
+    <div class="stage stage-sub">
       <span class="stage-no">5.0 — 効く</span>
       <h3>打った施策の、その後を追う</h3>
-      <p>実施した施策を記録しておくと、翌月の実績と突き合わせて効果を確認できます。季節要因や他の施策の影響も混ざるため、その施策だけの効果とは限りません。それでも「やりっぱなしにしない」ための土台になります。</p>
-      <!-- 5.0 の実画面は未掲載。サンプルデータでは施策の実施月＝当月のため、
-           比較対象の翌月実績がまだ存在せず全件「測定待ち」になる（構造上の制約）。
-           backend/sample_data.py に過去月の施策＋翌月実績を仕込んだうえで撮り直し、
-           ここに <figure class="shot"> を差し込む。詳細は docs/LP_redesign_sekkei_2026-08-07.md §8 -->
+      <p>実施した施策を記録しておくと、翌月の実績と突き合わせて効果を確認できます。季節要因や他の施策の影響も混ざるため、その施策だけの効果とは限りませんが、「やりっぱなしにしない」ための土台になります。</p>
+      <!-- 5.0 の実画面は補助工程化（2026-08-20）に伴い掲載しない方針に変更。
+           従来の「撮り直して差し込む」残タスクはクローズ（docs/LP_redesign_sekkei_2026-08-07.md §8 の
+           前提が変わった）。主役工程に昇格させる場合のみ、sample_data に過去月の施策＋翌月実績を
+           仕込んだうえで撮影して差し込むこと -->
     </div>
   </div>
 </section>
@@ -458,6 +477,10 @@
         <dd>2026年6月〜7月</dd>
         <dt>実施したこと</dt>
         <dd>ウレシルを導入し、診断結果に基づいて広告運用を見直し</dd>
+        <!-- ⚠️ 運用ストーリー追記の位置（2026-08-20 決定・保留中）:
+             「何に困っていて・何を見直したか」の短い記述をここに <dt>背景</dt><dd>…</dd> として足す。
+             書けるのはオーナーが提供する許諾済みの事実だけ。推測・作文・数値の言い換えは禁止
+             （docs/LP_redesign_sekkei_2026-08-07.md §9 のルールを厳守） -->
       </dl>
       <p class="case-note">※ 掲載については当該企業の許可を得ています。上記は特定の店舗・特定の期間における実績であり、効果を保証するものではありません。成果は商材・価格帯・競合状況・広告予算などによって変わります。</p>
     </div>
@@ -501,6 +524,8 @@
     <div class="plan">
       <span class="badge">14日間 無料トライアル</span>
       <h3>ウレシル 月額プラン</h3>
+      <!-- ツールとコンサルの境界を対象者で明記する（2026-08-20 レビュー採用） -->
+      <p style="margin: 4px 0 0; font-size: 14px; color: var(--sub);">ツールを使って自分で運用を改善したい方向け</p>
       <div class="price">
         <span class="main nw">¥20,000<small>（税抜）</small></span>
         <span class="sub nw">¥22,000<small>（税込）/ 月</small></span>
@@ -513,13 +538,13 @@
         <li>週次・月次の改善アラート表示</li>
         <li>メール・アプリ内フォームでのサポート</li>
       </ul>
-      <a class="btn js-signup" href="https://app.ureshiru.com/billing?signup=1">14日間の無料トライアルを始める</a>
+      <a class="btn js-signup" href="https://app.ureshiru.com/billing?signup=1">14日間無料で試す</a>
     </div>
     <p class="trial-note">トライアル中に解約すれば料金は一切かかりません。</p>
 
     <div class="consult">
-      <h3>運用まで一緒にやってほしい方へ</h3>
-      <p>ECコンサルティングは、店舗の規模・課題をお聞きしたうえで個別にお見積りします（¥150,000〜）。KPIレビュー会、RPP入札・予算配分の改善提案、商品ページ改善のアドバイスなど。</p>
+      <h3>伴走してほしい方へ — ECコンサルティング（別サービス）</h3>
+      <p>ウレシル（ツール）とは別の、個別契約のサービスです。店舗の規模・課題をお聞きしたうえで個別にお見積りします（¥150,000〜）。KPIレビュー会、RPP入札・予算配分の改善提案、商品ページ改善のアドバイスなど。ツールで自走するか、伴走を付けるかで選んでください。</p>
       <a class="btn-quiet" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%20EC%E3%82%B3%E3%83%B3%E3%82%B5%E3%83%AB%E3%81%AE%E3%81%94%E7%9B%B8%E8%AB%87">コンサルの相談をする</a>
     </div>
   </div>
@@ -558,7 +583,7 @@
   <div class="wrap">
     <h2>まずは14日間、無料でお試しください</h2>
     <p>登録してCSVを取り込むだけで、今日からKPIを可視化できます。トライアル中の解約で料金はかかりません。</p>
-    <a class="btn js-signup" href="https://app.ureshiru.com/billing?signup=1">14日間、無料で試す</a>
+    <a class="btn js-signup" href="https://app.ureshiru.com/billing?signup=1">14日間無料で試す</a>
     <p class="band-sub"><a class="js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">導入前に無料デモ（30分）を予約する</a></p>
   </div>
 </section>

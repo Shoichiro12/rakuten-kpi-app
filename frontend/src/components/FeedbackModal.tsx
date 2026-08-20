@@ -125,7 +125,7 @@ export default function FeedbackModal({
                   <Icon size={16} className={category === value ? 'text-blue-600' : 'text-gray-400'} />
                   <span className="flex-1">
                     <span className="block text-sm font-medium text-gray-800">{label}</span>
-                    <span className="block text-[11px] text-gray-400">{hint}</span>
+                    <span className="block text-xs text-gray-400">{hint}</span>
                   </span>
                 </button>
               ))}

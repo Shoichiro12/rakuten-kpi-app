@@ -114,12 +114,12 @@ export default function ProductKPIPage() {
                 <ul className="divide-y divide-gray-50 max-h-56 overflow-y-auto">
                   {invAlerts.map((a) => (
                     <li key={a.management_no} className="px-4 py-2 flex items-center gap-3 text-sm">
-                      <span className={`shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium ${a.status === 'out' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                      <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${a.status === 'out' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                         {a.status === 'out' ? '欠品' : '僅少'}
                       </span>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-gray-800">{a.product_name || a.management_no}</p>
-                        <p className="text-[11px] text-gray-400">
+                        <p className="text-xs text-gray-400">
                           {a.status === 'out'
                             ? (a.zero_stock_days > 0 ? `在庫0日数 ${a.zero_stock_days}日` : '在庫なし')
                             : `残り約${a.days_left ?? '—'}日（在庫${a.stock_count.toLocaleString()}点）`}
@@ -167,6 +167,10 @@ export default function ProductKPIPage() {
               </label>
             </div>
 
+            {/* 一覧は「判断用」の列だけに圧縮する（2026-08-20 レビュー採用）。
+                全指標（GP/GPR/CV/CVR/ROAS/Limit CPO など）は右の詳細パネルへ集約し、
+                表とパネルで同じKPIを二重に出さない（表=どれを見るか決める場所、
+                パネル=正確な値を確認する場所。規約4章の役割分担）。 */}
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
               {!loading && products.length === 0 && (
                 <div className="py-12 text-center text-sm text-gray-400">
@@ -175,30 +179,31 @@ export default function ProductKPIPage() {
               )}
               {products.length > 0 && <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  {/* 単位はセルではなく見出しに1回だけ置く（右寄せの邪魔になるため）。規約 1-2
-                      日本語見出しに uppercase は効かないので外した */}
+                  {/* 単位はセルではなく見出しに1回だけ置く（右寄せの邪魔になるため）。規約 1-2 */}
                   <thead className="bg-gray-50 text-xs text-gray-500 sticky top-0">
                     <tr>
                       <SortableTh label="商品名" sortKey="product_name" sort={sort} align="left" className="pl-1" />
+                      <th className="px-3 py-2.5 text-left font-medium whitespace-nowrap">状態</th>
                       <SortableTh label="RPP売上（円）" sortKey="gross" sort={sort} />
-                      <SortableTh label="GP（円）" sortKey="gp" sort={sort} />
-                      <SortableTh label="GPR（%）" sortKey="gpr" sort={sort} />
-                      <SortableTh label="CV（件）" sortKey="cv" sort={sort} />
-                      <SortableTh label="CVR（%）" sortKey="cvr" sort={sort} />
-                      <SortableTh label="ROAS（%）" sortKey="roas" sort={sort} />
-                      <SortableTh label="CPO（円）" sortKey="cpo" sort={sort} />
-                      <SortableTh label="Limit CPO（円）" sortKey="limit_cpo" sort={sort} />
                       <SortableTh label="ROI（%）" sortKey="roi" sort={sort} />
+                      <SortableTh label="CPO（円）" sortKey="cpo" sort={sort} />
+                      <th className="px-3 py-2.5 text-center font-medium whitespace-nowrap">詳細</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
-                    {sort.apply(products).map((p) => (
+                    {sort.apply(products).map((p) => {
+                      const isSelected = selectedProduct?.product_url === p.product_url
+                      const issues: string[] = []
+                      // しきい値は生の数値で判定する（規約）。赤=即対応の意味色に統一
+                      if (p.limit_cpo_exceeded) issues.push('CPO超過')
+                      if (p.roi < 100) issues.push('ROI100%割れ')
+                      return (
                       <tr
                         key={p.product_url}
                         onClick={() => handleSelectProduct(p)}
-                        className={`hover:bg-blue-50 cursor-pointer transition-colors ${
-                          selectedProduct?.product_url === p.product_url ? 'bg-blue-50' : ''
-                        } ${p.limit_cpo_exceeded ? 'bg-red-50 hover:bg-red-100' : ''}`}
+                        className={`cursor-pointer transition-colors ${
+                          p.limit_cpo_exceeded ? 'bg-red-50 hover:bg-red-100' : isSelected ? 'bg-blue-50' : 'hover:bg-blue-50'
+                        }`}
                       >
                         <td className="px-4 py-2.5">
                           <div className="flex items-start gap-1.5">
@@ -209,7 +214,7 @@ export default function ProductKPIPage() {
                               <p className="font-medium text-gray-900 leading-tight">
                                 {p.product_name}
                                 {p.is_active === false && (
-                                  <span className="ml-1.5 align-middle px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 text-[10px] font-medium">廃盤</span>
+                                  <span className="ml-1.5 align-middle px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 text-xs font-medium">廃盤</span>
                                 )}
                               </p>
                               <div className="flex items-center gap-1.5">
@@ -219,25 +224,42 @@ export default function ProductKPIPage() {
                             </div>
                           </div>
                         </td>
-                        {/* 表は丸めない（生値）。単位は見出しに出したのでセルからは外す。
-                            数値は右寄せ＋等幅（tabular-nums）で桁位置を揃える。規約 1-2 / 4
-                            色を付けるのは「しきい値を跨いだセル」だけ。ROI が100%以上のときに
-                            緑を付けると全行が色付きになり、何も目立たなくなる */}
-                        <td className="px-3 py-2.5 text-right text-gray-900 font-medium tabular-nums">{num(p.gross)}</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">{num(p.gp)}</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">{pct(p.gpr)}</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">{num(p.cv)}</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">{pct(p.cvr, 2)}</td>
-                        <td className="px-3 py-2.5 text-right tabular-nums">{pct(p.roas)}</td>
-                        <td className={`px-3 py-2.5 text-right font-medium tabular-nums ${p.limit_cpo_exceeded ? 'text-red-600' : ''}`}>
-                          {num(p.cpo)}
+                        <td className="px-3 py-2.5">
+                          {issues.length > 0 ? (
+                            <span className="inline-flex flex-wrap gap-1">
+                              {issues.map((label) => (
+                                <span key={label} className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-red-100 text-red-700 whitespace-nowrap">
+                                  {label}
+                                </span>
+                              ))}
+                            </span>
+                          ) : (
+                            // 課題なしは色を付けない（全行が色付きになると何も目立たない。規約 2-3）
+                            <span className="text-xs text-gray-400">良好</span>
+                          )}
                         </td>
-                        <td className="px-3 py-2.5 text-right text-gray-500 tabular-nums">{num(p.limit_cpo)}</td>
+                        {/* 表は丸めない（生値）。数値は右寄せ＋等幅（tabular-nums）。規約 1-2 / 4 */}
+                        <td className="px-3 py-2.5 text-right text-gray-900 font-medium tabular-nums">{num(p.gross)}</td>
                         <td className={`px-3 py-2.5 text-right font-medium tabular-nums ${p.roi < 100 ? 'text-red-600' : ''}`}>
                           {pct(p.roi)}
                         </td>
+                        <td className={`px-3 py-2.5 text-right font-medium tabular-nums ${p.limit_cpo_exceeded ? 'text-red-600' : ''}`}>
+                          {num(p.cpo)}
+                        </td>
+                        <td className="px-3 py-2.5 text-center">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleSelectProduct(p) }}
+                            aria-expanded={isSelected}
+                            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                              isSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }`}
+                          >
+                            {isSelected ? '表示中' : '詳細'}
+                          </button>
+                        </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>}
@@ -260,16 +282,21 @@ export default function ProductKPIPage() {
                     ⚠️ CPO（{formatCurrency(selectedProduct.cpo)}）がLimit CPO（{formatCurrency(selectedProduct.limit_cpo)}）を超過しています
                   </div>
                 )}
+                {/* 一覧から外した指標もここに集約する（一覧=判断用・パネル=確認用の役割分担） */}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   {[
+                    ['RPP売上', formatCurrency(selectedProduct.gross)],
                     ['Rev', formatCurrency(selectedProduct.rev)],
                     ['ROI', formatPercent(selectedProduct.roi)],
                     ['GP', formatCurrency(selectedProduct.gp)],
                     ['GPR', formatPercent(selectedProduct.gpr)],
-                    ['Av', formatCurrency(selectedProduct.av)],
+                    ['CV', formatNumber(selectedProduct.cv)],
                     ['CVR', formatPercent(selectedProduct.cvr, 2)],
+                    ['Av', formatCurrency(selectedProduct.av)],
                     ['ROAS', formatPercent(selectedProduct.roas)],
                     ['CPC', formatCurrency(selectedProduct.cpc)],
+                    ['CPO', formatCurrency(selectedProduct.cpo)],
+                    ['Limit CPO', formatCurrency(selectedProduct.limit_cpo)],
                   ].map(([label, value]) => (
                     <div key={label as string} className="bg-gray-50 rounded p-2">
                       <p className="text-gray-500">{label}</p>

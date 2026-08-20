@@ -230,7 +230,7 @@ export default function Dashboard() {
           <div className="lg:col-span-2 bg-white rounded-xl border shadow-sm p-4 flex flex-col">
             <div className="flex items-center gap-2">
               <p className="text-sm font-medium text-gray-600">売上{data?.target_sales ? ' vs 目標' : ''}</p>
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
                 shop ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
               }`}>
                 {shop ? '商品分析（店舗全体）' : 'RPP経由売上'}
@@ -316,10 +316,27 @@ export default function Dashboard() {
         {/* ═══ 2層: アクション帯（今日やること・アラート・評価マトリクス）═══ */}
         {!isYearly && <TodayActions data={recos} onChanged={load} />}
 
+        {/* アラートは最大3件を初期表示し、残りは開閉に格納する（2026-08-20 レビュー採用）。
+            全件を同じ強さで並べると、どれから手を付けるかが読めなくなるため。 */}
         {alerts.length > 0 && (
           <div>
-            <h3 className="text-sm font-semibold text-gray-700 mb-2">改善重要アラート</h3>
-            <AlertPanel alerts={alerts} />
+            <h3 className="text-sm font-semibold text-gray-700 mb-2">
+              改善重要アラート
+              {alerts.length > 3 && (
+                <span className="ml-2 font-normal text-xs text-gray-400">全{alerts.length}件のうち上位3件</span>
+              )}
+            </h3>
+            <AlertPanel alerts={alerts.slice(0, 3)} />
+            {alerts.length > 3 && (
+              <details className="mt-2">
+                <summary className={`text-xs text-gray-500 cursor-pointer select-none hover:text-gray-700 inline-flex items-center ${FOCUS_RING}`}>
+                  残り{alerts.length - 3}件のアラートを表示
+                </summary>
+                <div className="mt-2">
+                  <AlertPanel alerts={alerts.slice(3)} />
+                </div>
+              </details>
+            )}
           </div>
         )}
 
@@ -442,7 +459,7 @@ export default function Dashboard() {
                     <tr key={row.label} className={row.warn ? 'bg-red-50/60' : undefined}>
                       <td className="px-4 py-2 text-gray-700">
                         {row.label}
-                        {row.warn && <span className="ml-1.5 text-[10px] text-red-600 font-medium">⚠️ 要確認</span>}
+                        {row.warn && <span className="ml-1.5 text-xs text-red-600 font-medium">⚠️ 要確認</span>}
                       </td>
                       <td className="px-3 py-2 text-right font-medium text-gray-900 tabular-nums">{row.value}</td>
                       <td className="px-3 py-2 text-right tabular-nums">{cell(row.wow)}</td>
@@ -456,8 +473,18 @@ export default function Dashboard() {
         </details>
         </>)}
 
+        {/* ═══ 推移グラフ（既定で畳む。2026-08-20 レビュー採用）═══
+            初期表示は「結論（ヒーロー）→ 次の行動（今日やること・アラート）→ 判断材料（4カード）」
+            までに絞り、傾向確認のグラフは開閉に格納する。 */}
+        <details className="bg-white rounded-xl border shadow-sm group">
+          <summary className="px-4 py-3 text-sm font-semibold text-gray-600 cursor-pointer select-none list-none flex items-center justify-between hover:bg-gray-50 rounded-xl group-open:rounded-b-none">
+            <span>推移グラフ（週次トレンド・売上/利益/広告費）</span>
+            <span className="text-xs text-gray-400 group-open:hidden">クリックで展開</span>
+            <span className="text-xs text-gray-400 hidden group-open:inline">閉じる</span>
+          </summary>
+          <div className="border-t p-4 space-y-6">
         {/* トレンドチャート */}
-        <div className="bg-white rounded-xl border shadow-sm p-4">
+        <div>
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-700">週次トレンド（8週間）</h3>
             <div className="flex gap-1">
@@ -486,7 +513,7 @@ export default function Dashboard() {
         </div>
 
         {/* Rev vs AdCost 比較チャート */}
-        <div className="bg-white rounded-xl border shadow-sm p-4">
+        <div>
           <h3 className="text-sm font-semibold text-gray-700 mb-3">売上・利益・広告費 推移</h3>
           <MultiLineChart
             data={trend}
@@ -498,11 +525,25 @@ export default function Dashboard() {
             formatter={(v) => `¥${v.toLocaleString()}`}
           />
         </div>
+          </div>
+        </details>
 
-        {/* ═══ 3層(c): 計画系パネル（売上予算プラン・アクセス逆算）═══
+        {/* ═══ 3層(c): 計画系パネル（売上予算プラン・アクセス逆算）。既定で畳む ═══
             月次予算の按分パネルのため年次表示では出さない（年間予算そのものはKGIに反映済み） */}
-        {!isYearly && <RevenuePlanPanel yearMonth={dateValue.slice(0, 7)} />}
-        {accessPlan && <AccessPlanner plan={accessPlan} />}
+        {!isYearly && (
+          <details className="bg-white rounded-xl border shadow-sm group">
+            <summary className="px-4 py-3 text-sm font-semibold text-gray-600 cursor-pointer select-none list-none flex items-center justify-between hover:bg-gray-50 rounded-xl group-open:rounded-b-none">
+              <span>計画（売上予算プラン・アクセス逆算）</span>
+              <span className="text-xs text-gray-400 group-open:hidden">クリックで展開</span>
+              <span className="text-xs text-gray-400 hidden group-open:inline">閉じる</span>
+            </summary>
+            <div className="border-t p-4 space-y-6 bg-gray-50/50 rounded-b-xl">
+              <RevenuePlanPanel yearMonth={dateValue.slice(0, 7)} />
+              {accessPlan && <AccessPlanner plan={accessPlan} />}
+            </div>
+          </details>
+        )}
+        {/* 年次は accessPlan を取得しない（診断系を呼ばない方針）ため、計画ブロックごと出さない */}
         </div>} {/* kpis && ... */}
       </div>
     </div>

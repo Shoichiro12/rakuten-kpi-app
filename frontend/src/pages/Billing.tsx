@@ -187,7 +187,7 @@ export default function Billing() {
               <div className="flex items-center gap-2 mb-3">
                 <CreditCard size={18} className="text-blue-600" />
                 <h3 className="text-sm font-semibold text-gray-800">現在のご契約</h3>
-                <span className="ml-1 text-[11px] px-1.5 py-0.5 rounded font-medium bg-green-100 text-green-700">
+                <span className="ml-1 text-xs px-1.5 py-0.5 rounded font-medium bg-green-100 text-green-700">
                   {STATUS_LABEL[status.status ?? ''] ?? status.status}
                 </span>
               </div>
@@ -267,7 +267,7 @@ export default function Billing() {
             <div className="bg-white rounded-xl border shadow-sm p-6">
               <div className="flex items-center gap-2 mb-1">
                 <h3 className="text-base font-bold text-gray-900">{plan?.label ?? 'ウレシル 月額プラン'}</h3>
-                <span className="text-[11px] px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-700">
+                <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-blue-100 text-blue-700">
                   {trialDays}日間無料
                 </span>
               </div>

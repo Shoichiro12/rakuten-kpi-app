@@ -50,17 +50,17 @@ export default function RevenuePlanPanel({ yearMonth }: { yearMonth: string }) {
           <TargetIcon size={15} className="text-violet-600" />
           <h3 className="text-sm font-semibold text-gray-700">売上予算プラン（{plan.base_month}）</h3>
           {plan.status === 'ok' && conf && (
-            <span className={`text-[10px] px-1.5 py-0.5 rounded font-medium ${
+            <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
               conf === 'high' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'
             }`}>
               季節按分（{conf === 'high' ? '精度高' : '実績1周分'}）
             </span>
           )}
           {plan.status === 'flat' && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-700">均等按分</span>
+            <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-amber-100 text-amber-700">均等按分</span>
           )}
         </div>
-        <span className="text-[10px] text-gray-400">
+        <span className="text-xs text-gray-400">
           年間予算 {plan.annual_sales_budget != null ? `¥${plan.annual_sales_budget.toLocaleString()}` : '未設定'}
           ／年度 {plan.budget_year.from}〜{plan.budget_year.to}
         </span>
@@ -91,42 +91,42 @@ export default function RevenuePlanPanel({ yearMonth }: { yearMonth: string }) {
           {/* 一気通貫: 予算 → 必要アクセス → 現状 → 想定広告費 */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
             <div className="bg-violet-50 border border-violet-100 rounded-lg p-3">
-              <p className="text-[10px] text-violet-600 font-medium">月次売上予算（按分）</p>
+              <p className="text-xs text-violet-600 font-medium">月次売上予算（按分）</p>
               <p className="text-lg font-bold text-violet-900">¥{Math.round(cur.sales_budget).toLocaleString()}</p>
             </div>
             <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 relative">
               <ArrowRight size={12} className="absolute -left-2 top-1/2 -translate-y-1/2 text-gray-300 hidden lg:block" />
-              <p className="text-[10px] text-gray-500 font-medium">必要アクセス（UU）</p>
+              <p className="text-xs text-gray-500 font-medium">必要アクセス（UU）</p>
               <p className="text-lg font-bold text-gray-900">{Math.round(cur.required_access).toLocaleString()}</p>
-              <p className="text-[10px] text-gray-400">目標CVR {cur.target_cvr}% × 客単価 ¥{Math.round(cur.target_av).toLocaleString()}</p>
+              <p className="text-xs text-gray-400">目標CVR {cur.target_cvr}% × 客単価 ¥{Math.round(cur.target_av).toLocaleString()}</p>
             </div>
             <div className="bg-gray-50 border border-gray-100 rounded-lg p-3 relative">
               <ArrowRight size={12} className="absolute -left-2 top-1/2 -translate-y-1/2 text-gray-300 hidden lg:block" />
-              <p className="text-[10px] text-gray-500 font-medium">現状アクセス（UU）</p>
+              <p className="text-xs text-gray-500 font-medium">現状アクセス（UU）</p>
               <p className="text-lg font-bold text-gray-900">
                 {cur.actual_access != null ? cur.actual_access.toLocaleString() : '—'}
               </p>
               {cur.actual_access_month && cur.actual_access_month !== cur.year_month && (
-                <p className="text-[10px] text-amber-600">{cur.actual_access_month}実績を見込みとして使用</p>
+                <p className="text-xs text-amber-600">{cur.actual_access_month}実績を見込みとして使用</p>
               )}
             </div>
             <div className={`border rounded-lg p-3 relative ${cur.shortfall_access > 0 ? 'bg-amber-50 border-amber-200' : 'bg-green-50 border-green-200'}`}>
               <ArrowRight size={12} className="absolute -left-2 top-1/2 -translate-y-1/2 text-gray-300 hidden lg:block" />
-              <p className={`text-[10px] font-medium ${cur.shortfall_access > 0 ? 'text-amber-700' : 'text-green-700'}`}>
+              <p className={`text-xs font-medium ${cur.shortfall_access > 0 ? 'text-amber-700' : 'text-green-700'}`}>
                 {cur.shortfall_access > 0 ? `不足 ${Math.round(cur.shortfall_access).toLocaleString()} UU → 想定追加広告費` : '必要アクセス充足'}
               </p>
               <p className={`text-lg font-bold ${cur.shortfall_access > 0 ? 'text-amber-900' : 'text-green-800'}`}>
                 {cur.shortfall_access <= 0 ? '追加投資なし' : cur.est_ad_cost != null ? `¥${Math.round(cur.est_ad_cost).toLocaleString()}` : '算出不可（RPP実績なし）'}
               </p>
               {cur.cpc != null && cur.shortfall_access > 0 && (
-                <p className="text-[10px] text-gray-500">
+                <p className="text-xs text-gray-500">
                   CPC ¥{cur.cpc.toLocaleString()}（{cur.cpc_source_month}実績{cur.cpc_is_fallback ? '・直近月で代用' : ''}）
                 </p>
               )}
             </div>
           </div>
 
-          <p className="text-[10px] text-gray-400 mt-2 leading-snug">
+          <p className="text-xs text-gray-400 mt-2 leading-snug">
             根拠: {cur.target_basis_detail}。{cur.note}。
             {plan.status === 'flat' && ` ${plan.guide.message}`}
           </p>
@@ -142,7 +142,7 @@ export default function RevenuePlanPanel({ yearMonth }: { yearMonth: string }) {
                 </p>
               </div>
             ) : plan.item_target_check.coverage_rate != null ? (
-              <p className="mt-1.5 text-[10px] text-gray-400">
+              <p className="mt-1.5 text-xs text-gray-400">
                 アイテム別目標設定済み: {plan.item_target_check.count}商品・合計 ¥{Math.round(plan.item_target_check.sum).toLocaleString()}
                 （月次予算の{plan.item_target_check.coverage_rate}%。全商品に設定する運用ではないため下回っていても正常です）
               </p>
@@ -173,7 +173,7 @@ export default function RevenuePlanPanel({ yearMonth }: { yearMonth: string }) {
                 >
                   この予算で試算
                 </button>
-                <span className="text-[10px] text-gray-400">入力値は保存されません</span>
+                <span className="text-xs text-gray-400">入力値は保存されません</span>
               </div>
 
               {plan.gap && (
@@ -185,7 +185,7 @@ export default function RevenuePlanPanel({ yearMonth }: { yearMonth: string }) {
                   )}
                   {plan.gap.within_budget === false && (
                     <>
-                      <p className="text-[10px] text-gray-500">
+                      <p className="text-xs text-gray-500">
                         許容広告費 ¥{plan.gap.allowable_ad_cost.toLocaleString()} で買える追加アクセスは
                         約 {Math.round(plan.gap.affordable_extra_ct ?? 0).toLocaleString()} クリック
                         （到達可能アクセス {Math.round(plan.gap.affordable_access ?? 0).toLocaleString()} UU、
@@ -203,15 +203,15 @@ export default function RevenuePlanPanel({ yearMonth }: { yearMonth: string }) {
                             <div className="flex items-center gap-2 flex-wrap">
                               <p className="text-xs font-bold text-gray-800">{o.label}</p>
                               {o.feasible === true && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-green-100 text-green-700">過去実績の範囲内</span>
+                                <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-green-100 text-green-700">過去実績の範囲内</span>
                               )}
                               {o.feasible === false && (
-                                <span className="text-[10px] px-1.5 py-0.5 rounded font-medium bg-red-100 text-red-600">上限めやす超過</span>
+                                <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-red-100 text-red-600">上限めやす超過</span>
                               )}
                             </div>
                             <p className="text-xs text-gray-600 mt-1 leading-relaxed">{o.detail}</p>
                             {o.improvement_pct != null && (
-                              <p className="text-[10px] text-gray-400 mt-1">現在の目標値からの改善幅: +{o.improvement_pct}%</p>
+                              <p className="text-xs text-gray-400 mt-1">現在の目標値からの改善幅: +{o.improvement_pct}%</p>
                             )}
                           </div>
                         ))}
@@ -224,7 +224,7 @@ export default function RevenuePlanPanel({ yearMonth }: { yearMonth: string }) {
                     </div>
                   )}
                   {plan.gap.within_budget === false && plan.gap.note && (
-                    <p className="text-[10px] text-gray-400 leading-snug">{plan.gap.note}</p>
+                    <p className="text-xs text-gray-400 leading-snug">{plan.gap.note}</p>
                   )}
                 </div>
               )}
