@@ -109,7 +109,7 @@ export default function HeroKgi({
               </span>
             )}
           </div>
-          {periodBasisNote && <p className="text-[11px] text-muted mt-1">{periodBasisNote}</p>}
+          {periodBasisNote && <p className="text-xs text-muted mt-1">{periodBasisNote}</p>}
 
           <div className="flex items-center justify-between text-xs mt-3 pt-3 border-t border-line">
             <span className="text-muted">{forecast != null ? 'このペースの着地見込み' : ''}</span>

@@ -58,10 +58,10 @@ function DropZone({
 
   const accentRing = accent === 'violet'
     ? 'hover:border-violet-400 hover:bg-violet-50'
-    : 'hover:border-blue-400 hover:bg-blue-50'
+    : 'hover:border-sage hover:bg-sage-soft'
   const dragRing = accent === 'violet'
     ? 'border-violet-500 bg-violet-50'
-    : 'border-blue-500 bg-blue-50'
+    : 'border-sage-deep bg-sage-soft'
 
   return (
     <div
@@ -74,16 +74,16 @@ function DropZone({
         pick(e.dataTransfer.files)
       }}
       className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${
-        loading ? 'opacity-50 pointer-events-none' : dragging ? dragRing : `border-gray-200 ${accentRing}`
+        loading ? 'opacity-50 pointer-events-none' : dragging ? dragRing : `border-line ${accentRing}`
       }`}
     >
-      <Upload size={30} className={`mx-auto mb-3 ${dragging ? 'text-blue-500' : 'text-gray-300'}`} />
-      <p className="text-sm font-medium text-gray-700">
+      <Upload size={30} className={`mx-auto mb-3 ${dragging ? 'text-sage-deep' : 'text-line'}`} />
+      <p className="text-sm font-medium text-sub">
         CSVファイルをドラッグ&ドロップ
       </p>
-      <p className="text-xs text-gray-400 mt-1">またはクリックして選択</p>
-      {hint && <p className="text-xs text-gray-400 mt-2">{hint}</p>}
-      {loading && <p className="text-xs text-blue-500 mt-2">解析中...</p>}
+      <p className="text-xs text-muted mt-1">またはクリックして選択</p>
+      {hint && <p className="text-xs text-muted mt-2">{hint}</p>}
+      {loading && <p className="text-xs text-sage-deep mt-2">解析中...</p>}
       <input
         ref={inputRef}
         type="file"
@@ -120,8 +120,8 @@ function MultiDropZone({ onFiles, loading }: { onFiles: (files: File[]) => void;
       }`}
     >
       <Upload size={34} className={`mx-auto mb-3 ${dragging ? 'text-emerald-500' : 'text-emerald-400'}`} />
-      <p className="text-sm font-bold text-gray-800">RMSからダウンロードしたファイルをここに放り込むだけ</p>
-      <p className="text-xs text-gray-500 mt-1.5">
+      <p className="text-sm font-bold text-ink">RMSからダウンロードしたファイルをここに放り込むだけ</p>
+      <p className="text-xs text-muted mt-1.5">
         zipのままでOK・複数ファイル同時OK・種別は自動判別（RPP広告 / 商品分析）
       </p>
       {loading && <p className="text-xs text-emerald-600 mt-2">取込み中...</p>}
@@ -154,7 +154,7 @@ function Collapsible({
     <div>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-gray-700"
+        className="flex items-center gap-1.5 text-xs font-medium text-muted hover:text-sub"
       >
         {open ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         {Icon && <Icon size={13} />}
@@ -186,7 +186,7 @@ function PreviewCard({
           <Eye size={16} className="text-violet-600" />
           <p className="text-sm font-semibold text-violet-900">取込み内容の確認 — {preview.year_month}</p>
         </div>
-        <button onClick={onCancel} className="text-xs text-gray-400 hover:text-gray-600">キャンセル</button>
+        <button onClick={onCancel} className="text-xs text-muted hover:text-sub">キャンセル</button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -198,9 +198,9 @@ function PreviewCard({
           { label: '平均CVR', value: formatRate(preview.avg_cvr, 2), exact: undefined },
         ].map(({ label, value, exact }) => (
           <div key={label} className="bg-white rounded-lg border border-violet-100 p-3 text-center">
-            <p className="text-xs text-gray-500">{label}</p>
+            <p className="text-xs text-muted">{label}</p>
             {/* 万・億の単位が数字から改行で切り離されないように折り返さない */}
-            <p className="text-sm font-bold text-gray-900 mt-0.5 tabular-nums whitespace-nowrap" title={exact}>
+            <p className="text-sm font-bold text-ink-strong mt-0.5 tabular-nums whitespace-nowrap" title={exact}>
               {value}
             </p>
           </div>
@@ -215,19 +215,19 @@ function PreviewCard({
       )}
 
       <div>
-        <p className="text-xs font-semibold text-gray-500 mb-2">売上上位5商品</p>
-        <div className="bg-white rounded-lg border border-violet-100 divide-y divide-gray-50">
+        <p className="text-xs font-semibold text-muted mb-2">売上上位5商品</p>
+        <div className="bg-white rounded-lg border border-violet-100 divide-y divide-bg-alt">
           {preview.top_products.map((p, i) => (
             <div key={p.management_no} className="flex items-center justify-between px-3 py-2">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xs text-gray-400 shrink-0">{i + 1}</span>
+                <span className="text-xs text-muted shrink-0">{i + 1}</span>
                 <div className="min-w-0">
-                  <p className="text-xs font-medium text-gray-800 truncate">{p.product_name || p.management_no}</p>
-                  <p className="text-xs text-gray-400">{p.management_no}</p>
+                  <p className="text-xs font-medium text-ink truncate">{p.product_name || p.management_no}</p>
+                  <p className="text-xs text-muted">{p.management_no}</p>
                 </div>
               </div>
               <span
-                className="text-xs font-bold text-gray-900 shrink-0 ml-2 tabular-nums"
+                className="text-xs font-bold text-ink-strong shrink-0 ml-2 tabular-nums"
                 title={formatYenExact(p.sales)}
               >
                 {formatYen(p.sales)}
@@ -238,7 +238,7 @@ function PreviewCard({
       </div>
 
       <div className="flex items-center justify-between pt-1">
-        <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+        <label className="flex items-center gap-2 text-xs text-sub cursor-pointer">
           <input
             type="checkbox"
             checked={overwrite}
@@ -289,23 +289,23 @@ function SetupProgress({ status }: { status: DataStatus | null }) {
   return (
     <div className="bg-white rounded-xl border shadow-sm p-4">
       <div className="flex items-center justify-between mb-3">
-        <p className="text-sm font-semibold text-gray-700">セットアップ進捗</p>
-        <span className="text-xs text-gray-500">{doneCount} / {items.length} 完了</span>
+        <p className="text-sm font-semibold text-sub">セットアップ進捗</p>
+        <span className="text-xs text-muted">{doneCount} / {items.length} 完了</span>
       </div>
       <div className="grid sm:grid-cols-3 gap-3">
         {items.map((item) => (
           <div
             key={item.key}
             className={`rounded-lg border p-3 flex items-center gap-2.5 ${
-              item.done ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'
+              item.done ? 'border-green-200 bg-green-50' : 'border-line bg-bg-alt'
             }`}
           >
             {item.done
               ? <CheckCircle size={18} className="text-green-500 shrink-0" />
-              : <div className="w-[18px] h-[18px] rounded-full border-2 border-gray-300 shrink-0" />}
+              : <div className="w-[18px] h-[18px] rounded-full border-2 border-line shrink-0" />}
             <div className="min-w-0">
-              <p className="text-xs font-medium text-gray-800 truncate">{item.label}</p>
-              <p className={`text-xs ${item.done ? 'text-green-600' : 'text-gray-400'}`}>{item.detail}</p>
+              <p className="text-xs font-medium text-ink truncate">{item.label}</p>
+              <p className={`text-xs ${item.done ? 'text-green-600' : 'text-muted'}`}>{item.detail}</p>
             </div>
           </div>
         ))}
@@ -604,7 +604,7 @@ export default function DataImport() {
     <div className="flex flex-col h-full">
       <Header title="データ取込み" subtitle="楽天RMSのCSVをアップロードするだけで分析が始まります" />
 
-      <div className="flex-1 overflow-auto p-6 bg-gray-50 space-y-5 max-w-5xl">
+      <div className="flex-1 overflow-auto p-6 bg-bg-alt space-y-5 max-w-5xl">
         {/* エラー: 認証エラーなら「再ログイン」CTA、常に「✕閉じる」を表示 */}
         {status && status.type === 'error' && (
           <ErrorBanner
@@ -697,7 +697,7 @@ export default function DataImport() {
         <SetupProgress status={dataStatus} />
 
         {/* はじめての方へ：3ステップ */}
-        <div className="bg-blue-600 rounded-xl p-5 text-white">
+        <div className="bg-sage-deep rounded-xl p-5 text-white">
           <div className="flex items-center gap-2 mb-3">
             <HelpCircle size={18} />
             <h3 className="text-sm font-bold">はじめての方へ — 3ステップで完了</h3>
@@ -710,10 +710,10 @@ export default function DataImport() {
             ].map(({ n, t, d }) => (
               <div key={n} className="bg-white/10 rounded-lg p-3">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="w-5 h-5 rounded-full bg-white text-blue-700 text-xs font-bold flex items-center justify-center">{n}</span>
+                  <span className="w-5 h-5 rounded-full bg-white text-sage-deep text-xs font-bold flex items-center justify-center">{n}</span>
                   <p className="text-xs font-semibold">{t}</p>
                 </div>
-                <p className="text-xs text-blue-100 leading-relaxed">{d}</p>
+                <p className="text-xs text-sage-soft leading-relaxed">{d}</p>
               </div>
             ))}
           </div>
@@ -726,8 +726,8 @@ export default function DataImport() {
               <Upload size={18} className="text-emerald-600" />
             </div>
             <div>
-              <h3 className="text-sm font-bold text-gray-900">まとめて取込み（おすすめ）</h3>
-              <p className="text-xs text-gray-500 mt-0.5">種類を選ぶ必要はありません。全部まとめてどうぞ</p>
+              <h3 className="text-sm font-bold text-ink-strong">まとめて取込み（おすすめ）</h3>
+              <p className="text-xs text-muted mt-0.5">種類を選ぶ必要はありません。全部まとめてどうぞ</p>
             </div>
           </div>
 
@@ -735,16 +735,16 @@ export default function DataImport() {
 
           {/* ダウンロードフォルダの候補ファイル */}
           {inbox && inbox.files.length > 0 && (
-            <div className="border-t border-gray-100 pt-4">
+            <div className="border-t border-bg-alt pt-4">
               <div className="flex items-center gap-2 mb-2">
                 <FolderDown size={15} className="text-emerald-600" />
-                <p className="text-xs font-semibold text-gray-700">
+                <p className="text-xs font-semibold text-sub">
                   ダウンロードフォルダに取込み候補が{inbox.files.length}件見つかりました（ドラッグ不要でそのまま取込めます）
                 </p>
               </div>
-              <div className="bg-gray-50 rounded-lg border border-gray-100 divide-y divide-gray-100 max-h-48 overflow-auto">
+              <div className="bg-bg-alt rounded-lg border border-bg-alt divide-y divide-bg-alt max-h-48 overflow-auto">
                 {inbox.files.map((f) => (
-                  <label key={f.name} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-gray-100">
+                  <label key={f.name} className="flex items-center gap-2.5 px-3 py-2 cursor-pointer hover:bg-bg-alt">
                     <input
                       type="checkbox"
                       checked={inboxSel.has(f.name)}
@@ -759,12 +759,12 @@ export default function DataImport() {
                       className="rounded shrink-0"
                     />
                     <span className={`text-xs rounded px-1.5 py-0.5 shrink-0 ${
-                      f.kind_guess === 'rpp' ? 'bg-blue-100 text-blue-700' : 'bg-violet-100 text-violet-700'
+                      f.kind_guess === 'rpp' ? 'bg-sage-soft text-sage-deep' : 'bg-violet-100 text-violet-700'
                     }`}>
                       {f.kind_guess === 'rpp' ? 'RPP広告' : '商品分析'}
                     </span>
-                    <span className="text-xs text-gray-800 truncate flex-1">{f.name}</span>
-                    <span className="text-xs text-gray-400 shrink-0">{f.modified}</span>
+                    <span className="text-xs text-ink truncate flex-1">{f.name}</span>
+                    <span className="text-xs text-muted shrink-0">{f.modified}</span>
                   </label>
                 ))}
               </div>
@@ -782,16 +782,16 @@ export default function DataImport() {
 
           {/* 取込み結果（ファイルごと） */}
           {autoResults && (
-            <div className="border-t border-gray-100 pt-4">
+            <div className="border-t border-bg-alt pt-4">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-gray-700">
+                <p className="text-xs font-semibold text-sub">
                   取込み結果: 成功 {formatCount(autoResults.ok_count, '件')} / 失敗 {formatCount(autoResults.ng_count, '件')}
                 </p>
-                <button onClick={() => setAutoResults(null)} className="text-xs text-gray-400 hover:text-gray-600">
+                <button onClick={() => setAutoResults(null)} className="text-xs text-muted hover:text-sub">
                   閉じる
                 </button>
               </div>
-              <div className="bg-gray-50 rounded-lg border border-gray-100 divide-y divide-gray-100">
+              <div className="bg-bg-alt rounded-lg border border-bg-alt divide-y divide-bg-alt">
                 {autoResults.results.map((r, i) => (
                   <div key={`${r.source}-${i}`} className="flex items-start gap-2.5 px-3 py-2">
                     {r.ok
@@ -801,16 +801,16 @@ export default function DataImport() {
                       <div className="flex items-center gap-2">
                         <span className={`text-xs rounded px-1.5 py-0.5 shrink-0 ${
                           r.kind === 'rpp'
-                            ? 'bg-blue-100 text-blue-700'
+                            ? 'bg-sage-soft text-sage-deep'
                             : r.kind === 'monthly'
                               ? 'bg-violet-100 text-violet-700'
-                              : 'bg-gray-200 text-gray-600'
+                              : 'bg-line text-sub'
                         }`}>
                           {r.kind === 'rpp' ? 'RPP広告' : r.kind === 'monthly' ? '商品分析' : '判別不可'}
                         </span>
-                        <span className="text-xs font-medium text-gray-800 truncate">{r.source}</span>
+                        <span className="text-xs font-medium text-ink truncate">{r.source}</span>
                       </div>
-                      <p className={`text-xs mt-0.5 ${r.ok ? 'text-gray-500' : 'text-red-500'}`}>{r.message}</p>
+                      <p className={`text-xs mt-0.5 ${r.ok ? 'text-muted' : 'text-red-500'}`}>{r.message}</p>
                     </div>
                   </div>
                 ))}
@@ -822,22 +822,22 @@ export default function DataImport() {
         {/* 個別に取り込む（種類ごと）。初回利用者の主役は上の「まとめて取込み」なので、
             種類を指定する取込みは折りたたみに格納する（2026-08-20 レビュー採用） */}
         <details className="bg-white rounded-xl border shadow-sm group">
-          <summary className="px-5 py-3.5 text-sm font-semibold text-gray-600 cursor-pointer select-none list-none flex items-center justify-between hover:bg-gray-50 rounded-xl group-open:rounded-b-none">
+          <summary className="px-5 py-3.5 text-sm font-semibold text-sub cursor-pointer select-none list-none flex items-center justify-between hover:bg-bg-alt rounded-xl group-open:rounded-b-none">
             <span>個別に取り込む（種類を指定・テキスト貼り付け）</span>
-            <span className="text-xs text-gray-400 group-open:hidden">クリックで展開</span>
-            <span className="text-xs text-gray-400 hidden group-open:inline">閉じる</span>
+            <span className="text-xs text-muted group-open:hidden">クリックで展開</span>
+            <span className="text-xs text-muted hidden group-open:inline">閉じる</span>
           </summary>
           <div className="border-t p-5">
         <div className="grid lg:grid-cols-2 gap-5">
           {/* RPP広告レポート */}
           <div className="bg-white rounded-xl border shadow-sm p-5 space-y-3">
             <div className="flex items-start gap-2.5">
-              <div className="w-9 h-9 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
-                <Megaphone size={18} className="text-blue-600" />
+              <div className="w-9 h-9 rounded-lg bg-sage-soft flex items-center justify-center shrink-0">
+                <Megaphone size={18} className="text-sage-deep" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-gray-900">① RPP広告レポート（週次）</h3>
-                <p className="text-xs text-gray-500 mt-0.5">広告費・ROAS・CPOなどの広告KPIを集計</p>
+                <h3 className="text-sm font-bold text-ink-strong">① RPP広告レポート（週次）</h3>
+                <p className="text-xs text-muted mt-0.5">広告費・ROAS・CPOなどの広告KPIを集計</p>
               </div>
             </div>
 
@@ -849,7 +849,7 @@ export default function DataImport() {
             />
 
             <Collapsible title="楽天RMSでの入手方法" icon={HelpCircle}>
-              <ol className="text-xs text-gray-600 space-y-1.5 pl-1">
+              <ol className="text-xs text-sub space-y-1.5 pl-1">
                 <li>① RMS →「広告・アフィリエイト」→ RPP を開く</li>
                 <li>② レポートダウンロードを選択</li>
                 <li>③ 対象期間（週／月）を指定してCSVを書き出す</li>
@@ -860,10 +860,10 @@ export default function DataImport() {
             <Collapsible title="テキストで貼り付ける（上級者向け）" icon={ClipboardPaste}>
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-muted">
                     {rppText.trim() ? `${rppText.trim().split('\n').length - 1}件` : '必須列: 商品URL / RPP売上 / 広告費 / 注文件数 / クリック数'}
                   </span>
-                  <button onClick={() => setRppText(RPP_TEMPLATE)} className="text-xs text-blue-500 hover:text-blue-700">
+                  <button onClick={() => setRppText(RPP_TEMPLATE)} className="text-xs text-sage-deep hover:text-sage-deep">
                     テンプレートを挿入
                   </button>
                 </div>
@@ -871,16 +871,16 @@ export default function DataImport() {
                   value={rppText}
                   onChange={(e) => setRppText(e.target.value)}
                   placeholder="CSVテキストをここに貼り付け"
-                  className="w-full h-32 text-xs font-mono border border-gray-200 rounded-lg p-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full h-32 text-xs font-mono border border-line rounded-lg p-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-sage-deep"
                 />
-                <label className="flex items-center gap-2 text-xs text-gray-600 cursor-pointer">
+                <label className="flex items-center gap-2 text-xs text-sub cursor-pointer">
                   <input type="checkbox" checked={overwrite} onChange={(e) => setOverwrite(e.target.checked)} className="rounded" />
                   同じ週のデータを上書きする
                 </label>
                 <button
                   onClick={handleRppText}
                   disabled={loading || !rppText.trim()}
-                  className="w-full py-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors"
+                  className="w-full py-2 bg-ink-strong hover:bg-ink disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors"
                 >
                   {loading ? 'インポート中...' : 'インポート実行'}
                 </button>
@@ -895,8 +895,8 @@ export default function DataImport() {
                 <BarChart3 size={18} className="text-violet-600" />
               </div>
               <div>
-                <h3 className="text-sm font-bold text-gray-900">② 商品分析レポート（月次）</h3>
-                <p className="text-xs text-gray-500 mt-0.5">アクセス・CVR・在庫・レビューなど商品別の実績</p>
+                <h3 className="text-sm font-bold text-ink-strong">② 商品分析レポート（月次）</h3>
+                <p className="text-xs text-muted mt-0.5">アクセス・CVR・在庫・レビューなど商品別の実績</p>
               </div>
             </div>
 
@@ -917,7 +917,7 @@ export default function DataImport() {
             )}
 
             <Collapsible title="楽天RMSでの入手方法" icon={HelpCircle}>
-              <ol className="text-xs text-gray-600 space-y-1.5 pl-1">
+              <ol className="text-xs text-sub space-y-1.5 pl-1">
                 <li>① RMS →「データ分析」→ 商品分析 を開く</li>
                 <li>② 対象月を指定してCSVダウンロード</li>
                 <li>③ ファイルはそのままでOK（先頭のヘッダー行は自動スキップ）</li>
@@ -927,17 +927,17 @@ export default function DataImport() {
 
             <Collapsible title="テキストで貼り付ける（旧形式）" icon={ClipboardPaste}>
               <div className="space-y-2">
-                <span className="text-xs text-gray-400">必須列: 商品URL / 年月（YYYY-MM）</span>
+                <span className="text-xs text-muted">必須列: 商品URL / 年月（YYYY-MM）</span>
                 <textarea
                   value={monthlyText}
                   onChange={(e) => setMonthlyText(e.target.value)}
                   placeholder="月次分析データを貼り付け"
-                  className="w-full h-32 text-xs font-mono border border-gray-200 rounded-lg p-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-violet-500"
+                  className="w-full h-32 text-xs font-mono border border-line rounded-lg p-2.5 resize-none focus:outline-none focus:ring-2 focus:ring-violet-500"
                 />
                 <button
                   onClick={handleMonthlyText}
                   disabled={loading || !monthlyText.trim()}
-                  className="w-full py-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors"
+                  className="w-full py-2 bg-ink-strong hover:bg-ink disabled:opacity-40 text-white text-xs font-medium rounded-lg transition-colors"
                 >
                   {loading ? 'インポート中...' : 'インポート実行'}
                 </button>
@@ -952,10 +952,10 @@ export default function DataImport() {
             折りたたみに格納する（削除という危険操作を初期表示から遠ざける意図もある） */}
         {((rppPeriods && (rppPeriods.weekly.length > 0 || rppPeriods.monthly.length > 0)) || monthlyPeriods.length > 0) && (
         <details className="bg-white rounded-xl border shadow-sm group">
-          <summary className="px-5 py-3.5 text-sm font-semibold text-gray-600 cursor-pointer select-none list-none flex items-center justify-between hover:bg-gray-50 rounded-xl group-open:rounded-b-none">
+          <summary className="px-5 py-3.5 text-sm font-semibold text-sub cursor-pointer select-none list-none flex items-center justify-between hover:bg-bg-alt rounded-xl group-open:rounded-b-none">
             <span>取込み済みデータの管理（履歴・個別削除）</span>
-            <span className="text-xs text-gray-400 group-open:hidden">クリックで展開</span>
-            <span className="text-xs text-gray-400 hidden group-open:inline">閉じる</span>
+            <span className="text-xs text-muted group-open:hidden">クリックで展開</span>
+            <span className="text-xs text-muted hidden group-open:inline">閉じる</span>
           </summary>
           <div className="border-t p-5 space-y-5">
 
@@ -964,30 +964,30 @@ export default function DataImport() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <Megaphone size={15} className="text-blue-600" />
-                <h3 className="text-sm font-bold text-gray-900">インポート済みRPPデータ</h3>
+                <Megaphone size={15} className="text-sage-deep" />
+                <h3 className="text-sm font-bold text-ink-strong">インポート済みRPPデータ</h3>
               </div>
               <button
                 onClick={() => navigate('/rpp')}
-                className="flex items-center gap-1 text-xs font-medium text-blue-600 hover:text-blue-800"
+                className="flex items-center gap-1 text-xs font-medium text-sage-deep hover:text-sage-deep"
               >
                 実績を閲覧 <ExternalLink size={12} />
               </button>
             </div>
-            <p className="text-xs text-gray-400">× を押すとその期間のデータだけを削除できます</p>
+            <p className="text-xs text-muted">× を押すとその期間のデータだけを削除できます</p>
             <div className="grid sm:grid-cols-2 gap-3">
               {rppPeriods.weekly.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 mb-1.5">週次</p>
+                  <p className="text-xs font-semibold text-muted mb-1.5">週次</p>
                   <div className="flex flex-wrap gap-1.5">
                     {rppPeriods.weekly.map((p) => (
-                      <span key={`${p.year_month}-${p.date_from}`} className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-100 rounded px-2 py-0.5">
+                      <span key={`${p.year_month}-${p.date_from}`} className="inline-flex items-center gap-1 text-xs bg-sage-soft text-sage-deep border border-sage-soft rounded px-2 py-0.5">
                         {p.date_from} 〜 {p.date_to}
                         <button
                           onClick={() => handleDeleteRppWeek(p.date_from, p.date_to)}
                           disabled={loading}
                           title="この週のデータを削除"
-                          className="text-blue-300 hover:text-red-500 font-bold leading-none disabled:opacity-40"
+                          className="text-sage hover:text-red-500 font-bold leading-none disabled:opacity-40"
                         >
                           ×
                         </button>
@@ -998,7 +998,7 @@ export default function DataImport() {
               )}
               {rppPeriods.monthly.length > 0 && (
                 <div>
-                  <p className="text-xs font-semibold text-gray-500 mb-1.5">月次</p>
+                  <p className="text-xs font-semibold text-muted mb-1.5">月次</p>
                   <div className="flex flex-wrap gap-1.5">
                     {rppPeriods.monthly.map((p) => (
                       <span key={p.year_month} className="inline-flex items-center gap-1 text-xs bg-violet-50 text-violet-700 border border-violet-100 rounded px-2 py-0.5">
@@ -1025,9 +1025,9 @@ export default function DataImport() {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <BarChart3 size={15} className="text-violet-600" />
-              <h3 className="text-sm font-bold text-gray-900">インポート済み商品分析データ（月次）</h3>
+              <h3 className="text-sm font-bold text-ink-strong">インポート済み商品分析データ（月次）</h3>
             </div>
-            <p className="text-xs text-gray-400">× を押すとその月のデータだけを削除できます</p>
+            <p className="text-xs text-muted">× を押すとその月のデータだけを削除できます</p>
             <div className="flex flex-wrap gap-1.5">
               {monthlyPeriods.map((m) => (
                 <span key={m.year_month} className="inline-flex items-center gap-1 text-xs bg-violet-50 text-violet-700 border border-violet-100 rounded px-2 py-0.5">
@@ -1091,7 +1091,7 @@ export default function DataImport() {
                 onClick={handleReset}
                 disabled={loading}
                 title="サンプルだけでなく、取り込んだ実データも削除されます"
-                className="flex items-center gap-1.5 px-3 py-2 border border-gray-300 hover:bg-gray-50 disabled:opacity-50 text-gray-600 text-sm rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-2 border border-line hover:bg-bg-alt disabled:opacity-50 text-sub text-sm rounded-lg transition-colors"
               >
                 <Trash2 size={14} /> 実績データを全削除
               </button>

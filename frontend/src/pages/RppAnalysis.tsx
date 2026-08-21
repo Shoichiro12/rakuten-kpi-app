@@ -52,15 +52,15 @@ function MiniKpiCard({
   const other: RppBasis = basis === '720' ? '12' : '720'
   return (
     <div className="bg-white rounded-xl border shadow-sm p-4 space-y-2">
-      <p className="text-xs font-medium text-gray-500">{label}</p>
+      <p className="text-xs font-medium text-muted">{label}</p>
       <div className="flex items-end gap-3">
         <div>
-          <p className="text-2xl font-bold text-gray-900">{primary}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{BASIS_LABEL[basis]}</p>
+          <p className="text-2xl font-bold text-ink-strong">{primary}</p>
+          <p className="text-xs text-muted mt-0.5">{BASIS_LABEL[basis]}</p>
         </div>
         <div className="pb-1">
-          <p className="text-base font-semibold text-gray-500">{secondary}</p>
-          <p className="text-xs text-gray-400">{BASIS_LABEL[other]}</p>
+          <p className="text-base font-semibold text-muted">{secondary}</p>
+          <p className="text-xs text-muted">{BASIS_LABEL[other]}</p>
         </div>
       </div>
     </div>
@@ -82,7 +82,7 @@ function PeriodSelect<T extends RppWeeklyPeriod | RppMonthlyPeriod>({
   renderValue: (item: T) => string
 }) {
   if (options.length === 0) {
-    return <span className="text-xs text-gray-400 px-2 py-1">データなし</span>
+    return <span className="text-xs text-muted px-2 py-1">データなし</span>
   }
   return (
     <div className="relative">
@@ -92,7 +92,7 @@ function PeriodSelect<T extends RppWeeklyPeriod | RppMonthlyPeriod>({
           const item = options.find((o) => renderValue(o) === e.target.value)
           onChange(e.target.value, item)
         }}
-        className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 cursor-pointer"
+        className="appearance-none pl-3 pr-8 py-1.5 text-sm border border-line rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-sage-deep cursor-pointer"
       >
         {options.map((o) => (
           <option key={renderValue(o)} value={renderValue(o)}>
@@ -102,7 +102,7 @@ function PeriodSelect<T extends RppWeeklyPeriod | RppMonthlyPeriod>({
       </select>
       <ChevronDown
         size={14}
-        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-gray-400"
+        className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 text-muted"
       />
     </div>
   )
@@ -120,7 +120,7 @@ const ISSUE_SHORT: Record<string, string> = {
 
 function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
   if (!diag) {
-    return <span className="text-gray-300">—</span>
+    return <span className="text-line">—</span>
   }
   if (diag.status === 'gated') {
     // ゲート判定（在庫・ページ品質）に該当 → 診断分類の対象外。バッジで理由を示す
@@ -137,7 +137,7 @@ function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
   if (diag.status === 'insufficient_data') {
     return (
       <span
-        className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500"
+        className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-bg-alt text-muted"
         title={diag.phase?.phase === 'new' ? '新商品フェーズのため基準50クリックで判定' : undefined}
       >
         データ不足{diag.phase?.phase === 'new' ? '（新商品）' : ''}
@@ -154,7 +154,7 @@ function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
   }
   const clsBadge = cls && cls.type !== 'good' ? (
     <span
-      className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap ${TONE_BADGE[cls.tone] ?? 'bg-gray-100 text-gray-600'}`}
+      className={`inline-block px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap ${TONE_BADGE[cls.tone] ?? 'bg-bg-alt text-sub'}`}
       title={cls.summary}
     >
       {cls.label}
@@ -186,7 +186,7 @@ function DiagnosisBadges({ diag }: { diag: RppDiagnosisItem | undefined }) {
           {ISSUE_SHORT[i.issue] ?? i.issue}
         </span>
       ))}
-      {rest > 0 && <span className="text-xs text-gray-400">+{rest}</span>}
+      {rest > 0 && <span className="text-xs text-muted">+{rest}</span>}
     </span>
   )
 }
@@ -314,7 +314,7 @@ export default function RppAnalysis() {
           <button
             onClick={loadData}
             disabled={loading}
-            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg hover:bg-gray-50 disabled:opacity-50 transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-line rounded-lg hover:bg-bg-alt disabled:opacity-50 transition-colors"
           >
             <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
             更新
@@ -323,19 +323,19 @@ export default function RppAnalysis() {
       />
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 overflow-auto p-6 bg-gray-50 space-y-5">
+        <div className="flex-1 overflow-auto p-6 bg-bg-alt space-y-5">
 
         {/* タブ + 期間セレクタ */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex bg-white border border-gray-200 rounded-lg p-0.5">
+          <div className="flex bg-white border border-line rounded-lg p-0.5">
             {(['weekly', 'monthly'] as const).map((t) => (
               <button
                 key={t}
                 onClick={() => setPeriodType(t)}
                 className={`px-4 text-sm font-medium rounded-md transition-colors ${TAP_TARGET} ${FOCUS_RING} ${
                   periodType === t
-                    ? 'bg-blue-600 text-white shadow-sm'
-                    : 'text-gray-600 hover:text-gray-900'
+                    ? 'bg-sage-deep text-white shadow-sm'
+                    : 'text-sub hover:text-ink-strong'
                 }`}
               >
                 {t === 'weekly' ? '週次' : '月次'}
@@ -363,8 +363,8 @@ export default function RppAnalysis() {
 
           {/* 表示基準の切替。720h/12hの併記を全カード・全列で繰り返さないための単一の切替点 */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">表示基準</span>
-            <div className="flex bg-white border border-gray-200 rounded-lg p-0.5">
+            <span className="text-xs text-muted">表示基準</span>
+            <div className="flex bg-white border border-line rounded-lg p-0.5">
               {(['720', '12'] as const).map((b) => (
                 <button
                   key={b}
@@ -372,21 +372,21 @@ export default function RppAnalysis() {
                   aria-pressed={basis === b}
                   className={`px-3 text-sm font-medium rounded-md transition-colors ${TAP_TARGET} ${FOCUS_RING} ${
                     basis === b
-                      ? 'bg-gray-900 text-white shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
+                      ? 'bg-ink-strong text-white shadow-sm'
+                      : 'text-sub hover:text-ink-strong'
                   }`}
                 >
                   {BASIS_LABEL[b]}
                 </button>
               ))}
             </div>
-            <span className="text-xs text-gray-400 hidden lg:inline">
+            <span className="text-xs text-muted hidden lg:inline">
               クリック後{basis === '720' ? '720時間（30日）' : '12時間'}以内の売上で集計
             </span>
           </div>
 
           {summary && (
-            <span className="text-xs text-gray-400 ml-auto">
+            <span className="text-xs text-muted ml-auto">
               {summary.count.toLocaleString()}件のデータ
             </span>
           )}
@@ -402,9 +402,9 @@ export default function RppAnalysis() {
         {/* データなし（periods未登録） */}
         {!loading && !hasPeriodData && (
           <div className="bg-white rounded-xl border shadow-sm p-12 text-center">
-            <BarChart2 size={40} className="mx-auto mb-4 text-gray-200" />
-            <p className="text-sm font-medium text-gray-500">RPPデータがありません</p>
-            <p className="text-xs text-gray-400 mt-1">
+            <BarChart2 size={40} className="mx-auto mb-4 text-line" />
+            <p className="text-sm font-medium text-muted">RPPデータがありません</p>
+            <p className="text-xs text-muted mt-1">
               データ取込みページからRPP広告レポートをインポートしてください
             </p>
           </div>
@@ -416,12 +416,12 @@ export default function RppAnalysis() {
             {/* KPIカード 4枚 */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="bg-white rounded-xl border shadow-sm p-4">
-                <p className="text-xs font-medium text-gray-500">広告費</p>
-                <p className="text-2xl font-bold text-gray-900 mt-2">
+                <p className="text-xs font-medium text-muted">広告費</p>
+                <p className="text-2xl font-bold text-ink-strong mt-2">
                   {s?.total_ad_cost != null ? formatCurrency(s.total_ad_cost) : 'データなし'}
                 </p>
                 {s?.avg_cpc != null && (
-                  <p className="text-xs text-gray-400 mt-1">平均CPC: {formatCurrency(s.avg_cpc)}</p>
+                  <p className="text-xs text-muted mt-1">平均CPC: {formatCurrency(s.avg_cpc)}</p>
                 )}
               </div>
               <MiniKpiCard
@@ -446,13 +446,13 @@ export default function RppAnalysis() {
 
             {/* 売上カード（選択基準を主・もう一方は比較行に退避。同格2枚には戻さない） */}
             <div className="bg-white rounded-xl border shadow-sm p-4 max-w-md">
-              <p className="text-xs font-medium text-gray-500">
+              <p className="text-xs font-medium text-muted">
                 売上（{BASIS_LABEL[basis]}基準）
               </p>
-              <p className="text-2xl font-bold text-gray-900 mt-2">
+              <p className="text-2xl font-bold text-ink-strong mt-2">
                 {grossV.main != null ? formatCurrency(grossV.main) : 'データなし'}
               </p>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-muted mt-1">
                 {BASIS_LABEL[basis === '720' ? '12' : '720']}基準: {grossV.sub != null ? formatCurrency(grossV.sub) : '—'}
               </p>
             </div>
@@ -460,7 +460,7 @@ export default function RppAnalysis() {
             {/* 棒グラフ（広告費上位10件） */}
             {chartData.length > 0 && (
               <div className="bg-white rounded-xl border shadow-sm p-5">
-                <p className="text-sm font-bold text-gray-900 mb-4">広告費上位商品（最大10件）</p>
+                <p className="text-sm font-bold text-ink-strong mb-4">広告費上位商品（最大10件）</p>
                 <ResponsiveContainer width="100%" height={260}>
                   <BarChart
                     data={chartData}
@@ -500,12 +500,12 @@ export default function RppAnalysis() {
 
             {/* 商品別テーブル */}
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-              <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
-                <p className="text-sm font-bold text-gray-900">商品別実績</p>
+              <div className="px-5 py-3 border-b border-bg-alt flex items-center justify-between">
+                <p className="text-sm font-bold text-ink-strong">商品別実績</p>
                 <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-500">行クリックで診断を表示</span>
+                  <span className="text-xs text-muted">行クリックで診断を表示</span>
                   {salesTotal > salesItems.length && (
-                    <span className="text-xs text-gray-400">
+                    <span className="text-xs text-muted">
                       {salesItems.length}件表示 / 全{salesTotal}件
                     </span>
                   )}
@@ -513,7 +513,7 @@ export default function RppAnalysis() {
               </div>
 
               {salesItems.length === 0 && !loading && (
-                <div className="px-5 py-10 text-center text-sm text-gray-400">データなし</div>
+                <div className="px-5 py-10 text-center text-sm text-muted">データなし</div>
               )}
 
               {salesItems.length > 0 && (
@@ -523,7 +523,7 @@ export default function RppAnalysis() {
                       {/* 列は選択基準のみ表示する（720h/12hの二重列には戻さない。
                           もう一方の基準は上の切替で見る）。診断列は商品名の直後＝判断に使う列を
                           識別列の直後に置く規約（4章） */}
-                      <tr className="bg-gray-50 text-left text-gray-500 font-medium">
+                      <tr className="bg-bg-alt text-left text-muted font-medium">
                         <SortableTh label="商品名" sortKey="product_name" sort={sort} align="left" className="px-1" />
                         <th className="px-4 py-2.5 whitespace-nowrap">診断</th>
                         <SortableTh label="広告費（円）" sortKey="ad_cost" sort={sort} className="px-1" />
@@ -534,7 +534,7 @@ export default function RppAnalysis() {
                         <SortableTh label={`CV ${BASIS_LABEL[basis]}（件）`} sortKey={`cv_${basis}`} sort={sort} className="px-1" />
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-50">
+                    <tbody className="divide-y divide-bg-alt">
                       {sort.apply(salesItems).map((item) => {
                         const diag = item.item_code ? diagByCode.get(item.item_code) : undefined
                         const isSelected = item.item_code != null && item.item_code === selectedCode
@@ -543,15 +543,15 @@ export default function RppAnalysis() {
                           key={item.id}
                           onClick={() => { if (item.item_code && diag) setSelectedCode(item.item_code) }}
                           className={`transition-colors ${
-                            isSelected ? 'bg-blue-50' : 'hover:bg-gray-50'
+                            isSelected ? 'bg-sage-soft' : 'hover:bg-bg-alt'
                           } ${item.item_code && diag ? 'cursor-pointer' : ''}`}
                         >
                           <td className="px-4 py-2.5 max-w-[180px]">
-                            <p className="font-medium text-gray-800 truncate">
+                            <p className="font-medium text-ink truncate">
                               {item.product_name || item.item_code || '—'}
                             </p>
                             {item.item_code && item.product_name && (
-                              <p className="text-gray-400 truncate">{item.item_code}</p>
+                              <p className="text-muted truncate">{item.item_code}</p>
                             )}
                           </td>
                           <td className="px-4 py-2.5 whitespace-nowrap">
@@ -571,10 +571,10 @@ export default function RppAnalysis() {
                               <DiagnosisBadges diag={diag} />
                             )}
                           </td>
-                          <td className="px-4 py-2.5 text-right font-medium text-gray-900 whitespace-nowrap tabular-nums">
+                          <td className="px-4 py-2.5 text-right font-medium text-ink-strong whitespace-nowrap tabular-nums">
                             {rppNum(item.ad_cost)}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap tabular-nums">
+                          <td className="px-4 py-2.5 text-right text-sub whitespace-nowrap tabular-nums">
                             {rppNum(pick(item, 'gross'))}
                           </td>
                           <td className="px-4 py-2.5 text-right whitespace-nowrap tabular-nums">
@@ -583,20 +583,20 @@ export default function RppAnalysis() {
                                 className={
                                   // 色を付けるのはしきい値を割った行だけ。300%以上を緑にすると
                                   // 全行が色付きになり、何も目立たなくなる（規約 4）
-                                  (pick(item, 'roas') ?? 0) < 100 ? 'text-danger' : 'text-gray-700'
+                                  (pick(item, 'roas') ?? 0) < 100 ? 'text-danger' : 'text-sub'
                                 }
                               >
                                 {pick(item, 'roas')!.toFixed(1)}
                               </span>
                             ) : '—'}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap tabular-nums">
+                          <td className="px-4 py-2.5 text-right text-sub whitespace-nowrap tabular-nums">
                             {rppNum(pick(item, 'cpo'))}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap tabular-nums">
+                          <td className="px-4 py-2.5 text-right text-sub whitespace-nowrap tabular-nums">
                             {rppPct(pick(item, 'cvr'), 2)}
                           </td>
-                          <td className="px-4 py-2.5 text-right text-gray-700 whitespace-nowrap tabular-nums">
+                          <td className="px-4 py-2.5 text-right text-sub whitespace-nowrap tabular-nums">
                             {rppNum(pick(item, 'cv'))}
                           </td>
                         </tr>
@@ -608,8 +608,8 @@ export default function RppAnalysis() {
               )}
 
               {loading && (
-                <div className="px-5 py-8 text-center text-sm text-gray-400">
-                  <RefreshCw size={20} className="animate-spin mx-auto mb-2 text-gray-300" />
+                <div className="px-5 py-8 text-center text-sm text-muted">
+                  <RefreshCw size={20} className="animate-spin mx-auto mb-2 text-line" />
                   読み込み中...
                 </div>
               )}

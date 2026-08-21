@@ -365,7 +365,7 @@ export default function MasterSettings() {
 
   const confidenceBadge = (c: 'high' | 'low') => (
     <span className={`ml-1 text-xs px-1 py-0.5 rounded font-medium ${
-      c === 'high' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'
+      c === 'high' ? 'bg-sage-soft text-sage-deep' : 'bg-bg-alt text-muted'
     }`}>
       {c === 'high' ? '高信頼' : '要確認'}
     </span>
@@ -401,7 +401,7 @@ export default function MasterSettings() {
           ) : (
             <button
               onClick={recalcAll}
-              className="flex items-center gap-2 px-3 py-2 bg-white border text-gray-700 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors"
+              className="flex items-center gap-2 px-3 py-2 bg-white border text-sub hover:bg-bg-alt text-sm font-medium rounded-lg transition-colors"
             >
               <RefreshCw size={14} />原価を全再計算
             </button>
@@ -409,7 +409,7 @@ export default function MasterSettings() {
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 bg-gray-50">
+      <div className="flex-1 overflow-auto p-6 bg-bg-alt">
         {/* 幅の上限は付けない（ダッシュボード・GAP・商品別KPI・RPPと同じ全幅）。
             列数の多いテーブルが画面幅を使い切れるようにするため。max-w-* を戻さないこと */}
         <div className="space-y-6">
@@ -436,7 +436,7 @@ export default function MasterSettings() {
                 {highCount > 0 && (
                   <button
                     onClick={approveAllHigh}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition-colors"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-sage-deep hover:bg-sage-deep text-white text-xs font-medium rounded-lg transition-colors"
                   >
                     <Check size={13} />高信頼の提案をまとめて承認（{highCount}）
                   </button>
@@ -445,17 +445,17 @@ export default function MasterSettings() {
 
               {suggestOpen && (
                 <>
-                  <p className="px-4 py-2 text-xs text-gray-400 border-b bg-gray-50/60">
+                  <p className="px-4 py-2 text-xs text-muted border-b bg-bg-alt/60">
                     取込で自動生成された商品のうち、カテゴリ・原価率が未確定のものです。「要確認」（低信頼）の提案は一括承認の対象外で、個別承認・編集のみになります。
                   </p>
-                  <ul className="divide-y divide-gray-100">
+                  <ul className="divide-y divide-bg-alt">
                     {suggestions.map((s) => (
                       <li key={s.management_no} className="px-4 py-3">
                         {editingSuggestId === s.management_no ? (
                           <div className="flex items-center gap-2 flex-wrap">
                             <div className="min-w-[150px]">
-                              <p className="text-sm font-medium text-gray-900 leading-tight">{s.product_name || '（名称未設定）'}</p>
-                              <p className="text-xs text-gray-400 font-mono">{s.management_no}</p>
+                              <p className="text-sm font-medium text-ink-strong leading-tight">{s.product_name || '（名称未設定）'}</p>
+                              <p className="text-xs text-muted font-mono">{s.management_no}</p>
                             </div>
                             <GenrePicker
                               tree={genreTree}
@@ -468,42 +468,42 @@ export default function MasterSettings() {
                                 type="number" min={0} max={100} step={1}
                                 value={editSuggest.cost_pct}
                                 onChange={(e) => setEditSuggest((p) => ({ ...p, cost_pct: Number(e.target.value) }))}
-                                className="w-16 text-right tabular-nums text-xs border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-16 text-right tabular-nums text-xs border border-line rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-sage-deep"
                               />
-                              <span className="text-gray-400 text-xs">%</span>
+                              <span className="text-muted text-xs">%</span>
                             </span>
                             <div className="ml-auto flex items-center gap-1">
-                              <button onClick={() => confirmEditSuggest(s)} className="flex items-center gap-1 px-2.5 py-1 bg-gray-900 hover:bg-gray-800 text-white text-xs rounded"><Check size={13} />確定</button>
-                              <button onClick={() => setEditingSuggestId(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded" title="取消"><X size={15} /></button>
+                              <button onClick={() => confirmEditSuggest(s)} className="flex items-center gap-1 px-2.5 py-1 bg-ink-strong hover:bg-ink text-white text-xs rounded"><Check size={13} />確定</button>
+                              <button onClick={() => setEditingSuggestId(null)} className="p-1.5 text-muted hover:bg-bg-alt rounded" title="取消"><X size={15} /></button>
                             </div>
                           </div>
                         ) : (
                           <div className="flex items-center gap-3 flex-wrap">
                             <div className="min-w-[150px]">
-                              <p className="text-sm font-medium text-gray-900 leading-tight">{s.product_name || '（名称未設定）'}</p>
-                              <p className="text-xs text-gray-400 font-mono">{s.management_no}</p>
+                              <p className="text-sm font-medium text-ink-strong leading-tight">{s.product_name || '（名称未設定）'}</p>
+                              <p className="text-xs text-muted font-mono">{s.management_no}</p>
                             </div>
                             <div className="flex-1 min-w-[170px] text-xs">
-                              <span className="text-gray-400">カテゴリ: </span>
+                              <span className="text-muted">カテゴリ: </span>
                               {s.current.category_id != null ? (
-                                <span className="text-gray-400">設定済み</span>
+                                <span className="text-muted">設定済み</span>
                               ) : s.suggested.category ? (
-                                <span className="text-gray-700">
+                                <span className="text-sub">
                                   {s.suggested.category.label}{confidenceBadge(s.suggested.category.confidence)}
-                                  <span className="text-gray-400 ml-1">{s.suggested.category.basis}</span>
+                                  <span className="text-muted ml-1">{s.suggested.category.basis}</span>
                                 </span>
                               ) : (
                                 <span className="text-amber-600">提案なし（新規カテゴリ作成が必要）</span>
                               )}
                             </div>
                             <div className="min-w-[150px] text-xs">
-                              <span className="text-gray-400">原価率: </span>
+                              <span className="text-muted">原価率: </span>
                               {s.current.cost_rate != null ? (
-                                <span className="text-gray-400">設定済み {Math.round(s.current.cost_rate * 100)}%</span>
+                                <span className="text-muted">設定済み {Math.round(s.current.cost_rate * 100)}%</span>
                               ) : (
-                                <span className="text-gray-700">
+                                <span className="text-sub">
                                   {Math.round(s.suggested.cost_rate.suggested_rate * 100)}%{confidenceBadge(s.suggested.cost_rate.confidence)}
-                                  <span className="text-gray-400 ml-1">{s.suggested.cost_rate.basis}</span>
+                                  <span className="text-muted ml-1">{s.suggested.cost_rate.basis}</span>
                                 </span>
                               )}
                             </div>
@@ -511,7 +511,7 @@ export default function MasterSettings() {
                               <button onClick={() => approveOne(s)} className="flex items-center gap-1 px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded transition-colors">
                                 <Check size={13} />承認
                               </button>
-                              <button onClick={() => startEditSuggest(s)} className="flex items-center gap-1 px-2.5 py-1 border text-gray-600 hover:bg-gray-50 text-xs rounded transition-colors">
+                              <button onClick={() => startEditSuggest(s)} className="flex items-center gap-1 px-2.5 py-1 border text-sub hover:bg-bg-alt text-xs rounded transition-colors">
                                 <Pencil size={12} />編集して確定
                               </button>
                             </div>
@@ -528,52 +528,52 @@ export default function MasterSettings() {
           {/* 店舗設定 */}
           {/* 3列グリッド＋w-fullの入力欄。全幅だと店舗名の入力欄だけが極端に長くなる（CLAUDE.md「画面幅の規約」） */}
           <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">店舗設定（デフォルト値）</h3>
+            <h3 className="text-sm font-semibold text-sub mb-4">店舗設定（デフォルト値）</h3>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <label className="text-xs text-gray-500">店舗名</label>
+                <label className="text-xs text-muted">店舗名</label>
                 <input
                   value={shopName}
                   onChange={(e) => setShopName(e.target.value)}
-                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 w-full border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500">デフォルト原価率（%）</label>
+                <label className="text-xs text-muted">デフォルト原価率（%）</label>
                 <input
                   type="number" min={0} max={100} step={1}
                   value={costPct}
                   onChange={(e) => setCostPct(Number(e.target.value))}
-                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 w-full border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500">デフォルト経費率（%）</label>
+                <label className="text-xs text-muted">デフォルト経費率（%）</label>
                 <input
                   type="number" min={0} max={100} step={1}
                   value={expensePct}
                   onChange={(e) => setExpensePct(Number(e.target.value))}
-                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 w-full border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep"
                 />
               </div>
               <div>
-                <label className="text-xs text-gray-500">発注アラート閾値（日）</label>
+                <label className="text-xs text-muted">発注アラート閾値（日）</label>
                 <input
                   type="number" min={1} max={120} step={1}
                   value={restockDays}
                   onChange={(e) => setRestockDays(Number(e.target.value))}
-                  className="mt-1 w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="mt-1 w-full border border-line rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep"
                 />
               </div>
             </div>
-            <p className="text-xs text-gray-400 mt-3">
+            <p className="text-xs text-muted mt-3">
               デフォルト原価率は、商品別に率が未設定の商品へ適用されます。変更するとRPP売上原価が再計算されます。
               発注アラート閾値は、在庫がこの日数分を切った商品を「在庫僅少」として先読み発注に出す基準です。
             </p>
             <div className="mt-4">
               <button
                 onClick={saveShop}
-                className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition-colors"
+                className="flex items-center gap-2 px-4 py-2 bg-ink-strong hover:bg-ink text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <Save size={15} />店舗設定を保存
               </button>
@@ -584,27 +584,27 @@ export default function MasterSettings() {
           <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b flex items-center justify-between gap-3 flex-wrap">
               <div className="flex items-center gap-3 flex-wrap">
-                <h3 className="text-sm font-semibold text-gray-700">商品マスタ</h3>
+                <h3 className="text-sm font-semibold text-sub">商品マスタ</h3>
                 {/* 検索＋ページング（2026-08-20）。SKUが多い店舗で縦に伸びすぎないようにする */}
                 <input
                   type="text"
                   value={masterKw}
                   onChange={(e) => { setMasterKw(e.target.value); setMasterPage(1) }}
                   placeholder="管理番号・商品名・ジャンルで検索"
-                  className="w-64 text-sm border border-gray-200 rounded px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-64 text-sm border border-line rounded px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-sage-deep"
                 />
-                <span className="text-xs text-gray-400 tabular-nums">
+                <span className="text-xs text-muted tabular-nums">
                   {visibleRows.length.toLocaleString()}件{masterKw ? `（全${activeFiltered.length.toLocaleString()}件から絞り込み）` : ''}
                 </span>
               </div>
               <div className="flex items-center gap-3">
                 <button
                   onClick={exportCsv}
-                  className="flex items-center gap-1.5 text-xs text-gray-600 border rounded-lg px-2.5 py-1.5 hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-1.5 text-xs text-sub border rounded-lg px-2.5 py-1.5 hover:bg-bg-alt transition-colors"
                 >
                   <Download size={13} />CSVエクスポート
                 </button>
-                <label className="flex items-center gap-1.5 text-xs text-gray-600 border rounded-lg px-2.5 py-1.5 hover:bg-gray-50 cursor-pointer transition-colors">
+                <label className="flex items-center gap-1.5 text-xs text-sub border rounded-lg px-2.5 py-1.5 hover:bg-bg-alt cursor-pointer transition-colors">
                   <Upload size={13} />CSVインポート
                   <input
                     type="file"
@@ -613,15 +613,15 @@ export default function MasterSettings() {
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) importCsv(f); e.target.value = '' }}
                   />
                 </label>
-                <label className="flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
-                  <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="rounded border-gray-300" />
+                <label className="flex items-center gap-1.5 text-xs text-sub cursor-pointer select-none">
+                  <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="rounded border-line" />
                   廃盤も表示
                 </label>
               </div>
             </div>
 
             {!loading && visibleRows.length === 0 && (
-              <div className="py-12 text-center text-sm text-gray-400">
+              <div className="py-12 text-center text-sm text-muted">
                 {masterKw
                   ? '検索条件に一致する商品がありません。'
                   : '商品マスタがまだありません。CSVを取込むか backfill スクリプトで生成してください。'}
@@ -631,7 +631,7 @@ export default function MasterSettings() {
             {visibleRows.length > 0 && (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500">
+                  <thead className="bg-bg-alt text-xs text-muted">
                     <tr>
                       <SortableTh label="管理番号" sortKey="management_no" sort={masterSort} align="left" className="pl-1" />
                       <SortableTh label="商品名" sortKey="product_name" sort={masterSort} align="left" />
@@ -641,15 +641,15 @@ export default function MasterSettings() {
                       <th className="px-3 py-2.5 text-center">状態</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-bg-alt">
                     {pagedRows.map((r) => (
-                      <tr key={r.management_no} className={r.is_active ? '' : 'bg-gray-50/60'}>
-                        <td className="px-4 py-2 text-gray-500 font-mono text-xs whitespace-nowrap">{r.management_no}</td>
+                      <tr key={r.management_no} className={r.is_active ? '' : 'bg-bg-alt/60'}>
+                        <td className="px-4 py-2 text-muted font-mono text-xs whitespace-nowrap">{r.management_no}</td>
                         <td className="px-3 py-2">
                           <input
                             defaultValue={r.product_name ?? ''}
                             onBlur={(e) => saveName(r, e.target.value.trim())}
-                            className="w-full min-w-[140px] bg-transparent border border-transparent hover:border-gray-200 focus:border-blue-400 rounded px-1.5 py-1 focus:outline-none"
+                            className="w-full min-w-[140px] bg-transparent border border-transparent hover:border-line focus:border-sage rounded px-1.5 py-1 focus:outline-none"
                           />
                         </td>
                         <td className="px-3 py-2">
@@ -666,10 +666,10 @@ export default function MasterSettings() {
                               type="number" min={0} max={100} step={1}
                               defaultValue={Math.round(r.cost_rate * 100)}
                               onBlur={(e) => saveRate(r, Number(e.target.value))}
-                              className="w-16 text-right tabular-nums border border-gray-200 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-16 text-right tabular-nums border border-line rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-sage-deep"
                             />
-                            <span className="text-gray-400 text-xs">%</span>
-                            <span className={`text-xs px-1 py-0.5 rounded ${r.cost_source === 'product' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-500'}`}>
+                            <span className="text-muted text-xs">%</span>
+                            <span className={`text-xs px-1 py-0.5 rounded ${r.cost_source === 'product' ? 'bg-sage-soft text-sage-deep' : 'bg-bg-alt text-muted'}`}>
                               {r.cost_source === 'product' ? '個別' : '既定'}
                             </span>
                           </span>
@@ -678,14 +678,14 @@ export default function MasterSettings() {
                           {/* ゲート用状態（診断・提案の前提。設計ドキュメント2-A / 3-A） */}
                           <div className="flex flex-col gap-1 min-w-[180px]">
                             <span className="inline-flex items-center gap-1.5">
-                              <span className="text-xs text-gray-400 w-14 shrink-0">フェーズ</span>
+                              <span className="text-xs text-muted w-14 shrink-0">フェーズ</span>
                               <select
                                 value={r.phase_override ?? 'auto'}
                                 onChange={(e) => {
                                   const v = e.target.value
                                   saveGateState(r, { phase_override: v === 'auto' ? null : (v as 'new' | 'established') })
                                 }}
-                                className="text-xs border border-gray-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="text-xs border border-line rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-2 focus:ring-sage-deep"
                                 title="新商品は最初の3ヶ月を様子見期間とし、RPP診断の母数基準を50クリックに引き上げます。自動=発売月から判定"
                               >
                                 <option value="auto">自動（発売+3ヶ月）</option>
@@ -696,19 +696,19 @@ export default function MasterSettings() {
                                 type="month"
                                 value={r.launch_month ?? ''}
                                 onChange={(e) => saveGateState(r, { launch_month: e.target.value || null })}
-                                className="text-xs border border-gray-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="text-xs border border-line rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-2 focus:ring-sage-deep"
                                 title="発売月。未入力は実績データの初出月から自動推定"
                               />
                             </span>
                             <span className="inline-flex items-center gap-1.5">
-                              <span className="text-xs text-gray-400 w-14 shrink-0">ページ</span>
+                              <span className="text-xs text-muted w-14 shrink-0">ページ</span>
                               <select
                                 value={r.page_ready === null ? 'unknown' : r.page_ready ? 'ready' : 'not_ready'}
                                 onChange={(e) => {
                                   const v = e.target.value
                                   saveGateState(r, { page_ready: v === 'unknown' ? null : v === 'ready' })
                                 }}
-                                className="text-xs border border-gray-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="text-xs border border-line rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-2 focus:ring-sage-deep"
                                 title="「未完成」にすると、ページが完成するまで広告関連の提案を保留し「まずページ完成」を提案します"
                               >
                                 <option value="unknown">未回答</option>
@@ -716,14 +716,14 @@ export default function MasterSettings() {
                                 <option value="not_ready">未完成</option>
                               </select>
                               <label
-                                className="inline-flex items-center gap-1 text-xs text-gray-500 cursor-pointer select-none"
+                                className="inline-flex items-center gap-1 text-xs text-muted cursor-pointer select-none"
                                 title="新商品の低ROASを意図的な投資として許容する場合にチェック。診断の数値は変わらず、表示が注記付きになります"
                               >
                                 <input
                                   type="checkbox"
                                   checked={r.investment_intent === true}
                                   onChange={(e) => saveGateState(r, { investment_intent: e.target.checked ? true : null })}
-                                  className="rounded border-gray-300"
+                                  className="rounded border-line"
                                 />
                                 投資許容
                               </label>
@@ -734,7 +734,7 @@ export default function MasterSettings() {
                           <button
                             onClick={() => toggleActive(r)}
                             className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                              r.is_active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-200 text-gray-500 hover:bg-gray-300'
+                              r.is_active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-line text-muted hover:bg-line'
                             }`}
                           >
                             {r.is_active ? '稼働中' : '廃盤'}
@@ -749,23 +749,23 @@ export default function MasterSettings() {
 
             {/* ページャ（50件/ページ）。1ページに収まるときは出さない */}
             {visibleRows.length > MASTER_PAGE_SIZE && (
-              <div className="px-4 py-2.5 border-t bg-gray-50/60 flex items-center justify-between gap-3 flex-wrap">
-                <span className="text-xs text-gray-500 tabular-nums">
+              <div className="px-4 py-2.5 border-t bg-bg-alt/60 flex items-center justify-between gap-3 flex-wrap">
+                <span className="text-xs text-muted tabular-nums">
                   {((safePage - 1) * MASTER_PAGE_SIZE + 1).toLocaleString()}〜{Math.min(safePage * MASTER_PAGE_SIZE, visibleRows.length).toLocaleString()}件 / 全{visibleRows.length.toLocaleString()}件
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => setMasterPage((p) => Math.max(1, p - 1))}
                     disabled={safePage <= 1}
-                    className="px-2.5 py-1 text-xs border border-gray-200 rounded bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="px-2.5 py-1 text-xs border border-line rounded bg-white hover:bg-bg-alt disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     ← 前へ
                   </button>
-                  <span className="text-xs text-gray-500 tabular-nums px-1">{safePage} / {totalPages}</span>
+                  <span className="text-xs text-muted tabular-nums px-1">{safePage} / {totalPages}</span>
                   <button
                     onClick={() => setMasterPage((p) => Math.min(totalPages, p + 1))}
                     disabled={safePage >= totalPages}
-                    className="px-2.5 py-1 text-xs border border-gray-200 rounded bg-white hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    className="px-2.5 py-1 text-xs border border-line rounded bg-white hover:bg-bg-alt disabled:opacity-40 disabled:cursor-not-allowed"
                   >
                     次へ →
                   </button>
@@ -773,19 +773,19 @@ export default function MasterSettings() {
               </div>
             )}
           </div>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-muted">
             原価率は「商品別（個別）→ 店舗デフォルト（既定）」の順で適用されます。値を変更するとRPP売上原価が自動で再計算され、GP・ROI・Rev等に反映されます。
           </p>
 
           {/* カテゴリ管理 */}
           <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b">
-              <h3 className="text-sm font-semibold text-gray-700">カテゴリ管理</h3>
-              <p className="text-xs text-gray-400 mt-0.5">大分類 &gt; 中分類 &gt; 小分類。取込みで自動生成されたカテゴリの整理や、手動追加ができます。</p>
+              <h3 className="text-sm font-semibold text-sub">カテゴリ管理</h3>
+              <p className="text-xs text-muted mt-0.5">大分類 &gt; 中分類 &gt; 小分類。取込みで自動生成されたカテゴリの整理や、手動追加ができます。</p>
             </div>
 
             {/* 新規作成フォーム（楽天ジャンルマスタから選択＋自由入力） */}
-            <div className="px-4 py-3 border-b bg-gray-50 flex flex-wrap items-center gap-2">
+            <div className="px-4 py-3 border-b bg-bg-alt flex flex-wrap items-center gap-2">
               <GenrePicker
                 tree={genreTree}
                 value={newCat}
@@ -793,35 +793,35 @@ export default function MasterSettings() {
               />
               <button
                 onClick={addCategory}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-ink-strong hover:bg-ink text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <Plus size={14} />追加
               </button>
             </div>
 
             {categories.length === 0 ? (
-              <div className="py-8 text-center text-sm text-gray-400">カテゴリがまだありません</div>
+              <div className="py-8 text-center text-sm text-muted">カテゴリがまだありません</div>
             ) : (
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-bg-alt">
                 {categories.map((c) => (
                   <li key={c.id} className="px-4 py-2.5 flex items-center gap-2">
                     {editingCatId === c.id ? (
                       <>
-                        <input value={editCat.genre_u1} onChange={(e) => setEditCat({ ...editCat, genre_u1: e.target.value })} placeholder="大分類" className="w-28 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        <span className="text-gray-300">&gt;</span>
-                        <input value={editCat.genre_u2} onChange={(e) => setEditCat({ ...editCat, genre_u2: e.target.value })} placeholder="中分類" className="w-28 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                        <span className="text-gray-300">&gt;</span>
-                        <input value={editCat.genre_u3} onChange={(e) => setEditCat({ ...editCat, genre_u3: e.target.value })} placeholder="小分類" className="w-28 border border-gray-200 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+                        <input value={editCat.genre_u1} onChange={(e) => setEditCat({ ...editCat, genre_u1: e.target.value })} placeholder="大分類" className="w-28 border border-line rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep" />
+                        <span className="text-line">&gt;</span>
+                        <input value={editCat.genre_u2} onChange={(e) => setEditCat({ ...editCat, genre_u2: e.target.value })} placeholder="中分類" className="w-28 border border-line rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep" />
+                        <span className="text-line">&gt;</span>
+                        <input value={editCat.genre_u3} onChange={(e) => setEditCat({ ...editCat, genre_u3: e.target.value })} placeholder="小分類" className="w-28 border border-line rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep" />
                         <div className="ml-auto flex items-center gap-1">
                           <button onClick={saveEditCat} className="p-1.5 text-green-600 hover:bg-green-50 rounded" title="保存"><Check size={15} /></button>
-                          <button onClick={() => setEditingCatId(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded" title="取消"><X size={15} /></button>
+                          <button onClick={() => setEditingCatId(null)} className="p-1.5 text-muted hover:bg-bg-alt rounded" title="取消"><X size={15} /></button>
                         </div>
                       </>
                     ) : (
                       <>
-                        <span className="text-sm text-gray-800">{categoryPath(c)}</span>
+                        <span className="text-sm text-ink">{categoryPath(c)}</span>
                         <div className="ml-auto flex items-center gap-1">
-                          <button onClick={() => startEditCat(c)} className="p-1.5 text-gray-500 hover:bg-gray-100 rounded" title="リネーム"><Pencil size={14} /></button>
+                          <button onClick={() => startEditCat(c)} className="p-1.5 text-muted hover:bg-bg-alt rounded" title="リネーム"><Pencil size={14} /></button>
                           <button onClick={() => removeCategory(c)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="削除"><Trash2 size={14} /></button>
                         </div>
                       </>
@@ -835,15 +835,15 @@ export default function MasterSettings() {
           {/* ジャンル別ベンチマーク手入力（アクション提案ロジック 3-B / 3-B'） */}
           <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b">
-              <h3 className="text-sm font-semibold text-gray-700">ジャンル別ベンチマーク（RMS表示値の手入力）</h3>
-              <p className="text-xs text-gray-400 mt-0.5">
+              <h3 className="text-sm font-semibold text-sub">ジャンル別ベンチマーク（RMS表示値の手入力）</h3>
+              <p className="text-xs text-muted mt-0.5">
                 楽天RMSに表示される「同ジャンル・同規模店舗のベンチマーク値」を入力すると、診断の比較基準として最優先で使われます。
                 未入力のジャンルは「自店の同ジャンル集計 → 汎用ベースライン（ページCVR 7% / 広告CVR 3〜5% / CTR 2%）」の順で自動的に代用されます。
               </p>
             </div>
 
             {/* 入力フォーム */}
-            <div className="px-4 py-3 border-b bg-gray-50 flex flex-wrap items-center gap-2">
+            <div className="px-4 py-3 border-b bg-bg-alt flex flex-wrap items-center gap-2">
               <GenrePicker
                 tree={genreTree}
                 value={newBench.genre}
@@ -853,7 +853,7 @@ export default function MasterSettings() {
               <select
                 value={newBench.metric}
                 onChange={(e) => setNewBench((p) => ({ ...p, metric: e.target.value as 'page_cvr' | 'ad_cvr' | 'ctr' }))}
-                className="text-xs border border-gray-200 rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="text-xs border border-line rounded px-2 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-sage-deep"
               >
                 <option value="page_cvr">ページ全体CVR</option>
                 <option value="ad_cvr">RPP広告経由CVR</option>
@@ -865,38 +865,38 @@ export default function MasterSettings() {
                   value={newBench.value}
                   onChange={(e) => setNewBench((p) => ({ ...p, value: e.target.value }))}
                   placeholder="7.52"
-                  className="w-20 text-right tabular-nums text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-20 text-right tabular-nums text-xs border border-line rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sage-deep"
                 />
-                <span className="text-gray-400 text-xs">%</span>
+                <span className="text-muted text-xs">%</span>
               </span>
               <input
                 value={newBench.memo}
                 onChange={(e) => setNewBench((p) => ({ ...p, memo: e.target.value }))}
                 placeholder="出典メモ（例: RMS 2026-07 表示値）"
-                className="w-52 text-xs border border-gray-200 rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-52 text-xs border border-line rounded px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-sage-deep"
               />
               <button
                 onClick={addBenchmark}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium rounded-lg transition-colors"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-ink-strong hover:bg-ink text-white text-sm font-medium rounded-lg transition-colors"
               >
                 <Plus size={14} />保存
               </button>
             </div>
 
             {benchmarks.length === 0 ? (
-              <div className="py-8 text-center text-sm text-gray-400">
+              <div className="py-8 text-center text-sm text-muted">
                 手入力のベンチマークはまだありません（自店集計・汎用ベースラインで動作中）
               </div>
             ) : (
-              <ul className="divide-y divide-gray-100">
+              <ul className="divide-y divide-bg-alt">
                 {benchmarks.map((b) => (
                   <li key={b.id} className="px-4 py-2.5 flex items-center gap-3">
-                    <span className="text-sm text-gray-800">
+                    <span className="text-sm text-ink">
                       {[b.genre_u1, b.genre_u2, b.genre_u3].filter(Boolean).join(' > ')}
                     </span>
-                    <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 font-medium">{b.metric_label}</span>
-                    <span className="text-sm font-semibold text-gray-900">{b.value}%</span>
-                    {b.memo && <span className="text-xs text-gray-400">{b.memo}</span>}
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-sage-soft text-sage-deep font-medium">{b.metric_label}</span>
+                    <span className="text-sm font-semibold text-ink-strong">{b.value}%</span>
+                    {b.memo && <span className="text-xs text-muted">{b.memo}</span>}
                     <div className="ml-auto">
                       <button onClick={() => removeBenchmark(b)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="削除">
                         <Trash2 size={14} />
