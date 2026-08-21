@@ -9,16 +9,16 @@ import EmptyState from '../components/EmptyState'
 import EvaluationMatrix from '../components/EvaluationMatrix'
 import AccessPlanner from '../components/dashboard/AccessPlanner'
 import RevenuePlanPanel from '../components/dashboard/RevenuePlanPanel'
-import TodayActions from '../components/dashboard/TodayActions'
 import ActionOutcomes from '../components/dashboard/ActionOutcomes'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
 import { formatYen, pointDiffFromChangeRate } from '../lib/format'
 import HeroKgi from '../components/diagnosis/HeroKgi'
+import DrillDown from '../components/diagnosis/DrillDown'
 import { usePeriodState } from '../lib/usePeriodState'
 import { FOCUS_RING, TAP_TARGET } from '../lib/a11y'
 import type {
-  DashboardData, Alert, TrendPoint, EvaluationResult, AccessPlan, RecommendationsResponse, OutcomesResponse,
+  DashboardData, Alert, TrendPoint, EvaluationResult, AccessPlan, RecommendationsResponse, OutcomesResponse, KPITree, KPIs,
 } from '../types'
 
 export default function Dashboard() {
@@ -30,11 +30,16 @@ export default function Dashboard() {
   const [accessPlan, setAccessPlan] = useState<AccessPlan | null>(null)
   const [recos, setRecos] = useState<RecommendationsResponse | null>(null)
   const [outcomes, setOutcomes] = useState<OutcomesResponse | null>(null)
+  // 段2（KpiTriage）用。月次・年次は目標比較あり、週次は target_comparable=false
+  const [kpiTree, setKpiTree] = useState<KPITree | null>(null)
   const [loading, setLoading] = useState(false)
   const [activeChart, setActiveChart] = useState<'gross' | 'gp' | 'roi' | 'cvr' | 'roas' | 'ct' | 'cpc'>('gross')
   // 売上3分解（1層ヒーロー用）。月次・年次はgap/shop（商品分析=店舗全体軸）から取得し、
   // 週次はdashboard本体のRPP軸KPI・前期比をそのまま使う（軸を混ぜない）。
-  const [decomp, setDecomp] = useState<{ current: Record<string, number | null>; changes: Record<string, number | null> } | null>(null)
+  // current は /gap/shop のレスポンス（KPIs互換。商品分析軸のときは ctr=0 で明示的に返る）に
+  // access フィールドが追加されたもの。ActionRx の課題検出（既存 ActionPanel ロジック流用）に
+  // そのまま渡せるよう KPIs 型として保持する。
+  const [decomp, setDecomp] = useState<{ current: (KPIs & { access?: number }) | null; changes: Record<string, number | null> } | null>(null)
 
   const isYearly = period === 'yearly'
 
@@ -48,7 +53,7 @@ export default function Dashboard() {
       // 年次は表示系のみ対応。診断・アラート・提案系は月次前提の設計のため呼ばない
       // （UIバックログ2026-08-03 区切りB。画面には注記を出す）。
       const yearly = period === 'yearly'
-      const [dash, als, tr, evalRes, planRes, recoRes, outcomeRes, shopGap] = await Promise.all([
+      const [dash, als, tr, evalRes, planRes, recoRes, outcomeRes, shopGap, tree] = await Promise.all([
         api.dashboard.get(period, dateParam) as Promise<DashboardData | null>,
         yearly ? Promise.resolve(null) : api.dashboard.alerts(period, dateParam) as Promise<{ alerts?: Alert[] } | null>,
         api.dashboard.trend(8) as Promise<{ trend?: TrendPoint[] } | null>,
@@ -59,15 +64,15 @@ export default function Dashboard() {
         // 3分解の前期比（月次・年次のみ。週次はdashboard本体のRPP軸changesを使う）
         period === 'weekly'
           ? Promise.resolve(null)
-          : api.gap.shop(period, dateParam, true).catch(() => null) as Promise<{ current?: Record<string, number | null>; changes?: Record<string, number | null> } | null>,
+          : api.gap.shop(period, dateParam, true).catch(() => null) as Promise<{ current?: (KPIs & { access?: number }) | null; changes?: Record<string, number | null> } | null>,
+        // 段2（KpiTriage）用のKGIツリー。GAP分析と同一データソース（ロジックは複製しない）
+        api.gap.kpiTree(period, dateParam).catch(() => null) as Promise<KPITree | null>,
       ])
       setData(dash ?? null)
+      setKpiTree(tree ?? null)
       setDecomp(
-        shopGap && (shopGap as { current?: Record<string, number | null> }).current
-          ? {
-              current: (shopGap as { current: Record<string, number | null> }).current,
-              changes: (shopGap as { changes?: Record<string, number | null> }).changes ?? {},
-            }
+        shopGap?.current
+          ? { current: shopGap.current, changes: shopGap.changes ?? {} }
           : null,
       )
       setAlerts((als as { alerts?: Alert[] } | null)?.alerts ?? [])
@@ -86,6 +91,7 @@ export default function Dashboard() {
       setRecos(null)
       setOutcomes(null)
       setDecomp(null)
+      setKpiTree(null)
     } finally {
       setLoading(false)
     }
@@ -152,23 +158,25 @@ export default function Dashboard() {
     return target * elapsed
   })()
 
+  // 段2（KpiTriage）の入力。週次はRPP軸（kpis+changes）、月次・年次は商品分析軸（decomp）。
+  // 軸は混ぜない（規約）。KpiTriage側は達成率が取れないKPI（週次）は前期比だけで判定する。
   const decompCards = (() => {
     if (period === 'weekly') {
       if (!kpis) return null
       return [
         // CVRは割合なので前期比は pt（変化率から復元する）。アクセスは中立なので色を付けない
-        { label: 'アクセス（RPPクリック）', value: formatNumber(kpis.ct), change: changes.ct_wow ?? null, unit: '%' as const, neutral: true },
-        { label: '転換率（CVR）', value: formatPercent(kpis.cvr, 2), change: pointDiffFromChangeRate(kpis.cvr, changes.cvr_wow), unit: 'pt' as const, neutral: false },
-        { label: '客単価（Av）', value: formatYen(kpis.av), change: changes.av_wow ?? null, unit: '%' as const, neutral: false },
+        { key: 'access' as const, label: 'アクセス（RPPクリック）', value: formatNumber(kpis.ct), change: changes.ct_wow ?? null, unit: '%' as const, neutral: true },
+        { key: 'cvr' as const, label: '転換率（CVR）', value: formatPercent(kpis.cvr, 2), change: pointDiffFromChangeRate(kpis.cvr, changes.cvr_wow), unit: 'pt' as const, neutral: false },
+        { key: 'av' as const, label: '客単価（Av）', value: formatYen(kpis.av), change: changes.av_wow ?? null, unit: '%' as const, neutral: false },
       ]
     }
-    if (!decomp) return null
+    if (!decomp || !decomp.current) return null
     const c = decomp.current
     const ch = decomp.changes
     return [
-      { label: 'アクセス人数（UU）', value: formatNumber(c.access ?? c.ct), change: ch.access ?? null, unit: '%' as const, neutral: true },
-      { label: '転換率（CVR）', value: formatPercent(c.cvr, 2), change: pointDiffFromChangeRate(c.cvr, ch.cvr), unit: 'pt' as const, neutral: false },
-      { label: '客単価（Av）', value: formatYen(c.av), change: ch.av ?? null, unit: '%' as const, neutral: false },
+      { key: 'access' as const, label: 'アクセス人数（UU）', value: formatNumber(c.access ?? c.ct), change: ch.access ?? null, unit: '%' as const, neutral: true },
+      { key: 'cvr' as const, label: '転換率（CVR）', value: formatPercent(c.cvr, 2), change: pointDiffFromChangeRate(c.cvr, ch.cvr), unit: 'pt' as const, neutral: false },
+      { key: 'av' as const, label: '客単価（Av）', value: formatYen(c.av), change: ch.av ?? null, unit: '%' as const, neutral: false },
     ]
   })()
 
@@ -235,32 +243,23 @@ export default function Dashboard() {
           achievementRate={data?.achievement_rate ?? null}
           sourceLabel={shop ? '商品分析（店舗全体）' : 'RPP経由売上'}
           periodBasisNote={period === 'weekly' ? '目標（週按分）' : undefined}
+          recoCount={(recos?.recommendations?.length ?? 0) + (recos?.product_recommendations?.length ?? 0)}
         >
-          {decompCards && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              {decompCards.map((c) => (
-                <div key={c.label} className="bg-bg-alt rounded-lg p-3 flex flex-col justify-between">
-                  <p className="text-xs font-medium text-sub">{c.label}</p>
-                  <div>
-                    <p className="font-num text-2xl font-bold text-ink tabular-nums">{c.value}</p>
-                    {/* 割合の指標は pt、中立の指標（アクセス）は色を付けない（規約 1-4 / 1-7） */}
-                    <p className={`text-xs mt-1 ${
-                      c.change == null || c.neutral ? 'text-muted'
-                        : c.change >= 0 ? 'text-up' : 'text-alert'
-                    }`}>
-                      {c.change == null
-                        ? '前期のデータなし'
-                        : `${c.change >= 0 ? '+' : ''}${c.change.toFixed(c.unit === 'pt' ? 2 : 1)}${c.unit} 前期比`}
-                    </p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          {/* ═══ 段2〜5: ドリルダウン本体（要因→ジャンル→商品→アクション）═══ */}
+          <DrillDown
+            period={period}
+            dateParam={dateValue.slice(0, period === 'monthly' ? 7 : period === 'yearly' ? 4 : 10)}
+            kpiTree={kpiTree}
+            decompItems={decompCards}
+            shopKpis={period === 'weekly' ? (kpis ?? null) : (decomp?.current ?? null)}
+            recos={recos}
+            onActionChanged={load}
+          />
         </HeroKgi>
 
-        {/* ═══ 2層: アクション帯（今日やること・アラート・評価マトリクス）═══ */}
-        {!isYearly && <TodayActions data={recos} onChanged={load} />}
+        {/* ═══ 2層: アクション帯（アラート・評価マトリクス）═══
+            「今日やるべきこと」は区切り4で撤去（段5のアクションが後継）。
+            件数バッジは段1（HeroKgi）に残す（確認事項Q2）。 */}
 
         {/* アラートは最大3件を初期表示し、残りは開閉に格納する（2026-08-20 レビュー採用）。
             全件を同じ強さで並べると、どれから手を付けるかが読めなくなるため。 */}

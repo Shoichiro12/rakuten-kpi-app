@@ -18,7 +18,7 @@ const ITEM_SORT_ACCESSORS = {
 
 const CONFIDENCE_LABELS: Record<string, { label: string; cls: string }> = {
   high: { label: '精度: 高（2年分以上の実績）', cls: 'bg-green-100 text-green-700' },
-  medium: { label: '精度: 中（実績1周分）', cls: 'bg-blue-100 text-blue-700' },
+  medium: { label: '精度: 中（実績1周分）', cls: 'bg-sage-soft text-sage-deep' },
   low: { label: '均等按分（実績12ヶ月未満）', cls: 'bg-amber-100 text-amber-700' },
 }
 
@@ -26,10 +26,10 @@ function Field({ label, description, children }: { label: string; description?: 
   return (
     // 幅の規約: フォーム行はラベル列が全体の1/3を占めるため、全幅のままだとラベルと入力欄が離れる。
     // ページ直下は全幅のままにしてブロック側で止める（CLAUDE.md「画面幅の規約」参照）
-    <div className="grid max-w-3xl grid-cols-3 gap-4 items-start py-4 border-b border-gray-100 last:border-0">
+    <div className="grid max-w-3xl grid-cols-3 gap-4 items-start py-4 border-b border-bg-alt last:border-0">
       <div>
-        <p className="text-sm font-medium text-gray-900">{label}</p>
-        {description && <p className="text-xs text-gray-500 mt-0.5">{description}</p>}
+        <p className="text-sm font-medium text-ink-strong">{label}</p>
+        {description && <p className="text-xs text-muted mt-0.5">{description}</p>}
       </div>
       <div className="col-span-2">{children}</div>
     </div>
@@ -284,7 +284,7 @@ export default function TargetSetting() {
           <button
             onClick={handleSave}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors"
+            className="flex items-center gap-2 px-4 py-2 bg-ink-strong hover:bg-ink disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors"
           >
             {saved ? <CheckCircle size={15} /> : <Save size={15} />}
             {saved ? '保存しました' : '保存'}
@@ -292,61 +292,61 @@ export default function TargetSetting() {
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 bg-gray-50">
+      <div className="flex-1 overflow-auto p-6 bg-bg-alt">
         {/* 幅の上限は付けない（他の表示系画面と同じ全幅）。
             アイテム別目標・年間目標プランナーの表が画面幅を使い切れるようにするため。max-w-* を戻さないこと */}
         <div className="space-y-6">
           {/* 対象月 */}
           {/* フォーム系カードは読みやすい幅で止める（CLAUDE.md「画面幅の規約」） */}
           <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
-            <h3 className="text-sm font-semibold text-gray-700 mb-4">対象月</h3>
+            <h3 className="text-sm font-semibold text-sub mb-4">対象月</h3>
             <input
               type="month"
               value={yearMonth}
               onChange={e => handleYearMonthChange(e.target.value)}
-              className="border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="border border-line rounded-lg px-3 py-2 text-sm text-sub focus:outline-none focus:ring-2 focus:ring-sage-deep"
             />
           </div>
 
           {/* KGI。入力の直下に試算を置き、入力→結果の因果を同じカード内で見せる
               （2026-08-20 レビュー採用。試算を離れた別カードに戻さないこと） */}
           <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">KGI（最終目標）</h3>
-            <p className="text-xs text-gray-500 mb-4">月次売上の目標値を設定します</p>
+            <h3 className="text-sm font-semibold text-sub mb-1">KGI（最終目標）</h3>
+            <p className="text-xs text-muted mb-4">月次売上の目標値を設定します</p>
             <Field label="月次売上目標" description="RPP売上ベース">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">¥</span>
+                <span className="text-sm text-muted">¥</span>
                 <input
                   type="number"
                   value={form.target_sales}
                   onChange={e => set('target_sales', Number(e.target.value))}
                   step={100000}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="border border-line rounded-lg px-3 py-2 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-sage-deep"
                 />
               </div>
             </Field>
 
             {/* 試算（この売上目標のとき何が起こるか。値は入力に即時追従する） */}
-            <div className="mt-4 bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-3xl">
-              <p className="text-sm font-semibold text-blue-800 mb-3">
+            <div className="mt-4 bg-sage-soft border border-sage-soft rounded-xl p-4 max-w-3xl">
+              <p className="text-sm font-semibold text-sage-deep mb-3">
                 この目標のときの試算（原価率{Math.round(costRate * 100)}%・経費率{Math.round(form.expense_rate * 100)}%を適用）
               </p>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <p className="text-blue-600 text-xs">推定GP（利益）</p>
-                  <p className="font-bold text-blue-900 tabular-nums">¥{Math.round(estimatedGP).toLocaleString()}</p>
+                  <p className="text-sage-deep text-xs">推定GP（利益）</p>
+                  <p className="font-bold text-sage-deep tabular-nums">¥{Math.round(estimatedGP).toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-blue-600 text-xs">店舗運営経費</p>
-                  <p className="font-bold text-blue-900 tabular-nums">¥{Math.round(form.target_sales * form.expense_rate).toLocaleString()}</p>
+                  <p className="text-sage-deep text-xs">店舗運営経費</p>
+                  <p className="font-bold text-sage-deep tabular-nums">¥{Math.round(form.target_sales * form.expense_rate).toLocaleString()}</p>
                 </div>
                 <div>
-                  <p className="text-blue-600 text-xs">KGI達成時CV試算</p>
-                  <p className="font-bold text-blue-900 tabular-nums">{form.target_av > 0 ? Math.round(form.target_sales / form.target_av).toLocaleString() : '—'}件</p>
+                  <p className="text-sage-deep text-xs">KGI達成時CV試算</p>
+                  <p className="font-bold text-sage-deep tabular-nums">{form.target_av > 0 ? Math.round(form.target_sales / form.target_av).toLocaleString() : '—'}件</p>
                 </div>
                 <div>
-                  <p className="text-blue-600 text-xs">目標客単価（下のKPI目標値）</p>
-                  <p className="font-bold text-blue-900 tabular-nums">{form.target_av > 0 ? `¥${form.target_av.toLocaleString()}` : '未設定'}</p>
+                  <p className="text-sage-deep text-xs">目標客単価（下のKPI目標値）</p>
+                  <p className="font-bold text-sage-deep tabular-nums">{form.target_av > 0 ? `¥${form.target_av.toLocaleString()}` : '未設定'}</p>
                 </div>
               </div>
             </div>
@@ -355,17 +355,17 @@ export default function TargetSetting() {
           {/* 年間売上予算（売上予算プラン・第4段階v2） */}
           <div className="bg-white rounded-xl border shadow-sm p-6">
             <div className="flex items-center justify-between gap-3 flex-wrap mb-1">
-              <h3 className="text-sm font-semibold text-gray-700">年間売上予算</h3>
+              <h3 className="text-sm font-semibold text-sub">年間売上予算</h3>
               {budgetSaved && (
                 <span className="flex items-center gap-1.5 text-xs text-green-600"><CheckCircle size={13} />保存しました</span>
               )}
             </div>
-            <p className="text-xs text-gray-500 mb-4">
+            <p className="text-xs text-muted mb-4">
               過去実績の季節性で月次に自動按分します（按分値は保存せず、実績の蓄積で自動的に精度が上がります）
             </p>
             <Field label="年間売上予算" description="未入力に戻すと機能をオフにできます">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">¥</span>
+                <span className="text-sm text-muted">¥</span>
                 <input
                   type="number"
                   value={annualBudget}
@@ -373,7 +373,7 @@ export default function TargetSetting() {
                   step={1000000}
                   placeholder="未設定"
                   onChange={e => setAnnualBudget(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="border border-line rounded-lg px-3 py-2 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-sage-deep"
                 />
               </div>
             </Field>
@@ -381,7 +381,7 @@ export default function TargetSetting() {
               <select
                 value={startMonth}
                 onChange={e => setStartMonth(Number(e.target.value))}
-                className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="border border-line rounded-lg px-3 py-2 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-sage-deep"
               >
                 {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
                   <option key={m} value={m}>{m}月</option>
@@ -392,7 +392,7 @@ export default function TargetSetting() {
               <button
                 onClick={saveBudget}
                 disabled={budgetSaving}
-                className="px-4 py-2 bg-gray-900 hover:bg-gray-800 disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors"
+                className="px-4 py-2 bg-ink-strong hover:bg-ink disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors"
               >
                 年間予算を保存して按分を更新
               </button>
@@ -402,23 +402,23 @@ export default function TargetSetting() {
             {plan && (
               <div className="mt-5 border-t pt-4">
                 {plan.status === 'no_budget' || plan.status === 'collect_data' ? (
-                  <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                    <p className="text-sm font-medium text-gray-700">{plan.guide.title}</p>
-                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">{plan.guide.message}</p>
+                  <div className="bg-bg-alt border border-line rounded-lg p-3">
+                    <p className="text-sm font-medium text-sub">{plan.guide.title}</p>
+                    <p className="text-xs text-muted mt-1 leading-relaxed">{plan.guide.message}</p>
                   </div>
                 ) : (
                   <>
                     <div className="flex items-center gap-2 flex-wrap mb-2">
-                      <p className="text-xs font-semibold text-gray-600">
+                      <p className="text-xs font-semibold text-sub">
                         年間目標プランナー（{plan.budget_year.from} 〜 {plan.budget_year.to}）
                       </p>
-                      <div className="flex gap-0.5 border border-gray-200 rounded-md p-0.5">
+                      <div className="flex gap-0.5 border border-line rounded-md p-0.5">
                         {(['summary', 'detail'] as const).map(v => (
                           <button
                             key={v}
                             onClick={() => setPlanView(v)}
                             className={`px-2 py-0.5 rounded text-xs font-medium transition-colors ${
-                              planView === v ? 'bg-gray-900 text-white' : 'text-gray-500 hover:bg-gray-100'
+                              planView === v ? 'bg-ink-strong text-white' : 'text-muted hover:bg-bg-alt'
                             }`}
                           >
                             {v === 'summary' ? 'サマリ' : '詳細'}
@@ -430,13 +430,13 @@ export default function TargetSetting() {
                           {CONFIDENCE_LABELS[plan.seasonal_index.confidence].label}
                         </span>
                       )}
-                      <span className="text-xs text-gray-400">
+                      <span className="text-xs text-muted">
                         根拠: 有効実績{plan.seasonal_index.valid_months}ヶ月
                         {plan.seasonal_index.period_from && `（${plan.seasonal_index.period_from}〜${plan.seasonal_index.period_to}）`}
                       </span>
                     </div>
                     {/* 注記は1行が長くなりすぎると読みにくいので、表と同じくらいの幅で折り返す */}
-                    <p className="max-w-3xl text-xs text-gray-400 mb-2 leading-snug">{plan.guide.message}</p>
+                    <p className="max-w-3xl text-xs text-muted mb-2 leading-snug">{plan.guide.message}</p>
                     <div className="overflow-x-auto">
                       {/* 親を全幅にしたぶん、列数の少ないこの表は放っておくと間延びする。
                           表そのものに上限幅を持たせて詰めておく（サマリ=5列 / 詳細=9列）。
@@ -446,7 +446,7 @@ export default function TargetSetting() {
                           planView === 'summary' ? 'max-w-2xl' : 'max-w-5xl'
                         }`}
                       >
-                        <thead className="bg-gray-50 text-xs text-gray-500">
+                        <thead className="bg-bg-alt text-xs text-muted">
                           <tr>
                             <th className="px-2 py-1.5 text-left">月</th>
                             {planView === 'detail' && <th className="px-2 py-1.5 text-right">季節指数</th>}
@@ -459,12 +459,12 @@ export default function TargetSetting() {
                             <th className="px-2 py-1.5 text-right">達成率（%）</th>
                           </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
+                        <tbody className="divide-y divide-bg-alt">
                           {plan.months.map(m => (
-                            <tr key={m.year_month} className={m.year_month === yearMonth ? 'bg-blue-50' : ''}>
-                              <td className="px-2 py-1.5 font-medium text-gray-800 whitespace-nowrap">{m.year_month}</td>
+                            <tr key={m.year_month} className={m.year_month === yearMonth ? 'bg-sage-soft' : ''}>
+                              <td className="px-2 py-1.5 font-medium text-ink whitespace-nowrap">{m.year_month}</td>
                               {planView === 'detail' && (
-                                <td className="px-2 py-1.5 text-right text-gray-600">{m.index != null ? m.index.toFixed(2) : '—'}</td>
+                                <td className="px-2 py-1.5 text-right text-sub">{m.index != null ? m.index.toFixed(2) : '—'}</td>
                               )}
                               <td className="px-2 py-1.5 text-right whitespace-nowrap">
                                 <span className="inline-flex items-center gap-1 justify-end">
@@ -473,12 +473,12 @@ export default function TargetSetting() {
                                       <span className="inline-block px-1 py-0.5 rounded text-xs font-medium bg-violet-100 text-violet-700" title="手動補正中。空欄で保存すると自動按分に戻ります">手動</span>
                                       <button
                                         onClick={() => saveOverride(m.year_month, null)}
-                                        className="text-xs text-gray-400 hover:text-red-500 underline"
+                                        className="text-xs text-muted hover:text-red-500 underline"
                                         title="補正を解除して自動按分に戻す"
                                       >解除</button>
                                     </>
                                   )}
-                                  <span className="text-gray-400 text-xs">¥</span>
+                                  <span className="text-muted text-xs">¥</span>
                                   <input
                                     key={`${m.year_month}:${m.sales_budget ?? ''}:${m.sales_budget_source ?? ''}`}
                                     type="number" min={0} step={100000}
@@ -497,22 +497,22 @@ export default function TargetSetting() {
                                       }
                                     }}
                                     className={`w-24 text-right border rounded px-1.5 py-0.5 text-xs focus:outline-none focus:ring-2 focus:ring-violet-500 ${
-                                      m.sales_budget_source === 'manual' ? 'border-violet-300 bg-violet-50/50' : 'border-gray-200'
+                                      m.sales_budget_source === 'manual' ? 'border-violet-300 bg-violet-50/50' : 'border-line'
                                     }`}
                                   />
                                 </span>
                               </td>
-                              <td className="px-2 py-1.5 text-right text-gray-900 whitespace-nowrap" title={m.basis_detail ?? undefined}>
+                              <td className="px-2 py-1.5 text-right text-ink-strong whitespace-nowrap" title={m.basis_detail ?? undefined}>
                                 {m.required_access != null ? Math.round(m.required_access).toLocaleString() : '—'}
                               </td>
                               {planView === 'detail' && (
-                                <td className="px-2 py-1.5 text-right text-gray-700 whitespace-nowrap" title={m.basis_detail ?? undefined}>
+                                <td className="px-2 py-1.5 text-right text-sub whitespace-nowrap" title={m.basis_detail ?? undefined}>
                                   {m.target_cvr != null ? String(m.target_cvr) : '—'}
                                   {m.target_cvr_basis === 'manual' && <span className="ml-0.5 text-xs text-violet-600" title="目標設定画面の手入力を採用">手</span>}
                                 </td>
                               )}
                               {planView === 'detail' && (
-                                <td className="px-2 py-1.5 text-right text-gray-700 whitespace-nowrap" title={m.basis_detail ?? undefined}>
+                                <td className="px-2 py-1.5 text-right text-sub whitespace-nowrap" title={m.basis_detail ?? undefined}>
                                   {m.target_av != null ? Math.round(m.target_av).toLocaleString() : '—'}
                                   {m.target_av_basis === 'manual' && <span className="ml-0.5 text-xs text-violet-600" title="目標設定画面の手入力を採用">手</span>}
                                 </td>
@@ -524,18 +524,18 @@ export default function TargetSetting() {
                                 {m.shortfall_access != null && m.shortfall_access <= 0 ? (
                                   <span className="text-green-600 font-medium">充足</span>
                                 ) : m.est_ad_cost != null ? (
-                                  <span className="text-gray-900">
+                                  <span className="text-ink-strong">
                                     {Math.round(m.est_ad_cost).toLocaleString()}
-                                    {m.cpc_is_fallback && <span className="text-gray-400">※</span>}
+                                    {m.cpc_is_fallback && <span className="text-muted">※</span>}
                                   </span>
                                 ) : (
                                   '—'
                                 )}
                               </td>
                               {planView === 'detail' && (
-                                <td className="px-2 py-1.5 text-right text-gray-600 whitespace-nowrap">{m.actual_sales != null ? Math.round(m.actual_sales).toLocaleString() : '—'}</td>
+                                <td className="px-2 py-1.5 text-right text-sub whitespace-nowrap">{m.actual_sales != null ? Math.round(m.actual_sales).toLocaleString() : '—'}</td>
                               )}
-                              <td className={`px-2 py-1.5 text-right font-medium ${m.achievement_rate == null ? 'text-gray-300' : m.achievement_rate >= 100 ? 'text-green-600' : 'text-red-500'}`}>
+                              <td className={`px-2 py-1.5 text-right font-medium ${m.achievement_rate == null ? 'text-line' : m.achievement_rate >= 100 ? 'text-green-600' : 'text-red-500'}`}>
                                 {m.achievement_rate != null ? String(m.achievement_rate) : '—'}
                               </td>
                             </tr>
@@ -548,7 +548,7 @@ export default function TargetSetting() {
                       const fb = plan.months.find(m => m.cpc_is_fallback && m.cpc_source_month)
                       if (!plan.months.some(m => m.est_ad_cost != null)) return null
                       return (
-                        <p className="mt-1.5 max-w-3xl text-xs text-gray-400 leading-snug">
+                        <p className="mt-1.5 max-w-3xl text-xs text-muted leading-snug">
                           想定追加広告費は各月のRPP実績CPCに基づく試算です
                           {fb && `（※印の月はRPP実績が無いため、直近実績月 ${fb.cpc_source_month} のCPC ¥${fb.cpc?.toLocaleString()} で代用）`}。
                           CPCの季節変動は考慮していません。実績が無い月の現状アクセスは直近実績月の値を見込みとして使っています。
@@ -560,7 +560,7 @@ export default function TargetSetting() {
                       const total = plan.months.reduce((s, m) => s + (m.sales_budget ?? 0), 0)
                       const diff = total - plan.annual_sales_budget
                       return (
-                        <p className={`mt-1.5 max-w-3xl text-xs leading-snug ${Math.abs(diff) >= 1 ? 'text-amber-600' : 'text-gray-400'}`}>
+                        <p className={`mt-1.5 max-w-3xl text-xs leading-snug ${Math.abs(diff) >= 1 ? 'text-amber-600' : 'text-muted'}`}>
                           12ヶ月合計 ¥{Math.round(total).toLocaleString()}／年間予算 ¥{Math.round(plan.annual_sales_budget).toLocaleString()}
                           {Math.abs(diff) >= 1 && `（差 ${diff > 0 ? '+' : ''}¥${Math.round(diff).toLocaleString()}。手動補正した月は他月へ再配分しないため合計がズレることがあります）`}
                         </p>
@@ -574,15 +574,15 @@ export default function TargetSetting() {
 
           {/* KPI */}
           <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">KPI目標値</h3>
-            <p className="text-xs text-gray-500 mb-4">売上 = アクセス × CVR × 客単価</p>
+            <h3 className="text-sm font-semibold text-sub mb-1">KPI目標値</h3>
+            <p className="text-xs text-muted mb-4">売上 = アクセス × CVR × 客単価</p>
             <Field label="アクセス目標（UU）" description="月間ユニークユーザー数">
               <input
                 type="number"
                 value={form.target_access}
                 onChange={e => set('target_access', Number(e.target.value))}
                 step={1000}
-                className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="border border-line rounded-lg px-3 py-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-sage-deep"
               />
             </Field>
             <Field label="CVR目標（%）" description="注文率">
@@ -594,20 +594,20 @@ export default function TargetSetting() {
                   step={0.1}
                   min={0}
                   max={100}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="border border-line rounded-lg px-3 py-2 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-sage-deep"
                 />
-                <span className="text-sm text-gray-500">%</span>
+                <span className="text-sm text-muted">%</span>
               </div>
             </Field>
             <Field label="客単価目標（Av）" description="1注文あたり平均売上">
               <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-500">¥</span>
+                <span className="text-sm text-muted">¥</span>
                 <input
                   type="number"
                   value={form.target_av}
                   onChange={e => set('target_av', Number(e.target.value))}
                   step={100}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="border border-line rounded-lg px-3 py-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-sage-deep"
                 />
               </div>
             </Field>
@@ -615,8 +615,8 @@ export default function TargetSetting() {
 
           {/* 経費率 */}
           <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
-            <h3 className="text-sm font-semibold text-gray-700 mb-1">経費設定</h3>
-            <p className="text-xs text-gray-500 mb-4">Steady Cost = RPP売上 × 経費率</p>
+            <h3 className="text-sm font-semibold text-sub mb-1">経費設定</h3>
+            <p className="text-xs text-muted mb-4">Steady Cost = RPP売上 × 経費率</p>
             <Field label="店舗運営経費率" description="楽天出店料・ポイント等">
               <div className="flex items-center gap-2">
                 <input
@@ -626,9 +626,9 @@ export default function TargetSetting() {
                   step={1}
                   min={0}
                   max={100}
-                  className="border border-gray-200 rounded-lg px-3 py-2 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="border border-line rounded-lg px-3 py-2 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-sage-deep"
                 />
-                <span className="text-sm text-gray-500">%</span>
+                <span className="text-sm text-muted">%</span>
               </div>
             </Field>
           </div>
@@ -641,8 +641,8 @@ export default function TargetSetting() {
               <div className="flex items-center justify-between gap-3 flex-wrap">
                 <div>
                   {/* 6列の表。全幅だと間延びするのでカード側で止める（CLAUDE.md「画面幅の規約」） */}
-                  <h3 className="text-sm font-semibold text-gray-700">アイテム別目標（{yearMonth}）</h3>
-                  <p className="text-xs text-gray-400 mt-0.5">
+                  <h3 className="text-sm font-semibold text-sub">アイテム別目標（{yearMonth}）</h3>
+                  <p className="text-xs text-muted mt-0.5">
                     入力するのは目標売上だけ。目標CVR・客単価は「現状値と前年値の低い方」を自動採用し（保守的な確定公式）、必要アクセス数を逆算します。複数まとめて入力して「一括保存」できます。
                   </p>
                 </div>
@@ -656,22 +656,22 @@ export default function TargetSetting() {
                   <input
                     type="text" value={itemKw} onChange={(e) => setItemKw(e.target.value)}
                     placeholder="商品名・管理番号で検索"
-                    className="w-52 text-sm border border-gray-200 rounded px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-52 text-sm border border-line rounded px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-sage-deep"
                   />
                   {genreOptions.length > 0 && (
                     <select
                       value={itemGenre} onChange={(e) => setItemGenre(e.target.value)}
-                      className="text-sm border border-gray-200 rounded px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="text-sm border border-line rounded px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-sage-deep"
                     >
                       <option value="">ジャンル（すべて）</option>
                       {genreOptions.map((g) => <option key={g} value={g}>{g}</option>)}
                     </select>
                   )}
-                  <label className="flex items-center gap-1.5 text-sm text-gray-600 cursor-pointer select-none">
+                  <label className="flex items-center gap-1.5 text-sm text-sub cursor-pointer select-none">
                     <input type="checkbox" checked={itemUnsetOnly} onChange={(e) => setItemUnsetOnly(e.target.checked)} className="rounded" />
                     未設定のみ
                   </label>
-                  <span className="text-xs text-gray-400">{filteredRows.length}件表示 / 全{itemRows.length}件</span>
+                  <span className="text-xs text-muted">{filteredRows.length}件表示 / 全{itemRows.length}件</span>
                   <div className="ml-auto flex items-center gap-2">
                     {dirtyRows.length > 0 && (
                       <span className="text-xs text-amber-600">未保存 {dirtyRows.length}件</span>
@@ -679,7 +679,7 @@ export default function TargetSetting() {
                     <button
                       onClick={bulkSaveItemTargets}
                       disabled={dirtyRows.length === 0 || bulkSaving}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white text-sm font-medium rounded"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sage-deep hover:bg-sage-deep disabled:bg-line disabled:cursor-not-allowed text-white text-sm font-medium rounded"
                     >
                       <Save size={14} />{bulkSaving ? '保存中…' : '一括保存'}
                     </button>
@@ -689,13 +689,13 @@ export default function TargetSetting() {
             </div>
 
             {itemRows.length === 0 ? (
-              <div className="py-8 text-center text-sm text-gray-400">
+              <div className="py-8 text-center text-sm text-muted">
                 商品データがまだありません。商品分析CSVを取り込むと商品が表示されます。
               </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-gray-50 text-xs text-gray-500">
+                  <thead className="bg-bg-alt text-xs text-muted">
                     <tr>
                       <SortableTh label="商品" sortKey="product_name" sort={itemSort} align="left" className="pl-1" />
                       <SortableTh label="目標売上（入力）" sortKey="target_sales" sort={itemSort} />
@@ -706,10 +706,10 @@ export default function TargetSetting() {
                       <th className="px-3 py-2.5 text-center whitespace-nowrap">操作</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-bg-alt">
                     {filteredRows.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="py-8 text-center text-sm text-gray-400">
+                        <td colSpan={7} className="py-8 text-center text-sm text-muted">
                           絞り込み条件に一致する商品がありません。
                         </td>
                       </tr>
@@ -719,10 +719,10 @@ export default function TargetSetting() {
                       return (
                         <tr key={r.management_no} className={dirty ? 'bg-amber-50/60' : undefined}>
                           <td className="px-4 py-2">
-                            <p className="text-gray-900 leading-tight">{r.product_name || r.management_no}</p>
-                            <p className="text-xs text-gray-400 font-mono">{r.management_no}</p>
+                            <p className="text-ink-strong leading-tight">{r.product_name || r.management_no}</p>
+                            <p className="text-xs text-muted font-mono">{r.management_no}</p>
                             {r.latest_actual ? (
-                              <p className="text-xs text-gray-400">
+                              <p className="text-xs text-muted">
                                 直近実績（{r.latest_actual.year_month}）: UU {r.latest_actual.access_uu.toLocaleString()} / CVR {r.latest_actual.cvr}% / 客単価 ¥{r.latest_actual.av.toLocaleString()}
                               </p>
                             ) : (
@@ -731,25 +731,25 @@ export default function TargetSetting() {
                           </td>
                           <td className="px-3 py-2 text-right whitespace-nowrap">
                             <span className="inline-flex items-center gap-1">
-                              <span className="text-gray-400 text-xs">¥</span>
+                              <span className="text-muted text-xs">¥</span>
                               <input
                                 type="number" min={0} step={10000}
                                 value={displayValue(r)}
                                 placeholder="未設定"
                                 onChange={(e) => setPending((p) => ({ ...p, [r.management_no]: e.target.value }))}
-                                className={`w-28 text-right border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-blue-500 ${dirty ? 'border-amber-400 bg-white' : 'border-gray-200'}`}
+                                className={`w-28 text-right border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-sage-deep ${dirty ? 'border-amber-400 bg-white' : 'border-line'}`}
                               />
                               {dirty && <span className="text-xs text-amber-600">未保存</span>}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-right text-gray-700">{t?.target_cvr != null ? String(t.target_cvr) : '—'}</td>
-                          <td className="px-3 py-2 text-right text-gray-700">{t?.target_av != null ? Math.round(t.target_av).toLocaleString() : '—'}</td>
-                          <td className="px-3 py-2 text-right font-medium text-gray-900">
+                          <td className="px-3 py-2 text-right text-sub">{t?.target_cvr != null ? String(t.target_cvr) : '—'}</td>
+                          <td className="px-3 py-2 text-right text-sub">{t?.target_av != null ? Math.round(t.target_av).toLocaleString() : '—'}</td>
+                          <td className="px-3 py-2 text-right font-medium text-ink-strong">
                             {t?.required_access != null ? Math.round(t.required_access).toLocaleString() : '—'}
                           </td>
                           <td className="px-3 py-2">
                             {!t ? (
-                              <span className="text-xs text-gray-300">—</span>
+                              <span className="text-xs text-line">—</span>
                             ) : t.calc_basis === 'rule' ? (
                               <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700" title={t.basis_detail ?? undefined}>
                                 自動算出（確定公式）
@@ -764,7 +764,7 @@ export default function TargetSetting() {
                                     <span className="text-xs text-green-600">承認済み</span>
                                     <button
                                       onClick={() => recalcItemTarget(r.management_no)}
-                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 border text-gray-500 hover:bg-gray-50 text-xs rounded"
+                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 border text-muted hover:bg-bg-alt text-xs rounded"
                                       title="最新の実績・推定で洗い直します"
                                     >
                                       <RefreshCw size={10} />再計算
@@ -773,7 +773,7 @@ export default function TargetSetting() {
                                 ) : (
                                   <button
                                     onClick={() => approveItemTarget(r.management_no)}
-                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded"
+                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-sage-deep hover:bg-sage-deep text-white text-xs font-medium rounded"
                                     title="承認するまで診断・逆算には使われません"
                                   >
                                     <Check size={10} />この参考値で確定
@@ -781,7 +781,7 @@ export default function TargetSetting() {
                                 )}
                               </span>
                             ) : (
-                              <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-500" title={t.basis_detail ?? undefined}>
+                              <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-bg-alt text-muted" title={t.basis_detail ?? undefined}>
                                 算出不能（データ待ち）
                               </span>
                             )}
@@ -792,13 +792,13 @@ export default function TargetSetting() {
                             {t ? (
                               <button
                                 onClick={() => deleteItemTarget(r.management_no)}
-                                className="inline-flex items-center gap-1 px-2 py-1 border border-gray-200 text-gray-500 hover:text-red-600 hover:border-red-300 hover:bg-red-50 text-xs rounded transition-colors"
+                                className="inline-flex items-center gap-1 px-2 py-1 border border-line text-muted hover:text-red-600 hover:border-red-300 hover:bg-red-50 text-xs rounded transition-colors"
                                 title="この商品のこの月の目標を削除します"
                               >
                                 <Trash2 size={11} />削除
                               </button>
                             ) : (
-                              <span className="text-xs text-gray-300">—</span>
+                              <span className="text-xs text-line">—</span>
                             )}
                           </td>
                         </tr>
@@ -808,7 +808,7 @@ export default function TargetSetting() {
                 </table>
               </div>
             )}
-            <p className="px-4 py-2.5 text-xs text-gray-400 border-t bg-gray-50/60 leading-snug">
+            <p className="px-4 py-2.5 text-xs text-muted border-t bg-bg-alt/60 leading-snug">
               計算式: 目標注文件数 = 目標売上 ÷ 目標客単価、必要アクセス数 = 目標注文件数 ÷ 目標CVR。
               実績が無い商品は同ジャンル・自店平均からの参考値を提示し、「この参考値で確定」を押すまで診断・逆算には使いません。
               商品分析CSVを取り込むと自動で再計算されます（実測が取れた商品は確定公式に自動切替）。
@@ -820,10 +820,10 @@ export default function TargetSetting() {
             // 4〜5列の表。全幅だと最も間延びするのでカード側で止める（CLAUDE.md「画面幅の規約」）
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden max-w-3xl">
               <div className="px-4 py-3 border-b">
-                <h3 className="text-sm font-semibold text-gray-700">設定済み目標一覧</h3>
+                <h3 className="text-sm font-semibold text-sub">設定済み目標一覧</h3>
               </div>
               <table className="w-full text-sm">
-                <thead className="bg-gray-50 text-xs text-gray-500">
+                <thead className="bg-bg-alt text-xs text-muted">
                   <tr>
                     <th className="px-4 py-2 text-left">対象月</th>
                     <th className="px-4 py-2 text-right">売上目標（円）</th>
@@ -832,14 +832,14 @@ export default function TargetSetting() {
                     <th className="px-4 py-2 text-right">経費率（%）</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-bg-alt">
                   {targets.map(t => (
                     <tr
                       key={t.year_month}
                       onClick={() => { setYearMonth(t.year_month); loadTarget(t.year_month) }}
-                      className="cursor-pointer hover:bg-blue-50 transition-colors"
+                      className="cursor-pointer hover:bg-sage-soft transition-colors"
                     >
-                      <td className="px-4 py-2.5 font-medium text-gray-900">{t.year_month}</td>
+                      <td className="px-4 py-2.5 font-medium text-ink-strong">{t.year_month}</td>
                       {/* 単位は見出しに1回だけ。数値は右寄せ＋等幅（規約 1-2） */}
                       <td className="px-4 py-2.5 text-right tabular-nums">{t.target_sales.toLocaleString()}</td>
                       <td className="px-4 py-2.5 text-right tabular-nums">{t.target_cvr}</td>

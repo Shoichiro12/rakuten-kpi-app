@@ -95,7 +95,7 @@ export default function ProductKPIPage() {
         }
       />
 
-      <div className="flex-1 overflow-auto p-6 bg-gray-50">
+      <div className="flex-1 overflow-auto p-6 bg-bg-alt">
         <div className="flex gap-6 h-full">
           {/* 商品一覧 */}
           <div className="flex-1 min-w-0 space-y-3">
@@ -111,23 +111,23 @@ export default function ProductKPIPage() {
                     </span>
                   </p>
                 </div>
-                <ul className="divide-y divide-gray-50 max-h-56 overflow-y-auto">
+                <ul className="divide-y divide-bg-alt max-h-56 overflow-y-auto">
                   {invAlerts.map((a) => (
                     <li key={a.management_no} className="px-4 py-2 flex items-center gap-3 text-sm">
                       <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${a.status === 'out' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                         {a.status === 'out' ? '欠品' : '僅少'}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <p className="truncate text-gray-800">{a.product_name || a.management_no}</p>
-                        <p className="text-xs text-gray-400">
+                        <p className="truncate text-ink">{a.product_name || a.management_no}</p>
+                        <p className="text-xs text-muted">
                           {a.status === 'out'
                             ? (a.zero_stock_days > 0 ? `在庫0日数 ${a.zero_stock_days}日` : '在庫なし')
                             : `残り約${a.days_left ?? '—'}日（在庫${a.stock_count.toLocaleString()}点）`}
                         </p>
                       </div>
-                      <span className="shrink-0 text-right text-xs text-gray-500">
-                        <span className="text-gray-400">機会損失 </span>
-                        <span className="font-semibold text-gray-700">約{formatCurrency(a.value_at_risk)}</span>
+                      <span className="shrink-0 text-right text-xs text-muted">
+                        <span className="text-muted">機会損失 </span>
+                        <span className="font-semibold text-sub">約{formatCurrency(a.value_at_risk)}</span>
                       </span>
                     </li>
                   ))}
@@ -140,7 +140,7 @@ export default function ProductKPIPage() {
               <button
                 onClick={() => setSelectedGenre('')}
                 className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                  !selectedGenre ? 'bg-gray-900 text-white' : 'bg-white border text-gray-600 hover:bg-gray-50'
+                  !selectedGenre ? 'bg-ink-strong text-white' : 'bg-white border text-sub hover:bg-bg-alt'
                 }`}
               >
                 すべて
@@ -150,18 +150,18 @@ export default function ProductKPIPage() {
                   key={g}
                   onClick={() => setSelectedGenre(g)}
                   className={`px-3 py-1 rounded-full text-xs font-medium transition-colors ${
-                    selectedGenre === g ? 'bg-gray-900 text-white' : 'bg-white border text-gray-600 hover:bg-gray-50'
+                    selectedGenre === g ? 'bg-ink-strong text-white' : 'bg-white border text-sub hover:bg-bg-alt'
                   }`}
                 >
                   {g}
                 </button>
               ))}
-              <label className="ml-auto flex items-center gap-1.5 text-xs text-gray-600 cursor-pointer select-none">
+              <label className="ml-auto flex items-center gap-1.5 text-xs text-sub cursor-pointer select-none">
                 <input
                   type="checkbox"
                   checked={showInactive}
                   onChange={e => setShowInactive(e.target.checked)}
-                  className="rounded border-gray-300"
+                  className="rounded border-line"
                 />
                 廃盤も表示
               </label>
@@ -173,14 +173,14 @@ export default function ProductKPIPage() {
                 パネル=正確な値を確認する場所。規約4章の役割分担）。 */}
             <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
               {!loading && products.length === 0 && (
-                <div className="py-12 text-center text-sm text-gray-400">
+                <div className="py-12 text-center text-sm text-muted">
                   商品データがありません
                 </div>
               )}
               {products.length > 0 && <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   {/* 単位はセルではなく見出しに1回だけ置く（右寄せの邪魔になるため）。規約 1-2 */}
-                  <thead className="bg-gray-50 text-xs text-gray-500 sticky top-0">
+                  <thead className="bg-bg-alt text-xs text-muted sticky top-0">
                     <tr>
                       <SortableTh label="商品名" sortKey="product_name" sort={sort} align="left" className="pl-1" />
                       <th className="px-3 py-2.5 text-left font-medium whitespace-nowrap">状態</th>
@@ -190,7 +190,7 @@ export default function ProductKPIPage() {
                       <th className="px-3 py-2.5 text-center font-medium whitespace-nowrap">詳細</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-bg-alt">
                     {sort.apply(products).map((p) => {
                       const isSelected = selectedProduct?.product_url === p.product_url
                       const issues: string[] = []
@@ -202,7 +202,7 @@ export default function ProductKPIPage() {
                         key={p.product_url}
                         onClick={() => handleSelectProduct(p)}
                         className={`cursor-pointer transition-colors ${
-                          p.limit_cpo_exceeded ? 'bg-red-50 hover:bg-red-100' : isSelected ? 'bg-blue-50' : 'hover:bg-blue-50'
+                          p.limit_cpo_exceeded ? 'bg-red-50 hover:bg-red-100' : isSelected ? 'bg-sage-soft' : 'hover:bg-sage-soft'
                         }`}
                       >
                         <td className="px-4 py-2.5">
@@ -211,14 +211,14 @@ export default function ProductKPIPage() {
                               <AlertTriangle size={13} className="text-red-500 mt-0.5 shrink-0" />
                             )}
                             <div>
-                              <p className="font-medium text-gray-900 leading-tight">
+                              <p className="font-medium text-ink-strong leading-tight">
                                 {p.product_name}
                                 {p.is_active === false && (
-                                  <span className="ml-1.5 align-middle px-1.5 py-0.5 rounded bg-gray-200 text-gray-500 text-xs font-medium">廃盤</span>
+                                  <span className="ml-1.5 align-middle px-1.5 py-0.5 rounded bg-line text-muted text-xs font-medium">廃盤</span>
                                 )}
                               </p>
                               <div className="flex items-center gap-1.5">
-                                <p className="text-xs text-gray-400">{p.management_no}</p>
+                                <p className="text-xs text-muted">{p.management_no}</p>
                                 <ReliabilityNote reliable={p.reliable} accessAxis={p.access_axis} variant="badge" />
                               </div>
                             </div>
@@ -235,11 +235,11 @@ export default function ProductKPIPage() {
                             </span>
                           ) : (
                             // 課題なしは色を付けない（全行が色付きになると何も目立たない。規約 2-3）
-                            <span className="text-xs text-gray-400">良好</span>
+                            <span className="text-xs text-muted">良好</span>
                           )}
                         </td>
                         {/* 表は丸めない（生値）。数値は右寄せ＋等幅（tabular-nums）。規約 1-2 / 4 */}
-                        <td className="px-3 py-2.5 text-right text-gray-900 font-medium tabular-nums">{num(p.gross)}</td>
+                        <td className="px-3 py-2.5 text-right text-ink-strong font-medium tabular-nums">{num(p.gross)}</td>
                         <td className={`px-3 py-2.5 text-right font-medium tabular-nums ${p.roi < 100 ? 'text-red-600' : ''}`}>
                           {pct(p.roi)}
                         </td>
@@ -251,7 +251,7 @@ export default function ProductKPIPage() {
                             onClick={(e) => { e.stopPropagation(); handleSelectProduct(p) }}
                             aria-expanded={isSelected}
                             className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
-                              isSelected ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                              isSelected ? 'bg-sage-deep text-white' : 'bg-bg-alt text-sub hover:bg-line'
                             }`}
                           >
                             {isSelected ? '表示中' : '詳細'}
@@ -272,10 +272,10 @@ export default function ProductKPIPage() {
               <div className="bg-white rounded-xl border shadow-sm p-4">
                 <div className="flex items-start justify-between mb-3">
                   <div>
-                    <p className="font-semibold text-gray-900 text-sm leading-snug">{selectedProduct.product_name}</p>
-                    <p className="text-xs text-gray-500 mt-0.5">{selectedProduct.management_no}</p>
+                    <p className="font-semibold text-ink-strong text-sm leading-snug">{selectedProduct.product_name}</p>
+                    <p className="text-xs text-muted mt-0.5">{selectedProduct.management_no}</p>
                   </div>
-                  <TrendingUp size={16} className="text-blue-500 shrink-0" />
+                  <TrendingUp size={16} className="text-sage-deep shrink-0" />
                 </div>
                 {selectedProduct.limit_cpo_exceeded && (
                   <div className="bg-red-50 border border-red-200 rounded p-2 text-xs text-red-700 mb-3">
@@ -298,9 +298,9 @@ export default function ProductKPIPage() {
                     ['CPO', formatCurrency(selectedProduct.cpo)],
                     ['Limit CPO', formatCurrency(selectedProduct.limit_cpo)],
                   ].map(([label, value]) => (
-                    <div key={label as string} className="bg-gray-50 rounded p-2">
-                      <p className="text-gray-500">{label}</p>
-                      <p className="font-semibold text-gray-900">{value}</p>
+                    <div key={label as string} className="bg-bg-alt rounded p-2">
+                      <p className="text-muted">{label}</p>
+                      <p className="font-semibold text-ink-strong">{value}</p>
                     </div>
                   ))}
                 </div>
@@ -313,7 +313,7 @@ export default function ProductKPIPage() {
 
               {productTrend.length > 0 && (
                 <div className="bg-white rounded-xl border shadow-sm p-4">
-                  <p className="text-xs font-semibold text-gray-700 mb-2">売上トレンド</p>
+                  <p className="text-xs font-semibold text-sub mb-2">売上トレンド</p>
                   <KPIChart
                     data={productTrend}
                     metric="gross"

@@ -84,6 +84,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | **サンプルデータの分離（is_sampleフラグ）・アイテム別目標の削除UI・商品マスタ高速化（報告書 `docs/sagyou_houkoku_sample_data_safety_2026-08-20.md`）**: オーナー報告3件への対応。①**サンプルは実データと分離**: データ系10テーブルに `is_sample` 列を追加（migrations._EXTRA_COLUMNSで既存DBにも冪等追加）。`generate_sample_data()` の冒頭全削除を廃止し「サンプル分だけ入れ替え」に変更。**無条件の全削除に戻さないこと**（実データが消える事故報告が発端）。`DELETE /api/sample-data` 新設、`/api/reset-data` はサンプル残骸（目標・アイテム別目標・マスタ）も一掃（実データの設定は保持）。実データと管理番号が衝突する商品は生成スキップ（実データ優先）。**サンプル生成に新テーブルを足すときは必ず is_sample=True を付け、delete_sample_data() の対象にも加えること**②アイテム別目標の削除ボタンをUIに追加（DELETE APIは既存・未接続だった）③**`masters.get_review_queue()` は固定6クエリのプリフェッチ方式。商品ループ内で db.query を呼ばないこと**（旧実装はN+1で数千SKUだと表示に約1分。3000商品で107ms・提案内容は旧実装と全件一致を実測）。フロントは提案を一覧と切り離して並行取得＋「計算中」プレースホルダ。商品マスタ一覧に検索＋50件/ページのページング。④**旧サンプル（フラグ無し）は起動時マイグレーション `_mark_legacy_sample_rows()` が遡及認定する**（管理番号＋商品名/URLのカタログ完全一致のみ・冪等。targets と product_categories は誤認定リスクがあるため対象外＝無害な残置）。**判定基準を緩めないこと**（実データを巻き込む） | 2026-08-20 | 実装済み（backend: models/migrations/sample_data/main/masters、frontend: DataImport/TargetSetting/MasterSettings/api/types。検証は報告書参照） |
 
+| **ダッシュボードのドリルダウン再設計（計画書 `docs/jisso_keikaku_dashboard_drilldown_2026-08-22.md`）**: ダッシュボード＝ドリルダウンの入口にする再設計。開いた瞬間に見えるのは「予算 vs 売上」だけ（段1 HeroKgi）。未達のときだけ「詳しく見る」で 段2要因（KpiTriage）→ 段3ジャンル（GenreDrill・粒度切替）→ 段4商品（ProductDrill）→ 段5アクション（ActionRx）に掘れる。判定・並び順・打ち手のロジックは既存GAP分析資産（`components/gap/kpiGap.ts` / `actionLibrary.ts`）をそのまま流用し、バックエンド改修なし。確認事項Q1〜Q5はオーナー承認済み（Q1=GAP分析ページは当面残す／Q2=「今日やるべきこと」は撤去し件数バッジのみ段1に残す・推移グラフ/計画パネルは折りたたみのまま維持／Q3=達成時も「達成していますが内訳を見る」の薄いリンクを残す／Q4=ワードマードもBIZ UDPGothicに統一／Q5=週次は「目標（週按分）」と表示ラベルに明記）。デザイントークン表はCLAUDE.md「デザイントークン」節参照 | 2026-08-22 | 区切り0〜5すべて実装済み（`frontend/tailwind.config.js` トークン追加・`components/diagnosis/{HeroKgi,DrillDown,KpiTriage,GenreDrill,ProductDrill,ActionRx,Breadcrumbs}.tsx` 新規・`pages/Dashboard.tsx` 置き換え・`components/dashboard/TodayActions.tsx` 削除・商品別KPI/RPP/データ取込み/商品マスタ/目標設定のgray/blue系トークン移行）。**検証済み**: `npm run build` 型エラー0、週次/月次/年次それぞれで段1〜5まで実際にクリックして遷移確認（軸ラベルの出し分け・達成済みKPIのクリック不可・年次でのActionRx非表示注記・パンくずの追従）、375px幅で横オーバーフロー0、サイドバー開閉・ツールチップ回帰確認、コンソールエラー0。**本番デプロイ・オーナー目視は未実施**（このセッション内で作業継続中） |
+
 ## ⚠️ セキュリティ最優先事項: 新しいテーブルには必ずRLSを（顧客データ漏洩の防止）
 
 **このプロダクトは他社（EC事業者）の売上データを預かる。データ漏洩は一度でも起こしてはならない。**
@@ -303,7 +305,7 @@ CSVパースは `backend/routers/import_csv.py`。エンコーディング/ス�
 
 フォント: 本文 `font-sans` = BIZ UDPGothic（400/700）、数値 `font-num` = Inter（500/600/700）+ `tabular-nums`。`index.html` の Google Fonts link と `tailwind.config.js` の `fontFamily` に導入済み。`font-display`（Poppins）・`font-mono`（Inconsolata）は既存箇所で使用中のため残置。
 
-商品別KPI/RPP/フォーム系に残る `gray`/`blue` 系の全面移行は区切り5のスコープ（未実施）。
+商品別KPI/RPP/データ取込み/商品マスタ・原価/目標設定の5画面に残っていた `gray`/`blue` 系は区切り5で新トークンへ機械的置換済み（2026-08-22）。GAP分析・請求・アカウント設定等の残りは対象外（GAP分析はQ1で当面残す方針、他は未着手）。ドリルダウン本体（`components/diagnosis/`）は区切り0〜5ですべて実装済み: HeroKgi（段1）→ DrillDown（段2〜5のコンテナ）→ KpiTriage/GenreDrill/ProductDrill/ActionRx。「今日やるべきこと」（TodayActions.tsx）は段5が後継のため削除済み。
 
 ### `.claude/agents/`（任意）
 

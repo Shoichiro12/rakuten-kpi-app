@@ -20,6 +20,8 @@ interface HeroKgiProps {
   sourceLabel: string
   /** 週次のときだけ「目標（週按分）」と明記する（確認事項Q5） */
   periodBasisNote?: string
+  /** 今日やるべきことの件数（区切り4でTodayActionsを撤去し、バッジだけここに残す。確認事項Q2） */
+  recoCount?: number
   /** 展開時にだけ出す内訳（売上3分解カード等） */
   children?: ReactNode
 }
@@ -37,6 +39,7 @@ export default function HeroKgi({
   achievementRate,
   sourceLabel,
   periodBasisNote,
+  recoCount,
   children,
 }: HeroKgiProps) {
   const [expanded, setExpanded] = useState(false)
@@ -52,15 +55,22 @@ export default function HeroKgi({
           <span className="text-sm text-muted">売上{hasTarget ? ' vs 目標' : ''}</span>
           <span className="text-xs px-1.5 py-0.5 rounded font-medium bg-bg-alt text-sub">{sourceLabel}</span>
         </div>
-        {hasTarget && (
-          <span
-            className={`text-xs font-bold px-2.5 py-1 rounded-full ${
-              achieved ? 'bg-up-bg text-up' : 'bg-alert-bg text-alert'
-            }`}
-          >
-            {achieved ? '達成' : '未達'}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          {!!recoCount && recoCount > 0 && (
+            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-sage-soft text-sage-deep">
+              今日やること {recoCount}件
+            </span>
+          )}
+          {hasTarget && (
+            <span
+              className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                achieved ? 'bg-up-bg text-up' : 'bg-alert-bg text-alert'
+              }`}
+            >
+              {achieved ? '達成' : '未達'}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* 金額はカード上では万・億で丸める（規約: docs/ui_number_and_chart_rules_2026-08-04.md 1-1） */}
@@ -99,7 +109,7 @@ export default function HeroKgi({
               </span>
             )}
           </div>
-          {periodBasisNote && <p className="text-[11px] text-muted mt-1">{periodBasisNote}</p>}
+          {periodBasisNote && <p className="text-xs text-muted mt-1">{periodBasisNote}</p>}
 
           <div className="flex items-center justify-between text-xs mt-3 pt-3 border-t border-line">
             <span className="text-muted">{forecast != null ? 'このペースの着地見込み' : ''}</span>
