@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { RefreshCw } from 'lucide-react'
 import Header from '../components/layout/Header'
 import KPICard from '../components/dashboard/KPICard'
@@ -43,7 +43,17 @@ export default function Dashboard() {
 
   const isYearly = period === 'yearly'
 
+  // レースコンディション対策: usePeriodState はマウント後に「データのある最新期間」を
+  // 取得して dateValue を自動更新するため、初期表示時は旧date→新dateの2回 load() が
+  // ほぼ同時に走る。ネットワークタイミング次第で旧dateのレスポンスが後から届くと、
+  // セレクタの表示（新date）とサブタイトル・データ（旧date）が食い違って見えていた
+  // （本番目視2026-08-22で発見）。レスポンス受信時に「今も同じ period/dateValue を
+  // 見ているか」をこの ref で確認し、違えば古い結果として捨てる。
+  const requestKeyRef = useRef({ period, dateValue })
+  requestKeyRef.current = { period, dateValue }
+
   const load = useCallback(async () => {
+    const requestKey = { period, dateValue }
     setLoading(true)
     try {
       const dateParam =
@@ -68,6 +78,13 @@ export default function Dashboard() {
         // 段2（KpiTriage）用のKGIツリー。GAP分析と同一データソース（ロジックは複製しない）
         api.gap.kpiTree(period, dateParam).catch(() => null) as Promise<KPITree | null>,
       ])
+
+      // このリクエストを開始した後に period/dateValue が変わっていたら、
+      // 後から発火した新しいリクエストの結果を上書きしてしまうので破棄する
+      const isStale = () =>
+        requestKeyRef.current.period !== requestKey.period || requestKeyRef.current.dateValue !== requestKey.dateValue
+      if (isStale()) return
+
       setData(dash ?? null)
       setKpiTree(tree ?? null)
       setDecomp(
@@ -82,6 +99,7 @@ export default function Dashboard() {
       setRecos((recoRes as RecommendationsResponse | null) ?? null)
       setOutcomes(outcomeRes ?? null)
     } catch (e) {
+      if (requestKeyRef.current.period !== requestKey.period || requestKeyRef.current.dateValue !== requestKey.dateValue) return
       console.error('[Dashboard] データ取得エラー:', e)
       setData(null)
       setAlerts([])
@@ -93,7 +111,9 @@ export default function Dashboard() {
       setDecomp(null)
       setKpiTree(null)
     } finally {
-      setLoading(false)
+      if (requestKeyRef.current.period === requestKey.period && requestKeyRef.current.dateValue === requestKey.dateValue) {
+        setLoading(false)
+      }
     }
   }, [period, dateValue])
 
