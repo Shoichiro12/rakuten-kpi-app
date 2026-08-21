@@ -83,7 +83,7 @@ function navRowClass(collapsed: boolean, isActive: boolean) {
     return `${base} justify-center py-0.5 ${isActive ? 'text-white' : 'text-gray-400'}`
   }
   return `${base} gap-3 px-4 py-3 ${
-    isActive ? 'bg-rakuten-red text-white font-medium' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
+    isActive ? 'bg-sage-deep text-white font-medium' : 'text-gray-300 hover:bg-gray-800 hover:text-white'
   }`
 }
 
@@ -118,11 +118,11 @@ function RowContent({ collapsed, icon: Icon, label, isActive = false, iconSize =
     return (
       <>
         {isActive && (
-          <span aria-hidden="true" className="absolute inset-y-1 left-0 w-[3px] rounded-r-full bg-rakuten-red" />
+          <span aria-hidden="true" className="absolute inset-y-1 left-0 w-[3px] rounded-r-full bg-sage" />
         )}
         <span
           className={`flex h-10 w-10 items-center justify-center rounded-lg transition-colors ${
-            isActive ? 'bg-rakuten-red text-white' : 'group-hover:bg-gray-800 group-hover:text-white'
+            isActive ? 'bg-sage-deep text-white' : 'group-hover:bg-gray-800 group-hover:text-white'
           }`}
         >
           <Icon size={iconSize} aria-hidden="true" />
@@ -158,7 +158,7 @@ export default function Sidebar({ onOpenHelp, onOpenFeedback, userEmail, onSignO
 
   return (
     <aside
-      className={`${collapsed ? 'w-16' : 'w-56'} min-h-screen bg-gray-900 text-white flex flex-col shrink-0`}
+      className={`${collapsed ? 'w-16' : 'w-56'} min-h-screen bg-ink-strong text-white flex flex-col shrink-0`}
     >
       <div
         className={`flex items-center border-b border-gray-700 ${

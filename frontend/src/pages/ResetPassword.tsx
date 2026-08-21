@@ -54,7 +54,7 @@ export default function ResetPassword({ onDone }: Props) {
             </p>
             <button
               onClick={onDone}
-              className="w-full py-2.5 bg-rakuten-red hover:opacity-90 text-white text-sm font-medium rounded-lg transition-opacity"
+              className="w-full py-2.5 bg-ink-strong hover:opacity-90 text-white text-sm font-medium rounded-lg transition-opacity"
             >
               アプリへ進む
             </button>
@@ -70,7 +70,7 @@ export default function ResetPassword({ onDone }: Props) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rakuten-red"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ink-strong"
                 placeholder="6文字以上"
               />
             </div>
@@ -83,7 +83,7 @@ export default function ResetPassword({ onDone }: Props) {
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
                 autoComplete="new-password"
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rakuten-red"
+                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ink-strong"
               />
             </div>
 
@@ -92,7 +92,7 @@ export default function ResetPassword({ onDone }: Props) {
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 py-2.5 bg-rakuten-red hover:opacity-90 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-opacity"
+              className="w-full flex items-center justify-center gap-2 py-2.5 bg-ink-strong hover:opacity-90 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-opacity"
             >
               {loading ? <Loader2 size={16} className="animate-spin" /> : <KeyRound size={16} />}
               パスワードを再設定
