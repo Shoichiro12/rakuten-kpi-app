@@ -1,8 +1,9 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Save, CheckCircle, Check, RefreshCw, Trash2 } from 'lucide-react'
 import Header from '../components/layout/Header'
 import { useTableSort } from '../components/table/useTableSort'
 import SortableTh from '../components/table/SortableTh'
+import { useEditableGrid } from '../components/grid/useEditableGrid'
 import { api } from '../lib/api'
 import { getCurrentYearMonth } from '../lib/utils'
 import type { Target, ItemTargetListEntry, RevenuePlanResponse } from '../types'
@@ -53,13 +54,30 @@ export default function TargetSetting() {
   // アイテム別目標（3-B''・第3段階）
   const [itemRows, setItemRows] = useState<ItemTargetListEntry[]>([])
   const [itemMsg, setItemMsg] = useState<string | null>(null)
-  // 一括入力（区切り2）: 編集中の値（management_no→入力文字列）・絞り込み・保存中
-  const [pending, setPending] = useState<Record<string, string>>({})
+  // 絞り込み（一括入力の編集状態そのものは useEditableGrid に委譲。区切り3）
   const [itemKw, setItemKw] = useState('')
   const [itemGenre, setItemGenre] = useState('')     // '' = すべて（genre_u1で絞る）
   const [itemUnsetOnly, setItemUnsetOnly] = useState(false)
-  const [bulkSaving, setBulkSaving] = useState(false)
   const itemSort = useTableSort<ItemTargetListEntry>(ITEM_SORT_ACCESSORS)
+
+  // EditableGrid共通フック（マスタCRUD規約2026-08-22 区切り3）。
+  // 入力欄1つ（目標売上）の編集バッファ・未保存判定・一括保存をここに集約する。
+  const grid = useEditableGrid<ItemTargetListEntry>({
+    rows: itemRows,
+    rowKey: (r) => r.management_no,
+    getSavedValue: (r) => (r.target?.target_sales != null ? String(r.target.target_sales) : ''),
+    isValidValue: (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 },
+    onBulkSave: async (entries) => {
+      const items = entries.map((e) => ({ management_no: e.rowKey, target_sales: Number(e.value) }))
+      const res = await api.itemTargets.bulk(yearMonth, items)
+      await loadItemTargets(yearMonth)
+      flashItem(`${res?.saved_count ?? items.length}件の目標を保存し、目標CVR・客単価・必要アクセスを自動算出しました`)
+    },
+  })
+  // loadItemTargets は空deps（安定参照）で持ちたいため、最新の grid を ref 経由で参照する
+  // （grid は毎レンダー新しいオブジェクトなので、依存配列に入れると useEffect が無限に再発火する）
+  const gridRef = useRef(grid)
+  gridRef.current = grid
 
   // 売上予算プラン（第4段階v2）: 年間売上予算・予算年度起点と按分プレビュー
   const [annualBudget, setAnnualBudget] = useState<number | ''>('')
@@ -113,7 +131,7 @@ export default function TargetSetting() {
     try {
       const res = await api.itemTargets.list(ym)
       setItemRows(res.items)
-      setPending({})   // 再取得したら編集中バッファは破棄（保存済みの値が正）
+      gridRef.current.clearPending()   // 再取得したら編集中バッファは破棄（保存済みの値が正）
     } catch (e) {
       console.error('[TargetSetting] アイテム別目標取得エラー:', e)
       setItemRows([])
@@ -124,24 +142,6 @@ export default function TargetSetting() {
     setItemMsg(msg)
     setTimeout(() => setItemMsg(null), 2500)
   }
-
-  // 入力欄の表示値（編集中があればそれを、無ければ保存済みの目標売上）
-  const displayValue = (r: ItemTargetListEntry): string => {
-    const p = pending[r.management_no]
-    if (p !== undefined) return p
-    return r.target?.target_sales != null ? String(r.target.target_sales) : ''
-  }
-
-  // その行が「未保存の変更」を持つか（数値として有効・0超・保存済みと異なる）
-  const isDirty = (r: ItemTargetListEntry): boolean => {
-    const p = pending[r.management_no]
-    if (p === undefined) return false
-    const v = Number(p)
-    if (!Number.isFinite(v) || v <= 0) return false
-    return v !== (r.target?.target_sales ?? null)
-  }
-
-  const dirtyRows = itemRows.filter(isDirty)
 
   // ジャンル絞り込みの選択肢（大分類・重複排除）
   const genreOptions = Array.from(
@@ -160,19 +160,13 @@ export default function TargetSetting() {
     return true
   })
 
-  const bulkSaveItemTargets = async () => {
-    const items = dirtyRows.map((r) => ({ management_no: r.management_no, target_sales: Number(pending[r.management_no]) }))
-    if (items.length === 0) { flashItem('保存対象の変更がありません'); return }
-    setBulkSaving(true)
+  const saveItemTargets = async () => {
+    if (grid.dirtyRows.length === 0) { flashItem('保存対象の変更がありません'); return }
     try {
-      const res = await api.itemTargets.bulk(yearMonth, items)
-      await loadItemTargets(yearMonth)
-      flashItem(`${res?.saved_count ?? items.length}件の目標を保存し、目標CVR・客単価・必要アクセスを自動算出しました`)
+      await grid.bulkSave()
     } catch (e) {
       console.error('[TargetSetting] アイテム別目標の一括保存エラー:', e)
       flashItem('一括保存に失敗しました')
-    } finally {
-      setBulkSaving(false)
     }
   }
 
@@ -673,15 +667,15 @@ export default function TargetSetting() {
                   </label>
                   <span className="text-xs text-muted">{filteredRows.length}件表示 / 全{itemRows.length}件</span>
                   <div className="ml-auto flex items-center gap-2">
-                    {dirtyRows.length > 0 && (
-                      <span className="text-xs text-amber-600">未保存 {dirtyRows.length}件</span>
+                    {grid.dirtyRows.length > 0 && (
+                      <span className="text-xs text-amber-600">未保存 {grid.dirtyRows.length}件</span>
                     )}
                     <button
-                      onClick={bulkSaveItemTargets}
-                      disabled={dirtyRows.length === 0 || bulkSaving}
+                      onClick={saveItemTargets}
+                      disabled={grid.dirtyRows.length === 0 || grid.saving}
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sage-deep hover:bg-sage-deep disabled:bg-line disabled:cursor-not-allowed text-white text-sm font-medium rounded"
                     >
-                      <Save size={14} />{bulkSaving ? '保存中…' : '一括保存'}
+                      <Save size={14} />{grid.saving ? '保存中…' : '一括保存'}
                     </button>
                   </div>
                 </div>
@@ -715,7 +709,7 @@ export default function TargetSetting() {
                       </tr>
                     ) : itemSort.apply(filteredRows).map((r) => {
                       const t = r.target
-                      const dirty = isDirty(r)
+                      const dirty = grid.isDirty(r)
                       return (
                         <tr key={r.management_no} className={dirty ? 'bg-amber-50/60' : undefined}>
                           <td className="px-4 py-2">
@@ -734,9 +728,9 @@ export default function TargetSetting() {
                               <span className="text-muted text-xs">¥</span>
                               <input
                                 type="number" min={0} step={10000}
-                                value={displayValue(r)}
+                                value={grid.displayValue(r)}
                                 placeholder="未設定"
-                                onChange={(e) => setPending((p) => ({ ...p, [r.management_no]: e.target.value }))}
+                                onChange={(e) => grid.setValue(r, e.target.value)}
                                 className={`w-28 text-right border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-sage-deep ${dirty ? 'border-amber-400 bg-white' : 'border-line'}`}
                               />
                               {dirty && <span className="text-xs text-amber-600">未保存</span>}
