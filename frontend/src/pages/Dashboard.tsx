@@ -9,7 +9,6 @@ import EmptyState from '../components/EmptyState'
 import EvaluationMatrix from '../components/EvaluationMatrix'
 import AccessPlanner from '../components/dashboard/AccessPlanner'
 import RevenuePlanPanel from '../components/dashboard/RevenuePlanPanel'
-import TodayActions from '../components/dashboard/TodayActions'
 import ActionOutcomes from '../components/dashboard/ActionOutcomes'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
@@ -244,6 +243,7 @@ export default function Dashboard() {
           achievementRate={data?.achievement_rate ?? null}
           sourceLabel={shop ? '商品分析（店舗全体）' : 'RPP経由売上'}
           periodBasisNote={period === 'weekly' ? '目標（週按分）' : undefined}
+          recoCount={(recos?.recommendations?.length ?? 0) + (recos?.product_recommendations?.length ?? 0)}
         >
           {/* ═══ 段2〜5: ドリルダウン本体（要因→ジャンル→商品→アクション）═══ */}
           <DrillDown
@@ -257,8 +257,9 @@ export default function Dashboard() {
           />
         </HeroKgi>
 
-        {/* ═══ 2層: アクション帯（今日やること・アラート・評価マトリクス）═══ */}
-        {!isYearly && <TodayActions data={recos} onChanged={load} />}
+        {/* ═══ 2層: アクション帯（アラート・評価マトリクス）═══
+            「今日やるべきこと」は区切り4で撤去（段5のアクションが後継）。
+            件数バッジは段1（HeroKgi）に残す（確認事項Q2）。 */}
 
         {/* アラートは最大3件を初期表示し、残りは開閉に格納する（2026-08-20 レビュー採用）。
             全件を同じ強さで並べると、どれから手を付けるかが読めなくなるため。 */}
