@@ -255,6 +255,9 @@ export const api = {
     /** product_name / category_id / is_active ＋ゲート用状態（フェーズ・ページ品質等）の編集 */
     updateProduct: (managementNo: string, data: Partial<Pick<import('../types').MasterProduct, 'product_name' | 'category_id' | 'is_active' | 'launch_month' | 'phase_override' | 'page_ready' | 'investment_intent'>>) =>
       request(`/master/products/${encodeURIComponent(managementNo)}`, { method: 'PUT', body: JSON.stringify(data) }),
+    /** 商品マスタから削除（ソフトデリート。一覧・診断・提案の母集団から除外。実績は保持） */
+    deleteProduct: (managementNo: string) =>
+      request<{ deleted_management_no: string }>(`/master/products/${encodeURIComponent(managementNo)}`, { method: 'DELETE' }),
     /* ─── ジャンル別ベンチマーク手入力（アクション提案ロジック 3-B / 3-B'）─── */
     benchmarks: () =>
       request<{ count: number; items: import('../types').GenreBenchmarkItem[] }>('/master/benchmarks')
