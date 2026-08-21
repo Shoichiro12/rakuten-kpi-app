@@ -177,8 +177,8 @@ export const api = {
   gap: {
     shop: (period: string, date?: string, includeInactive?: boolean) =>
       request(`/gap/shop?period=${period}${date ? `&date=${date}` : ''}${includeInactive === undefined ? '' : `&include_inactive=${includeInactive}`}`),
-    genre: (period: string, date?: string, includeInactive?: boolean) =>
-      request(`/gap/genre?period=${period}${date ? `&date=${date}` : ''}${includeInactive === undefined ? '' : `&include_inactive=${includeInactive}`}`),
+    genre: (period: string, date?: string, includeInactive?: boolean, level?: 'u1' | 'u2' | 'u3', parent?: string) =>
+      request(`/gap/genre?period=${period}${date ? `&date=${date}` : ''}${includeInactive === undefined ? '' : `&include_inactive=${includeInactive}`}${level ? `&level=${level}` : ''}${parent ? `&parent=${encodeURIComponent(parent)}` : ''}`),
     product: (period: string, date?: string, genre?: string, includeInactive?: boolean) =>
       request(`/gap/product?period=${period}${date ? `&date=${date}` : ''}${genre ? `&genre=${encodeURIComponent(genre)}` : ''}${includeInactive === undefined ? '' : `&include_inactive=${includeInactive}`}`),
     kpiTree: (period: string, date?: string) =>
