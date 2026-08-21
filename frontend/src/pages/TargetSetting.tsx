@@ -1,21 +1,10 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Save, CheckCircle, Check, RefreshCw, Trash2 } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { Save, CheckCircle } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import Header from '../components/layout/Header'
-import { useTableSort } from '../components/table/useTableSort'
-import SortableTh from '../components/table/SortableTh'
-import { useEditableGrid } from '../components/grid/useEditableGrid'
 import { api } from '../lib/api'
 import { getCurrentYearMonth } from '../lib/utils'
-import type { Target, ItemTargetListEntry, RevenuePlanResponse } from '../types'
-
-// アイテム別目標テーブルのソート用アクセサ（target配下・直近実績のネスト値）
-const ITEM_SORT_ACCESSORS = {
-  product_name: (r: ItemTargetListEntry) => r.product_name ?? r.management_no,
-  target_sales: (r: ItemTargetListEntry) => r.target?.target_sales ?? null,
-  target_cvr: (r: ItemTargetListEntry) => r.target?.target_cvr ?? null,
-  target_av: (r: ItemTargetListEntry) => r.target?.target_av ?? null,
-  required_access: (r: ItemTargetListEntry) => r.target?.required_access ?? null,
-}
+import type { Target, RevenuePlanResponse } from '../types'
 
 const CONFIDENCE_LABELS: Record<string, { label: string; cls: string }> = {
   high: { label: '精度: 高（2年分以上の実績）', cls: 'bg-green-100 text-green-700' },
@@ -51,33 +40,8 @@ export default function TargetSetting() {
   const [saved, setSaved] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  // アイテム別目標（3-B''・第3段階）
-  const [itemRows, setItemRows] = useState<ItemTargetListEntry[]>([])
-  const [itemMsg, setItemMsg] = useState<string | null>(null)
-  // 絞り込み（一括入力の編集状態そのものは useEditableGrid に委譲。区切り3）
-  const [itemKw, setItemKw] = useState('')
-  const [itemGenre, setItemGenre] = useState('')     // '' = すべて（genre_u1で絞る）
-  const [itemUnsetOnly, setItemUnsetOnly] = useState(false)
-  const itemSort = useTableSort<ItemTargetListEntry>(ITEM_SORT_ACCESSORS)
-
-  // EditableGrid共通フック（マスタCRUD規約2026-08-22 区切り3）。
-  // 入力欄1つ（目標売上）の編集バッファ・未保存判定・一括保存をここに集約する。
-  const grid = useEditableGrid<ItemTargetListEntry>({
-    rows: itemRows,
-    rowKey: (r) => r.management_no,
-    getSavedValue: (r) => (r.target?.target_sales != null ? String(r.target.target_sales) : ''),
-    isValidValue: (v) => { const n = Number(v); return Number.isFinite(n) && n > 0 },
-    onBulkSave: async (entries) => {
-      const items = entries.map((e) => ({ management_no: e.rowKey, target_sales: Number(e.value) }))
-      const res = await api.itemTargets.bulk(yearMonth, items)
-      await loadItemTargets(yearMonth)
-      flashItem(`${res?.saved_count ?? items.length}件の目標を保存し、目標CVR・客単価・必要アクセスを自動算出しました`)
-    },
-  })
-  // loadItemTargets は空deps（安定参照）で持ちたいため、最新の grid を ref 経由で参照する
-  // （grid は毎レンダー新しいオブジェクトなので、依存配列に入れると useEffect が無限に再発火する）
-  const gridRef = useRef(grid)
-  gridRef.current = grid
+  // アイテム別目標の一括編集は商品マスタ「アイテム別目標」タブへ移設済み
+  // （マスタCRUD規約2026-08-22 区切り5。API・ロジックは無変更、置き場所のみ変更）
 
   // 売上予算プラン（第4段階v2）: 年間売上予算・予算年度起点と按分プレビュー
   const [annualBudget, setAnnualBudget] = useState<number | ''>('')
@@ -126,83 +90,6 @@ export default function TargetSetting() {
       setBudgetSaving(false)
     }
   }
-
-  const loadItemTargets = useCallback(async (ym: string) => {
-    try {
-      const res = await api.itemTargets.list(ym)
-      setItemRows(res.items)
-      gridRef.current.clearPending()   // 再取得したら編集中バッファは破棄（保存済みの値が正）
-    } catch (e) {
-      console.error('[TargetSetting] アイテム別目標取得エラー:', e)
-      setItemRows([])
-    }
-  }, [])
-
-  const flashItem = (msg: string) => {
-    setItemMsg(msg)
-    setTimeout(() => setItemMsg(null), 2500)
-  }
-
-  // ジャンル絞り込みの選択肢（大分類・重複排除）
-  const genreOptions = Array.from(
-    new Set(itemRows.map((r) => r.genre_u1).filter((g): g is string => !!g)),
-  ).sort()
-
-  // 絞り込み結果（キーワード・ジャンル・未設定のみ）
-  const filteredRows = itemRows.filter((r) => {
-    if (itemGenre && r.genre_u1 !== itemGenre) return false
-    if (itemUnsetOnly && r.target != null) return false
-    if (itemKw) {
-      const kw = itemKw.toLowerCase()
-      const name = (r.product_name || '').toLowerCase()
-      if (!name.includes(kw) && !r.management_no.toLowerCase().includes(kw)) return false
-    }
-    return true
-  })
-
-  const saveItemTargets = async () => {
-    if (grid.dirtyRows.length === 0) { flashItem('保存対象の変更がありません'); return }
-    try {
-      await grid.bulkSave()
-    } catch (e) {
-      console.error('[TargetSetting] アイテム別目標の一括保存エラー:', e)
-      flashItem('一括保存に失敗しました')
-    }
-  }
-
-  const approveItemTarget = async (mno: string) => {
-    try {
-      await api.itemTargets.approve({ management_no: mno, year_month: yearMonth })
-      await loadItemTargets(yearMonth)
-      flashItem(`${mno} の参考値を確定しました（診断・逆算で使われます）`)
-    } catch (e) {
-      console.error('[TargetSetting] 参考値承認エラー:', e)
-    }
-  }
-
-  const recalcItemTarget = async (mno: string) => {
-    try {
-      await api.itemTargets.recalc({ management_no: mno, year_month: yearMonth })
-      await loadItemTargets(yearMonth)
-      flashItem(`${mno} を最新の実績で再計算しました`)
-    } catch (e) {
-      console.error('[TargetSetting] 再計算エラー:', e)
-    }
-  }
-
-  /** アイテム別目標の削除（2026-08-20 オーナー要望）。設定済みの目標行だけが対象 */
-  const deleteItemTarget = async (mno: string) => {
-    if (!window.confirm(`${mno} の ${yearMonth} のアイテム別目標を削除します。よろしいですか？`)) return
-    try {
-      await api.itemTargets.remove(mno, yearMonth)
-      await loadItemTargets(yearMonth)
-      flashItem(`${mno} の目標を削除しました`)
-    } catch (e) {
-      console.error('[TargetSetting] アイテム別目標の削除エラー:', e)
-    }
-  }
-
-  useEffect(() => { loadItemTargets(yearMonth) }, [yearMonth, loadItemTargets])
 
   useEffect(() => {
     api.targets.list()
@@ -267,7 +154,6 @@ export default function TargetSetting() {
   }
 
   const estimatedGP = form.target_sales * (1 - (form.expense_rate + costRate))
-  const estimatedRev = estimatedGP - form.target_sales * form.expense_rate
 
   return (
     <div className="flex flex-col h-full">
@@ -288,7 +174,7 @@ export default function TargetSetting() {
 
       <div className="flex-1 overflow-auto p-6 bg-bg-alt">
         {/* 幅の上限は付けない（他の表示系画面と同じ全幅）。
-            アイテム別目標・年間目標プランナーの表が画面幅を使い切れるようにするため。max-w-* を戻さないこと */}
+            年間目標プランナーの表が画面幅を使い切れるようにするため。max-w-* を戻さないこと */}
         <div className="space-y-6">
           {/* 対象月 */}
           {/* フォーム系カードは読みやすい幅で止める（CLAUDE.md「画面幅の規約」） */}
@@ -629,184 +515,17 @@ export default function TargetSetting() {
 
           {/* 試算はKGIカード内へ移動した（入力と結果の因果を切らない。2026-08-20） */}
 
-          {/* アイテム別目標（3-B''・第3段階） */}
-          <div className="bg-white rounded-xl border shadow-sm overflow-hidden max-w-5xl">
-            <div className="px-4 py-3 border-b space-y-3">
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  {/* 6列の表。全幅だと間延びするのでカード側で止める（CLAUDE.md「画面幅の規約」） */}
-                  <h3 className="text-sm font-semibold text-sub">アイテム別目標（{yearMonth}）</h3>
-                  <p className="text-xs text-muted mt-0.5">
-                    入力するのは目標売上だけ。目標CVR・客単価は「現状値と前年値の低い方」を自動採用し（保守的な確定公式）、必要アクセス数を逆算します。複数まとめて入力して「一括保存」できます。
-                  </p>
-                </div>
-                {itemMsg && (
-                  <span className="flex items-center gap-1.5 text-xs text-green-600"><CheckCircle size={13} />{itemMsg}</span>
-                )}
-              </div>
-
-              {itemRows.length > 0 && (
-                <div className="flex items-center gap-2 flex-wrap">
-                  <input
-                    type="text" value={itemKw} onChange={(e) => setItemKw(e.target.value)}
-                    placeholder="商品名・管理番号で検索"
-                    className="w-52 text-sm border border-line rounded px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-sage-deep"
-                  />
-                  {genreOptions.length > 0 && (
-                    <select
-                      value={itemGenre} onChange={(e) => setItemGenre(e.target.value)}
-                      className="text-sm border border-line rounded px-2.5 py-1.5 bg-white focus:outline-none focus:ring-2 focus:ring-sage-deep"
-                    >
-                      <option value="">ジャンル（すべて）</option>
-                      {genreOptions.map((g) => <option key={g} value={g}>{g}</option>)}
-                    </select>
-                  )}
-                  <label className="flex items-center gap-1.5 text-sm text-sub cursor-pointer select-none">
-                    <input type="checkbox" checked={itemUnsetOnly} onChange={(e) => setItemUnsetOnly(e.target.checked)} className="rounded" />
-                    未設定のみ
-                  </label>
-                  <span className="text-xs text-muted">{filteredRows.length}件表示 / 全{itemRows.length}件</span>
-                  <div className="ml-auto flex items-center gap-2">
-                    {grid.dirtyRows.length > 0 && (
-                      <span className="text-xs text-amber-600">未保存 {grid.dirtyRows.length}件</span>
-                    )}
-                    <button
-                      onClick={saveItemTargets}
-                      disabled={grid.dirtyRows.length === 0 || grid.saving}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sage-deep hover:bg-sage-deep disabled:bg-line disabled:cursor-not-allowed text-white text-sm font-medium rounded"
-                    >
-                      <Save size={14} />{grid.saving ? '保存中…' : '一括保存'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {itemRows.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted">
-                商品データがまだありません。商品分析CSVを取り込むと商品が表示されます。
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-bg-alt text-xs text-muted">
-                    <tr>
-                      <SortableTh label="商品" sortKey="product_name" sort={itemSort} align="left" className="pl-1" />
-                      <SortableTh label="目標売上（入力）" sortKey="target_sales" sort={itemSort} />
-                      <SortableTh label="目標CVR（%）" sortKey="target_cvr" sort={itemSort} />
-                      <SortableTh label="目標客単価（円）" sortKey="target_av" sort={itemSort} />
-                      <SortableTh label="必要アクセス（UU）" sortKey="required_access" sort={itemSort} />
-                      <th className="px-3 py-2.5 text-left">根拠</th>
-                      <th className="px-3 py-2.5 text-center whitespace-nowrap">操作</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-bg-alt">
-                    {filteredRows.length === 0 ? (
-                      <tr>
-                        <td colSpan={7} className="py-8 text-center text-sm text-muted">
-                          絞り込み条件に一致する商品がありません。
-                        </td>
-                      </tr>
-                    ) : itemSort.apply(filteredRows).map((r) => {
-                      const t = r.target
-                      const dirty = grid.isDirty(r)
-                      return (
-                        <tr key={r.management_no} className={dirty ? 'bg-amber-50/60' : undefined}>
-                          <td className="px-4 py-2">
-                            <p className="text-ink-strong leading-tight">{r.product_name || r.management_no}</p>
-                            <p className="text-xs text-muted font-mono">{r.management_no}</p>
-                            {r.latest_actual ? (
-                              <p className="text-xs text-muted">
-                                直近実績（{r.latest_actual.year_month}）: UU {r.latest_actual.access_uu.toLocaleString()} / CVR {r.latest_actual.cvr}% / 客単価 ¥{r.latest_actual.av.toLocaleString()}
-                              </p>
-                            ) : (
-                              <p className="text-xs text-amber-600">実績データなし（保存すると参考値を推定します）</p>
-                            )}
-                          </td>
-                          <td className="px-3 py-2 text-right whitespace-nowrap">
-                            <span className="inline-flex items-center gap-1">
-                              <span className="text-muted text-xs">¥</span>
-                              <input
-                                type="number" min={0} step={10000}
-                                value={grid.displayValue(r)}
-                                placeholder="未設定"
-                                onChange={(e) => grid.setValue(r, e.target.value)}
-                                className={`w-28 text-right border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-sage-deep ${dirty ? 'border-amber-400 bg-white' : 'border-line'}`}
-                              />
-                              {dirty && <span className="text-xs text-amber-600">未保存</span>}
-                            </span>
-                          </td>
-                          <td className="px-3 py-2 text-right text-sub">{t?.target_cvr != null ? String(t.target_cvr) : '—'}</td>
-                          <td className="px-3 py-2 text-right text-sub">{t?.target_av != null ? Math.round(t.target_av).toLocaleString() : '—'}</td>
-                          <td className="px-3 py-2 text-right font-medium text-ink-strong">
-                            {t?.required_access != null ? Math.round(t.required_access).toLocaleString() : '—'}
-                          </td>
-                          <td className="px-3 py-2">
-                            {!t ? (
-                              <span className="text-xs text-line">—</span>
-                            ) : t.calc_basis === 'rule' ? (
-                              <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-green-100 text-green-700" title={t.basis_detail ?? undefined}>
-                                自動算出（確定公式）
-                              </span>
-                            ) : t.calc_basis === 'estimated' ? (
-                              <span className="inline-flex items-center gap-1.5 flex-wrap">
-                                <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700" title={t.basis_detail ?? undefined}>
-                                  参考値（推定）
-                                </span>
-                                {t.estimated_approved ? (
-                                  <>
-                                    <span className="text-xs text-green-600">承認済み</span>
-                                    <button
-                                      onClick={() => recalcItemTarget(r.management_no)}
-                                      className="inline-flex items-center gap-1 px-1.5 py-0.5 border text-muted hover:bg-bg-alt text-xs rounded"
-                                      title="最新の実績・推定で洗い直します"
-                                    >
-                                      <RefreshCw size={10} />再計算
-                                    </button>
-                                  </>
-                                ) : (
-                                  <button
-                                    onClick={() => approveItemTarget(r.management_no)}
-                                    className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-sage-deep hover:bg-sage-deep text-white text-xs font-medium rounded"
-                                    title="承認するまで診断・逆算には使われません"
-                                  >
-                                    <Check size={10} />この参考値で確定
-                                  </button>
-                                )}
-                              </span>
-                            ) : (
-                              <span className="inline-block px-1.5 py-0.5 rounded text-xs font-medium bg-bg-alt text-muted" title={t.basis_detail ?? undefined}>
-                                算出不能（データ待ち）
-                              </span>
-                            )}
-                          </td>
-                          {/* 操作: 設定済みの目標だけ削除できる（2026-08-20 オーナー要望。
-                              消せないと不要な目標が溜まり、逆算・診断の重複の原因になる） */}
-                          <td className="px-3 py-2 text-center">
-                            {t ? (
-                              <button
-                                onClick={() => deleteItemTarget(r.management_no)}
-                                className="inline-flex items-center gap-1 px-2 py-1 border border-line text-muted hover:text-red-600 hover:border-red-300 hover:bg-red-50 text-xs rounded transition-colors"
-                                title="この商品のこの月の目標を削除します"
-                              >
-                                <Trash2 size={11} />削除
-                              </button>
-                            ) : (
-                              <span className="text-xs text-line">—</span>
-                            )}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            )}
-            <p className="px-4 py-2.5 text-xs text-muted border-t bg-bg-alt/60 leading-snug">
-              計算式: 目標注文件数 = 目標売上 ÷ 目標客単価、必要アクセス数 = 目標注文件数 ÷ 目標CVR。
-              実績が無い商品は同ジャンル・自店平均からの参考値を提示し、「この参考値で確定」を押すまで診断・逆算には使いません。
-              商品分析CSVを取り込むと自動で再計算されます（実測が取れた商品は確定公式に自動切替）。
+          {/* アイテム別目標は商品マスタへ移設済み（マスタCRUD規約2026-08-22 区切り5） */}
+          <div className="bg-white rounded-xl border shadow-sm p-4 max-w-3xl flex items-center justify-between gap-3">
+            <p className="text-sm text-sub">
+              商品ごとの目標売上は「商品マスタ」の<span className="font-medium text-ink-strong">アイテム別目標</span>タブへ移動しました。
             </p>
+            <Link
+              to="/master"
+              className="shrink-0 px-3 py-1.5 bg-ink-strong hover:bg-ink text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              商品マスタを開く
+            </Link>
           </div>
 
           {/* 設定済み目標一覧 */}
