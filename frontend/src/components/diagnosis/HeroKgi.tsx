@@ -1,25 +1,24 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import BulletChart from '../kpi/BulletChart'
-import { formatYen, formatYenAxis } from '../../lib/format'
+import { formatYen, formatYenExact } from '../../lib/format'
 import { formatCurrency } from '../../lib/utils'
 import { FOCUS_RING } from '../../lib/a11y'
 
 interface HeroKgiProps {
   /** 実績（RPP経由 or 商品分析の売上） */
   actualSales: number | null
-  /** 目標（バックエンドが期間に応じて按分済みの値を返す） */
-  targetSales: number | null
-  /** あるべき進捗（ペーサー）。目標 × 経過割合 */
-  pacer: number | null
+  /** 按分目標（週按分/月按分/年按分）。バーの100%・達成率・不足額の基準（修正指示2026-08-22 B） */
+  proratedTarget: number | null
+  /** フル目標（期間の満額）。3行目の着地見込み比較の分母にのみ使う */
+  fullTarget: number | null
   /** このペースの着地見込み */
   forecast: number | null
-  /** 達成率（%） */
-  achievementRate: number | null
   /** 実績の出所ラベル（RPP経由売上 / 商品分析（店舗全体）） */
   sourceLabel: string
-  /** 週次のときだけ「目標（週按分）」と明記する（確認事項Q5） */
-  periodBasisNote?: string
+  /** 按分方式のラベル（週按分/月按分/年按分）。大数字の右に按分目標と併記する（確認事項Q5） */
+  periodBasisLabel: string
+  /** 着地見込みの比較基準ラベル（週目標比/月目標比/年目標比） */
+  fullTargetBasisLabel: string
   /** 今日やるべきことの件数（区切り4でTodayActionsを撤去し、バッジだけここに残す。確認事項Q2） */
   recoCount?: number
   /** 展開時にだけ出す内訳（売上3分解カード等） */
@@ -30,23 +29,30 @@ interface HeroKgiProps {
  * ダッシュボードのドリルダウン入口（段1）。
  * 開いた瞬間に見えるのは「予算 vs 売上」だけ。達成していれば既定では何も足さない。
  * 未達のときだけ「詳しく見る」で下（children）に掘れる（確認事項Q3で達成時も薄いリンクを残す）。
+ *
+ * バーは按分目標を100%とする単純な進捗バー（修正指示2026-08-22 A）。
+ * 弾丸グラフ（BulletChart）は使わない — 期間途中の実績をフル目標軸で見せると
+ * 常にほぼ空に見えてしまい、インラインラベルも衝突するため。BulletChart自体は
+ * GAP分析等で使用中のため削除しない（HeroKgiからの参照だけ外す）。
  */
 export default function HeroKgi({
   actualSales,
-  targetSales,
-  pacer,
+  proratedTarget,
+  fullTarget,
   forecast,
-  achievementRate,
   sourceLabel,
-  periodBasisNote,
+  periodBasisLabel,
+  fullTargetBasisLabel,
   recoCount,
   children,
 }: HeroKgiProps) {
   const [expanded, setExpanded] = useState(false)
 
-  const hasTarget = targetSales != null && targetSales > 0
-  const achieved = hasTarget && achievementRate != null && achievementRate >= 100
-  const diff = hasTarget && actualSales != null ? actualSales - targetSales : null
+  const hasTarget = proratedTarget != null && proratedTarget > 0
+  const achievementRate = hasTarget && actualSales != null ? (actualSales / proratedTarget) * 100 : null
+  const achieved = achievementRate != null && achievementRate >= 100
+  const diff = hasTarget && actualSales != null ? actualSales - proratedTarget : null
+  const fillPct = achievementRate != null ? Math.min(100, Math.max(0, achievementRate)) : 0
 
   return (
     <div className="bg-paper rounded-xl border border-line p-5">
@@ -73,33 +79,32 @@ export default function HeroKgi({
         </div>
       </div>
 
-      {/* 金額はカード上では万・億で丸める（規約: docs/ui_number_and_chart_rules_2026-08-04.md 1-1） */}
+      {/* 1行目: 実績（大・num）＋按分目標（右添え・muted） */}
       <p className="font-num text-[40px] leading-[1.05] font-semibold text-ink mt-2 tracking-tight tabular-nums">
         {formatYen(actualSales)}
         {hasTarget && (
-          <span className="font-sans text-base font-normal text-muted ml-2">
-            目標 {formatYen(targetSales)}
+          <span className="font-sans text-base font-normal text-muted ml-2" title={fullTarget != null ? `満額 ${formatYenExact(fullTarget)}` : undefined}>
+            目標 {formatYen(proratedTarget)}（{periodBasisLabel}）
           </span>
         )}
       </p>
 
       {hasTarget ? (
         <>
-          <div className="mt-4">
-            <BulletChart
-              value={actualSales ?? 0}
-              target={targetSales}
-              pace={pacer}
-              projection={forecast}
-              lowerIsBetter={false}
-              formatTick={(v) => formatYenAxis(v)}
-              valueLabel={formatYen(actualSales)}
-              projectionLabel={forecast != null ? `着地見込 ${formatYen(forecast)}` : undefined}
-              ariaLabel={`売上の弾丸グラフ。実績 ${formatYen(actualSales)}、目標 ${formatYen(targetSales)}`}
-              height={86}
-            />
+          {/* バー: 按分目標=100%の単純な進捗バー。バー上に文字は置かない */}
+          <div className="relative mt-4">
+            <div className="h-1.5 rounded-[3px] bg-bg-alt overflow-hidden">
+              <div
+                className={`h-full rounded-[3px] ${achieved ? 'bg-up' : 'bg-alert'}`}
+                style={{ width: `${fillPct}%` }}
+              />
+            </div>
+            {/* 目標ティック（右端＝按分目標の位置） */}
+            <div aria-hidden="true" className="absolute right-0 -top-0.5 -bottom-0.5 w-[1.5px] bg-sub" />
           </div>
-          <div className="flex items-center justify-between text-xs text-sub mt-1">
+
+          {/* 2行目: 達成率（左）／ 不足・超過額（右） */}
+          <div className="flex items-center justify-between text-xs text-sub mt-2">
             <span className="font-num tabular-nums font-semibold text-ink">
               達成率 {achievementRate?.toFixed(1)}%
             </span>
@@ -109,13 +114,17 @@ export default function HeroKgi({
               </span>
             )}
           </div>
-          {periodBasisNote && <p className="text-xs text-muted mt-1">{periodBasisNote}</p>}
 
+          {/* 3行目: 着地見込み（罫線下・sub色） */}
           <div className="flex items-center justify-between text-xs mt-3 pt-3 border-t border-line">
             <span className="text-muted">{forecast != null ? 'このペースの着地見込み' : ''}</span>
             <span className="font-num font-medium text-sub tabular-nums">
               {forecast != null
-                ? `${formatCurrency(forecast)}${hasTarget ? `（目標比 ${Math.round((forecast / targetSales) * 100)}%）` : ''}`
+                ? `${formatCurrency(forecast)}${
+                    fullTarget != null && fullTarget > 0
+                      ? `（${fullTargetBasisLabel} ${Math.round((forecast / fullTarget) * 100)}%）`
+                      : ''
+                  }`
                 : '—'}
             </span>
           </div>
