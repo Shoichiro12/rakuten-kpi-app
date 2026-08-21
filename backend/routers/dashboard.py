@@ -102,7 +102,10 @@ def resolve_yearly_target(db: Session, year: int) -> tuple[float, float]:
 
     targets = (
         db.query(Target)
-        .filter(Target.year_month >= f"{year}-01", Target.year_month <= f"{year}-12")
+        .filter(
+            Target.year_month >= f"{year}-01", Target.year_month <= f"{year}-12",
+            Target.archived_at.is_(None),
+        )
         .order_by(Target.year_month.asc())
         .all()
     )
@@ -209,7 +212,9 @@ def get_dashboard(
         period_label = year_month
         prev_label = prev_ym
 
-    target = db.query(Target).filter(Target.year_month == year_month).first()
+    target = db.query(Target).filter(
+        Target.year_month == year_month, Target.archived_at.is_(None)
+    ).first()
     expense_rate = target.expense_rate if target else 0.15
     # 週次目標は日割り按分（月をまたぐ週は日数按分で合算）。KPI評価マトリクス
     # （routers/evaluation.py）と同じ period_utils.prorate_weekly_target_field を使う。
@@ -305,7 +310,7 @@ def get_alerts(
         return {"alerts": []}
 
     target = db.query(Target).filter(
-        Target.year_month == target_ym
+        Target.year_month == target_ym, Target.archived_at.is_(None)
     ).first()
     expense_rate = target.expense_rate if target else 0.15
 

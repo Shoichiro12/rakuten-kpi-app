@@ -307,6 +307,19 @@ CSVパースは `backend/routers/import_csv.py`。エンコーディング/ス�
 
 商品別KPI/RPP/データ取込み/商品マスタ・原価/目標設定の5画面に残っていた `gray`/`blue` 系は区切り5で新トークンへ機械的置換済み（2026-08-22）。GAP分析・請求・アカウント設定等の残りは対象外（GAP分析はQ1で当面残す方針、他は未着手）。ドリルダウン本体（`components/diagnosis/`）は区切り0〜5ですべて実装済み: HeroKgi（段1）→ DrillDown（段2〜5のコンテナ）→ KpiTriage/GenreDrill/ProductDrill/ActionRx。「今日やるべきこと」（TodayActions.tsx）は段5が後継のため削除済み。
 
+### マスタCRUD規約（2026-08-22 決定・計画書 `docs/jisso_keikaku_input_ia_seiri_2026-08-22.md`）
+
+対象3マスタ: `products`（商品マスタ）/ `product_categories`（カテゴリマスタ）/ `targets`（目標マスタ）。新しいマスタテーブルを追加するときもこの規約に従う。
+
+- **削除は原則ソフトデリート（`archived_at`列）。** 物理削除しない。実績集計・過去データは保持し、一覧・診断・提案・ドリルダウン・アイテム別目標の母集団からは除外する
+- **商品の状態はユーザー概念として「販売中／廃盤」の2値のみ**（`is_active`）。「アーカイブ」という状態・表記はUIに出さない。削除操作は単に「削除」と呼び一覧から消える。`archived_at` は内部実装専用（Q7）
+- **母集団除外は共通関数に集約する。** `masters.inactive_management_nos()` が `is_active=False`（廃盤）と `archived_at is not None`（削除済み）の両方を判定して除外対象を返す単一の真実。**新しく商品の母集団を絞り込む場所を足すときは必ずこの関数を呼び、`is_active` や `archived_at` を個別に判定しないこと**（画面ごとに実装すると除外漏れが起きる）。`Target` は共通関数を経由しないクエリが多い（`db.query(Target).filter(...)`が dashboard/evaluation/gap_analysis/revenue_plan/period_utils に分散）ため、**新しく Target を参照するときは必ず `Target.archived_at.is_(None)` を明示的に条件へ加えること**
+- **upsert（POST）は削除済み行を復活させる。** カテゴリ・目標マスタとも「同じキーで保存し直す」＝ユーザーの復元意思とみなし、`archived_at` を `None` に戻す（find-or-create の再利用。ユニーク制約があるため、削除済み行を残したまま同キーで新規作成すると制約違反になる）。復元専用のUIは無い
+- **CSVエクスポート/インポートは商品マスタ（`routers/masters.py`）の作法が単一の型。** BOM付きUTF-8出力（Excelでそのまま開ける）／取込は `utf-8-sig → utf-8 → cp932 → shift_jis` の順に自動判別／キー列でupsert／削除済みはエクスポートに含めない／**インポートは追加・更新のみで行の削除は絶対にしない**（アップロード事故で既存データが消える事態を構造的に防ぐ）。ラウンドトリップ保証（エクスポート→無編集で戻す→同じ状態になる）を壊さないこと
+- **CSVルートは `/{key}` より前に定義すること。** FastAPIはルート定義順にマッチを試みるため、`GET /export` を `GET /{id}` の後ろに置くと `id="export"` としてパスパラメータに吸われる（実装時に踏んだ）
+- **1行の検証エラーで全体をロールバックしない実装（アイテム別目標等、行ごとの厳密な検証があるCSV）は `db.begin_nested()`（SAVEPOINT）で1行ずつ隔離する。** 他行の取込を継続しつつ `error_rows` にエラー行番号と理由を返す
+- **全削除系（実績データ全削除・サンプル削除等）は `ConfirmDeleteModal`（`components/ConfirmDeleteModal.tsx`）を使う。** `window.confirm` ではなくチェックボックス必須の確認画面を挟む（誤操作防止をもう1段強める）。1件ずつの行削除（商品・カテゴリ等）はここまで要求しない
+
 ### `.claude/agents/`（任意）
 
 `backend-engineer` / `frontend-engineer` / `data-analyst`(読取専用) / `qa-debugger` の専門サブエージェント定義あり。担当領域は backend=`/backend`、frontend=`/frontend` に分け、同一ファイルの同時編集を避ける運用。

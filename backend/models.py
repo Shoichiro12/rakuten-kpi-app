@@ -67,6 +67,9 @@ class Target(Base, UserScopedMixin):
     #    （フォーム保存のたびに補正が消える事故を防ぐため）。
     target_sales_budget = Column(Float, nullable=True)
     created_at = Column(DateTime, default=func.now())
+    # マスタCRUD規約（2026-08-22）: 削除はソフトデリート。archived_at が非nullの行は
+    # 一覧・診断・提案から除外する（「月目標をクリアする」＝この月の行を削除する操作）。
+    archived_at = Column(DateTime, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("user_id", "year_month", name="uq_target_user_month"),
@@ -276,6 +279,9 @@ class ProductCategory(Base, UserScopedMixin):
     genre_u1 = Column(String)
     genre_u2 = Column(String)
     genre_u3 = Column(String)
+    # マスタCRUD規約（2026-08-22）: 削除はソフトデリート。archived_at が非nullのカテゴリは
+    # 一覧・商品マスタのカテゴリ選択肢から除外する。
+    archived_at = Column(DateTime, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("user_id", "genre_u1", "genre_u2", "genre_u3", name="uq_category"),
@@ -310,6 +316,11 @@ class Product(Base, UserScopedMixin):
     investment_intent = Column(Boolean, nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    # マスタCRUD規約（2026-08-22）: ユーザー概念は「販売中／廃盤」の2値のみ（is_active）。
+    # 「アーカイブ」は表に出さない内部実装で、UI上の「削除」操作がこの列を立てる。
+    # archived_at が非nullの商品は一覧・診断・提案・ドリルダウンの母集団から除外する
+    # （is_active=False の廃盤除外と同じ経路に載せる。実績集計・過去データは保持）。
+    archived_at = Column(DateTime, nullable=True)
 
     __table_args__ = (
         UniqueConstraint("user_id", "shop_id", "management_no", name="uq_product"),

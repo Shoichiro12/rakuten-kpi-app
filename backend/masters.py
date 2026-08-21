@@ -138,14 +138,19 @@ def resolve_cost_rate(db: Session, management_no: Optional[str]) -> float:
 
 
 def inactive_management_nos(db: Session) -> set:
-    """現ユーザーの廃盤（is_active=False）商品の management_no 集合を返す。
+    """現ユーザーの除外対象商品（廃盤=is_active=False、または削除済み=archived_at設定）の
+    management_no 集合を返す。
 
-    集計クエリから廃盤商品を除外するのに使う。商品マスタに未登録の管理番号は
-    「稼働中」とみなす（除外しない）。
+    集計クエリから除外するのに使う。商品マスタに未登録の管理番号は「稼働中」とみなす
+    （除外しない）。「廃盤」と「削除」はユーザー概念としては別（Q7: 廃盤は分析対象のまま
+    残す・削除は一覧から消す）だが、どちらも診断・提案・ドリルダウンの母集団からは
+    同じ経路で除外する（マスタCRUD規約2026-08-22。個別実装を増やさないこと）。
     """
     return {
         p.management_no
-        for p in db.query(Product).filter(Product.is_active.is_(False)).all()
+        for p in db.query(Product).filter(
+            (Product.is_active.is_(False)) | (Product.archived_at.isnot(None))
+        ).all()
         if p.management_no
     }
 
@@ -221,7 +226,7 @@ def suggest_category(db: Session, shop_id: int, management_no: str) -> Optional[
     if not any([u1, u2, u3]):
         return None
 
-    cats = db.query(ProductCategory).all()
+    cats = db.query(ProductCategory).filter(ProductCategory.archived_at.is_(None)).all()
 
     # 1) 完全一致（大/中/小すべて一致）
     for c in cats:
@@ -260,7 +265,10 @@ def suggest_cost_rate(db: Session, shop_id: int, management_no: str) -> dict:
         same_cat_mnos = [
             p.management_no
             for p in db.query(Product)
-            .filter(Product.category_id == cat_id, Product.management_no != management_no)
+            .filter(
+                Product.category_id == cat_id, Product.management_no != management_no,
+                Product.archived_at.is_(None),
+            )
             .all()
             if p.management_no
         ]
@@ -303,11 +311,14 @@ def get_review_queue(db: Session, shop_id: int) -> list[dict]:
     }
     prods = (
         db.query(Product)
-        .filter(Product.shop_id == shop_id, Product.is_active.is_(True))
+        .filter(
+            Product.shop_id == shop_id, Product.is_active.is_(True),
+            Product.archived_at.is_(None),
+        )
         .order_by(Product.management_no)
         .all()
     )
-    cats = db.query(ProductCategory).all()
+    cats = db.query(ProductCategory).filter(ProductCategory.archived_at.is_(None)).all()
 
     # キュー対象（カテゴリか原価が未確定）だけを対象にジャンルを一括取得
     queue_prods = [

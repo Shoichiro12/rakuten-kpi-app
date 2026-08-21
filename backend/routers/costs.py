@@ -69,7 +69,7 @@ def list_costs(db: Session = Depends(get_db)):
     }
 
     items = []
-    for p in db.query(Product).order_by(Product.management_no).all():
+    for p in db.query(Product).filter(Product.archived_at.is_(None)).order_by(Product.management_no).all():
         override = cost_map.get(p.management_no)
         if override is not None:
             rate, memo, source = override[0], override[1], "product"

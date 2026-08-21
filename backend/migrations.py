@@ -70,6 +70,12 @@ _EXTRA_COLUMNS = {
     ],
 }
 
+# マスタCRUD規約（2026-08-22）: ソフトデリート用 archived_at 列。
+# is_sample と同じパターンで、対象3マスタに冪等追加する。
+_ARCHIVABLE_TABLES = ("products", "product_categories", "targets")
+for _t in _ARCHIVABLE_TABLES:
+    _EXTRA_COLUMNS.setdefault(_t, []).append(("archived_at", "TIMESTAMP"))
+
 # サンプルデータ識別フラグ（2026-08-20）。サンプル生成・削除がこの列だけを対象にし、
 # 実データを巻き込まないようにする。既存行は DEFAULT FALSE（=実データ扱い）で埋まる。
 _IS_SAMPLE_TABLES = (
