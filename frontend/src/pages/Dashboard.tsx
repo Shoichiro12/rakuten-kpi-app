@@ -112,51 +112,59 @@ export default function Dashboard() {
   // 実績（軸は混ぜない。商品分析があればそちら、無ければRPP経由）
   const actualSales = shop ? shop.sales : kpis?.gross ?? null
 
-  // ── 着地見込み（1層ヒーロー用）───────────────────────────────
-  // 対象期間が「現在進行中」のときだけ、実績 ÷ 経過割合 で単純予測する。
-  // 過去期間は実績＝確定なので出さない。経過1割未満は振れが大きすぎるため出さない。
-  const forecast = (() => {
-    const actual = shop ? shop.sales : kpis?.gross
-    if (actual == null) return null
+  // ── 経過割合（0〜1）。段1（HeroKgi）の按分目標・着地見込み共通の基準 ─────
+  // 過去期間（選択日が今日より前）は1（=期間フル）、未来期間はnull（想定外・通常は選べない）。
+  // ⚠️ これは線形按分。ECは日次が一様ではない（スーパーSALE等）ので、
+  //    季節指数で重み付けする改良は別チケット（規約 3-4 に記載）。
+  const elapsedRatio = (() => {
     const today = new Date()
-    let ratio: number | null = null
     if (period === 'weekly') {
       const start = new Date(dateValue)
       start.setDate(start.getDate() - (start.getDay() % 7))
       const diff = Math.floor((today.getTime() - start.getTime()) / 86400000)
-      if (diff >= 0 && diff < 7) ratio = (diff + 1) / 7
-    } else if (period === 'monthly') {
-      if (dateValue.slice(0, 7) === `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`) {
-        const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
-        ratio = today.getDate() / daysInMonth
-      }
-    } else {
-      if (dateValue.slice(0, 4) === String(today.getFullYear())) {
-        const startOfYear = new Date(today.getFullYear(), 0, 1)
-        const dayOfYear = Math.floor((today.getTime() - startOfYear.getTime()) / 86400000) + 1
-        const daysInYear = (today.getFullYear() % 4 === 0 && today.getFullYear() % 100 !== 0) || today.getFullYear() % 400 === 0 ? 366 : 365
-        ratio = dayOfYear / daysInYear
-      }
+      if (diff >= 7) return 1
+      if (diff < 0) return null
+      return (diff + 1) / 7
     }
-    if (ratio == null || ratio < 0.1) return null
-    return Math.round(actual / ratio)
+    if (period === 'monthly') {
+      const curYm = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`
+      const targetYm = dateValue.slice(0, 7)
+      if (targetYm !== curYm) return targetYm < curYm ? 1 : null
+      const daysInMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0).getDate()
+      return today.getDate() / daysInMonth
+    }
+    // yearly: 経過月按分（1〜12月の経過月数 / 12）
+    const targetYear = dateValue.slice(0, 4)
+    const curYear = String(today.getFullYear())
+    if (targetYear !== curYear) return targetYear < curYear ? 1 : null
+    return (today.getMonth() + 1) / 12
   })()
+
+  // ── 着地見込み（1層ヒーロー用）───────────────────────────────
+  // 対象期間が「現在進行中」のときだけ、実績 ÷ 経過割合 で単純予測する。
+  // 過去期間は実績＝確定・未来期間は算出不能なので出さない。経過1割未満は振れが大きすぎるため出さない。
+  const forecast = (() => {
+    const actual = shop ? shop.sales : kpis?.gross
+    if (actual == null) return null
+    if (elapsedRatio == null || elapsedRatio >= 1 || elapsedRatio < 0.1) return null
+    return Math.round(actual / elapsedRatio)
+  })()
+
+  // ── 按分目標（段1のバー・達成率・不足額の基準）。修正指示2026-08-22 B ────
+  // 週次=週按分、月次=月目標×経過日数按分（過去月はフル）、年次=年目標×経過月按分（過去年はフル）。
+  // 達成率・不足額（超過額）・バーのfill%はすべてこの値を基準に統一する（軸の混線防止）。
+  const proratedTarget = (() => {
+    const target = data?.target_sales
+    if (target == null || target <= 0 || elapsedRatio == null) return null
+    return target * Math.min(1, elapsedRatio)
+  })()
+
+  const periodBasisLabel = period === 'weekly' ? '週按分' : period === 'monthly' ? '月按分' : '年按分'
+  const fullTargetBasisLabel = period === 'weekly' ? '週目標比' : period === 'monthly' ? '月目標比' : '年目標比'
 
   // ── 売上3分解（1層ヒーロー用）。軸を混ぜない ─────────────────
   // 週次: dashboard本体（RPP軸: ct/cvr/av + changes）
   // 月次・年次: gap/shop（商品分析=店舗全体軸: access/cvr/av + changes）
-  // ペーサー（あるべき進捗）= 目標 × 経過割合。
-  // 経過割合は forecast（= 実績 ÷ 経過割合）から逆算できるので、新しいデータは要らない。
-  // ⚠️ これは線形按分。ECは日次が一様ではない（スーパーSALE等）ので、
-  //    季節指数で重み付けする改良は別チケット（規約 3-4 に記載）。
-  const pacer = (() => {
-    const target = data?.target_sales
-    if (target == null || target <= 0) return null
-    if (forecast == null || forecast <= 0 || actualSales == null) return null
-    const elapsed = actualSales / forecast
-    if (!Number.isFinite(elapsed) || elapsed <= 0 || elapsed >= 1) return null
-    return target * elapsed
-  })()
 
   // 段2（KpiTriage）の入力。週次はRPP軸（kpis+changes）、月次・年次は商品分析軸（decomp）。
   // 軸は混ぜない（規約）。KpiTriage側は達成率が取れないKPI（週次）は前期比だけで判定する。
@@ -237,12 +245,12 @@ export default function Dashboard() {
             未達のときだけ「詳しく見る」で売上3分解（アクセス/CVR/客単価）に掘れる。 */}
         <HeroKgi
           actualSales={actualSales}
-          targetSales={data?.target_sales ?? null}
-          pacer={pacer}
+          proratedTarget={proratedTarget}
+          fullTarget={data?.target_sales ?? null}
           forecast={forecast}
-          achievementRate={data?.achievement_rate ?? null}
           sourceLabel={shop ? '商品分析（店舗全体）' : 'RPP経由売上'}
-          periodBasisNote={period === 'weekly' ? '目標（週按分）' : undefined}
+          periodBasisLabel={periodBasisLabel}
+          fullTargetBasisLabel={fullTargetBasisLabel}
           recoCount={(recos?.recommendations?.length ?? 0) + (recos?.product_recommendations?.length ?? 0)}
         >
           {/* ═══ 段2〜5: ドリルダウン本体（要因→ジャンル→商品→アクション）═══ */}
