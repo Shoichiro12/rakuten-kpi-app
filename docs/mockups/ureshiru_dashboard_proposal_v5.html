@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ウレシル ダッシュボード再設計 v5 — BIZ UDPGothic × Inter</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#383731; --ink-strong:#2e2d29; --sub:#504b42; --muted:#6b6559;
+    --paper:#fdfcf9; --bg-alt:#f4f1ea; --line:#e5dfd4;
+    --sage:#78927b; --sage-soft:#eef2ec; --sage-deep:#4c6850;
+    --alert:#c2382f; --alert-bg:#fbe9e7; --up:#17714d; --up-bg:#e3f0e8;
+  }
+  *{ box-sizing:border-box; }
+  html{ -webkit-font-smoothing:antialiased; }
+  body{
+    margin:0; background:var(--bg-alt); color:var(--ink);
+    font-family:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
+    font-size:13.5px; line-height:1.7;
+  }
+  .num{ font-family:"Inter","BIZ UDPGothic",sans-serif; font-weight:600; font-variant-numeric:tabular-nums; letter-spacing:-.01em; }
+  h1,h2,h3{ margin:0; font-weight:700; }
+  a{ color:inherit; }
+  button{ font-family:inherit; }
+  :focus-visible{ outline:2px solid var(--ink); outline-offset:2px; }
+  @media (prefers-reduced-motion: reduce){ *{ transition:none !important; } }
+
+  svg.ic{ width:16px; height:16px; stroke:currentColor; stroke-width:1.5; fill:none; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+
+  /* ================= sidebar ================= */
+  .frame{ display:flex; min-height:100vh; }
+  .rail{
+    width:224px; flex-shrink:0; background:var(--ink-strong); color:#c9c5b8;
+    padding:14px 0 18px; display:flex; flex-direction:column;
+  }
+  .rail.collapsed{ width:64px; }
+  .rail-head{ display:flex; align-items:center; justify-content:space-between; padding:0 14px 16px; min-height:36px; }
+  .rail.collapsed .rail-head{ justify-content:center; padding:0 0 16px; }
+  .brand{ font-weight:700; font-size:15px; color:#fdfcf9; letter-spacing:.02em; white-space:nowrap; }
+  .brand .dot{ color:var(--sage); }
+  .rail.collapsed .brand{ display:none; }
+  .rail-toggle{
+    background:none; border:none; color:#a8a396; cursor:pointer; padding:6px; border-radius:6px;
+    display:flex; align-items:center;
+  }
+  .rail-toggle:hover{ color:#fdfcf9; background:rgba(255,255,255,.06); }
+
+  .rail nav{ display:flex; flex-direction:column; gap:1px; }
+  .rail nav a{
+    position:relative; display:flex; align-items:center; gap:11px; padding:9px 18px;
+    text-decoration:none; color:#a8a396; font-size:13px; border-left:2px solid transparent;
+    white-space:nowrap;
+  }
+  .rail nav a:hover{ color:#e8e4d8; }
+  .rail nav a.active{ color:#fdfcf9; border-left-color:var(--sage); background:rgba(255,255,255,.04); }
+  .rail.collapsed nav a{ justify-content:center; padding:11px 0; }
+  .rail.collapsed nav a .lbl{ display:none; }
+  /* 折りたたみ時のツールチップ（ホバー＋キーボードフォーカスで表示） */
+  .rail nav a .tip{
+    display:none; position:absolute; left:100%; margin-left:10px; top:50%; transform:translateY(-50%);
+    background:var(--ink); color:#fdfcf9; font-size:12px; padding:4px 10px; border-radius:5px;
+    white-space:nowrap; pointer-events:none; z-index:20;
+  }
+  .rail.collapsed nav a:hover .tip, .rail.collapsed nav a:focus-visible .tip{ display:block; }
+  .rail-note{ margin-top:auto; font-size:10.5px; color:#6f6b5f; padding:14px 18px 0; }
+  .rail.collapsed .rail-note{ display:none; }
+
+  /* ================= main ================= */
+  .main{ flex:1; padding:30px 44px 100px; max-width:920px; }
+  .topbar{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:8px; }
+  .topbar h1{ font-size:18px; }
+  .period{ font-size:12px; color:var(--muted); }
+
+  /* ドリルの軌跡（この画面のシグネチャ） */
+  .path{ display:flex; align-items:center; gap:6px; font-size:12px; color:var(--muted); margin-bottom:26px; min-height:20px; flex-wrap:wrap; }
+  .path .p{ display:inline-flex; align-items:center; gap:6px; }
+  .path .p + .p::before{ content:"›"; color:var(--line); font-size:13px; margin-right:6px; }
+  .path .p.here{ color:var(--ink); font-weight:700; }
+
+  .demo{ display:inline-flex; gap:2px; border:1px solid var(--line); border-radius:6px; padding:2px; margin-bottom:24px; background:var(--paper); }
+  .demo button{ border:none; background:transparent; padding:4px 12px; border-radius:4px; font-size:12px; color:var(--muted); cursor:pointer; }
+  .demo button.on{ background:var(--ink); color:#fff; }
+  .demo-lbl{ font-size:11px; color:var(--muted); margin-bottom:5px; }
+
+  section.step{ margin-bottom:28px; opacity:0; max-height:0; overflow:hidden; transition:opacity .25s ease; }
+  section.step.show{ opacity:1; max-height:none; overflow:visible; }
+
+  /* ================= hero ================= */
+  .hero{ background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:20px 24px; }
+  .hero-top{ display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+  .hero-lbl{ font-size:12.5px; color:var(--muted); }
+  .pill{ font-size:11.5px; font-weight:700; padding:2px 10px; border-radius:20px; }
+  .pill.alert{ color:var(--alert); background:var(--alert-bg); }
+  .pill.up{ color:var(--up); background:var(--up-bg); }
+  .hero-val{ font-size:32px; line-height:1.15; }
+  .hero-val .unit{ font-family:"BIZ UDPGothic",sans-serif; font-size:13px; font-weight:400; color:var(--muted); margin-left:8px; }
+  .bullet{ position:relative; height:6px; background:var(--bg-alt); border-radius:3px; margin:16px 0 8px; }
+  .bullet .fill{ position:absolute; inset:0 auto 0 0; border-radius:3px; background:var(--ink); }
+  .bullet.alert .fill{ background:var(--alert); }
+  .bullet.up .fill{ background:var(--up); }
+  .bullet .tgt{ position:absolute; top:-3px; bottom:-3px; width:1.5px; background:var(--sub); }
+  .hero-foot{ display:flex; justify-content:space-between; font-size:12px; color:var(--sub); }
+  .hero-foot .gap-amt{ font-weight:700; color:var(--alert); }
+  .hero-foot .gap-amt.over{ color:var(--up); }
+  .hero-msg{ font-size:13px; color:var(--sub); margin-top:16px; padding-top:14px; border-top:1px solid var(--line); }
+  .btn{
+    background:var(--ink-strong); color:#fff; border:none; padding:8px 18px; border-radius:6px;
+    font-size:13px; font-weight:700; cursor:pointer;
+  }
+  .btn:hover{ opacity:.85; }
+  .btn.line{ background:transparent; color:var(--ink); border:1px solid var(--line); }
+  .btn.line:hover{ background:var(--bg-alt); opacity:1; }
+
+  /* ================= steps ================= */
+  .step-head{ display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px; }
+  .step-head h2{ font-size:14.5px; }
+  .step-sub{ font-size:11.5px; color:var(--muted); }
+
+  /* KPI: 一番悪いものだけ立てる */
+  .kpi-main{
+    display:flex; justify-content:space-between; align-items:center; gap:14px;
+    background:var(--paper); border:1px solid var(--line); border-left:3px solid var(--alert);
+    border-radius:8px; padding:14px 18px; cursor:pointer; margin-bottom:4px;
+  }
+  .kpi-main:hover{ background:#faf8f2; }
+  .kpi-main .lbl{ font-size:12px; color:var(--muted); }
+  .kpi-main .v{ font-size:22px; color:var(--alert); }
+  .kpi-main .r{ text-align:right; font-size:11.5px; color:var(--muted); }
+  .kpi-main .r b{ display:block; font-size:13px; color:var(--alert); }
+  .kpi-rest{ padding:0 4px; }
+  .kpi-line{ display:flex; justify-content:space-between; align-items:center; padding:9px 6px; border-bottom:1px solid var(--line); font-size:13px; }
+  .kpi-line:last-child{ border-bottom:0; }
+  .kpi-line .lbl{ color:var(--sub); }
+  .kpi-line .v{ font-size:13.5px; }
+  .kpi-line .v.bad{ color:var(--alert); }
+  .kpi-line .v.good{ color:var(--up); }
+  .kpi-line .meta{ font-size:11px; color:var(--muted); margin-left:8px; }
+  .kpi-line.click{ cursor:pointer; border-radius:5px; margin:0 -6px; padding:9px 12px; }
+  .kpi-line.click:hover{ background:rgba(56,55,49,.04); }
+  .note{ font-size:12px; color:var(--sub); margin-top:10px; padding-left:10px; border-left:2px solid var(--sage); }
+
+  /* ジャンル・シリーズ: GitHubのIssue行の文法 */
+  .seg{ display:inline-flex; gap:1px; border:1px solid var(--line); border-radius:6px; padding:2px; background:var(--paper); }
+  .seg button{ border:none; background:transparent; padding:4px 12px; border-radius:4px; font-size:12px; color:var(--muted); cursor:pointer; }
+  .seg button.on{ background:var(--bg-alt); color:var(--ink); font-weight:700; }
+
+  .rows{ margin-top:12px; border-top:1px solid var(--line); }
+  .row{
+    display:flex; align-items:center; gap:16px; padding:11px 10px; margin:0 -10px;
+    border-bottom:1px solid var(--line); cursor:pointer; border-radius:6px;
+  }
+  .row:hover{ background:rgba(56,55,49,.04); }
+  .row .t{ flex:1; min-width:0; }
+  .row .t .nm{ font-weight:700; font-size:13.5px; }
+  .row .t .meta{ font-size:11.5px; color:var(--muted); margin-top:1px; }
+  .row .m{ width:88px; text-align:right; font-size:11px; color:var(--muted); flex-shrink:0; }
+  .row .m b{ display:block; font-size:13px; color:var(--ink); font-family:"Inter",sans-serif; font-weight:600; font-variant-numeric:tabular-nums; }
+  .row .m b.bad{ color:var(--alert); }
+  .row .m b.good{ color:var(--up); }
+  .row.dim{ opacity:.45; }
+  .row .flag-dot{ width:7px; height:7px; border-radius:50%; background:var(--alert); flex-shrink:0; }
+  .row .flag-dot.ok{ background:var(--line); }
+
+  /* SKU + アクション */
+  .sku-wrap{ display:grid; grid-template-columns:210px 1fr; gap:24px; margin-top:14px; align-items:start; }
+  .thumb{ aspect-ratio:1; background:var(--paper); border:1px solid var(--line); border-radius:8px; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:11px; margin-bottom:10px; }
+  .sku-nm{ font-size:13.5px; font-weight:700; }
+  .sku-id{ font-size:11px; color:var(--muted); margin-bottom:10px; }
+  .mt{ width:100%; font-size:12px; border-collapse:collapse; }
+  .mt td{ padding:6px 0; border-bottom:1px solid var(--line); color:var(--sub); }
+  .mt td:last-child{ text-align:right; font-family:"Inter",sans-serif; font-weight:600; font-variant-numeric:tabular-nums; color:var(--ink); }
+  .mt tr.warn td:last-child{ color:var(--alert); }
+
+  .act{ background:var(--paper); border:1px solid var(--line); border-radius:8px; padding:16px 20px; margin-bottom:12px; }
+  .act .tag{ display:inline-block; font-size:11px; font-weight:700; color:var(--alert); background:var(--alert-bg); padding:1px 9px; border-radius:20px; margin-bottom:8px; }
+  .act h3{ font-size:15px; margin-bottom:6px; }
+  .act p{ font-size:12.5px; color:var(--sub); margin:0 0 12px; max-width:56ch; }
+  .act .stats{ display:flex; gap:24px; font-size:11px; color:var(--muted); margin-bottom:14px; }
+  .act .stats b{ display:block; font-size:13.5px; color:var(--ink); font-family:"Inter",sans-serif; font-weight:600; font-variant-numeric:tabular-nums; }
+  .act-sub{ display:flex; justify-content:space-between; align-items:center; gap:10px; padding:10px 4px; border-bottom:1px solid var(--line); font-size:12.5px; color:var(--sub); }
+  .act-sub:last-child{ border-bottom:0; }
+  .act-sub .l{ color:var(--ink); font-weight:700; }
+  .act-sub .who{ font-size:11px; color:var(--sage-deep); flex-shrink:0; }
+
+  .foot{ margin-top:46px; padding-top:20px; border-top:1px solid var(--line); font-size:11.5px; color:var(--muted); }
+  .foot b{ color:var(--sub); }
+</style>
+</head>
+<body>
+<div class="frame">
+  <aside class="rail" id="rail">
+    <div class="rail-head">
+      <span class="brand">ウレシル<span class="dot">.</span></span>
+      <button class="rail-toggle" id="railToggle" aria-label="サイドバーを折りたたむ" aria-expanded="true" onclick="toggleRail()">
+        <svg class="ic" viewBox="0 0 20 20"><rect x="2.5" y="3.5" width="15" height="13" rx="1.5"/><line x1="7.5" y1="3.5" x2="7.5" y2="16.5"/></svg>
+      </button>
+    </div>
+    <nav>
+      <a class="active" href="#"><svg class="ic" viewBox="0 0 20 20"><rect x="3" y="3" width="6" height="6" rx="1"/><rect x="11" y="3" width="6" height="6" rx="1"/><rect x="3" y="11" width="6" height="6" rx="1"/><rect x="11" y="11" width="6" height="6" rx="1"/></svg><span class="lbl">ダッシュボード</span><span class="tip" aria-hidden="true">ダッシュボード</span></a>
+      <a href="#"><svg class="ic" viewBox="0 0 20 20"><polyline points="3,15 8,9 12,12 17,4"/></svg><span class="lbl">GAP分析</span><span class="tip" aria-hidden="true">GAP分析</span></a>
+      <a href="#"><svg class="ic" viewBox="0 0 20 20"><rect x="3" y="7" width="14" height="10" rx="1"/><polyline points="6,7 6,4 14,4 14,7"/></svg><span class="lbl">商品別KPI</span><span class="tip" aria-hidden="true">商品別KPI</span></a>
+      <a href="#"><svg class="ic" viewBox="0 0 20 20"><path d="M3 8v4h3l6 4V4L6 8H3z"/></svg><span class="lbl">RPP広告実績</span><span class="tip" aria-hidden="true">RPP広告実績</span></a>
+      <a href="#"><svg class="ic" viewBox="0 0 20 20"><path d="M10 13V4M6 8l4-4 4 4"/><path d="M3 15h14"/></svg><span class="lbl">データ取込み</span><span class="tip" aria-hidden="true">データ取込み</span></a>
+      <a href="#"><svg class="ic" viewBox="0 0 20 20"><path d="M4 4h6l6 6-6 6-6-6V4z"/><circle cx="7.5" cy="7.5" r="1"/></svg><span class="lbl">商品マスタ・原価</span><span class="tip" aria-hidden="true">商品マスタ・原価</span></a>
+      <a href="#"><svg class="ic" viewBox="0 0 20 20"><circle cx="10" cy="10" r="6.5"/><circle cx="10" cy="10" r="1.4" fill="currentColor" stroke="none"/></svg><span class="lbl">目標設定</span><span class="tip" aria-hidden="true">目標設定</span></a>
+      <a href="#"><svg class="ic" viewBox="0 0 20 20"><rect x="4" y="3" width="12" height="14" rx="1"/><line x1="7" y1="7" x2="13" y2="7"/><line x1="7" y1="10" x2="13" y2="10"/><line x1="7" y1="13" x2="10" y2="13"/></svg><span class="lbl">レポート出力</span><span class="tip" aria-hidden="true">レポート出力</span></a>
+    </nav>
+    <div class="rail-note">開閉トグルは上部・幅切替は即時<br>（2026-08-03 承認どおり）</div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1>ダッシュボード</h1>
+      <span class="period">週次　2026/8/16〜22</span>
+    </div>
+    <div class="path" id="path"><span class="p here">全体</span></div>
+
+    <div class="demo-lbl">デモ切替（確認用・実画面には出ません）</div>
+    <div class="demo">
+      <button class="on" id="bGap" onclick="setOk(false)">未達のとき</button>
+      <button id="bOk" onclick="setOk(true)">達成のとき</button>
+    </div>
+
+    <!-- 予算 vs 売上 -->
+    <div class="hero">
+      <div class="hero-top">
+        <span class="hero-lbl">今週の売上 vs 予算</span>
+        <span class="pill alert" id="pillState">未達</span>
+      </div>
+      <div class="hero-val num" id="heroVal">¥742,402<span class="unit">目標 ¥1,130,000</span></div>
+      <div class="bullet alert" id="heroBullet"><div class="fill" style="width:65.7%"></div><div class="tgt" style="left:100%"></div></div>
+      <div class="hero-foot"><span>達成率 <span class="num">65.7%</span></span><span class="gap-amt num" id="gapAmt">不足 ¥387,598</span></div>
+      <div class="hero-msg" id="heroMsg">予算に対して売上が届いていません。内訳を確認しましょう。</div>
+      <div style="margin-top:14px" id="heroCta"><button class="btn" onclick="go(1)">詳しく見る</button></div>
+    </div>
+
+    <div style="height:26px"></div>
+
+    <!-- STEP 1 -->
+    <section class="step" id="s1">
+      <div class="step-head"><h2>何が足りていないか</h2><span class="step-sub">達成している指標は掘り下げ不要</span></div>
+      <div class="kpi-main" onclick="go(2)" tabindex="0">
+        <div>
+          <div class="lbl">アクセス（RPPクリック）</div>
+          <div class="v num">3,266</div>
+        </div>
+        <div class="r">目標比<b class="num">28.9%</b>詳しく見る ›</div>
+      </div>
+      <div class="kpi-rest">
+        <div class="kpi-line">
+          <span class="lbl">転換率（CVR）</span>
+          <span><span class="v num good">3.37%</span><span class="meta">達成 224.7%</span></span>
+        </div>
+        <div class="kpi-line click" onclick="go(2)" tabindex="0">
+          <span class="lbl">客単価（Av）</span>
+          <span><span class="v num bad">¥6,749</span><span class="meta">目標比 96.4%</span></span>
+        </div>
+      </div>
+      <div class="note">最もギャップが大きいのはアクセスです。まずここから見ます。</div>
+    </section>
+
+    <!-- STEP 2 -->
+    <section class="step" id="s2">
+      <div class="step-head">
+        <h2>どのジャンルが足りていないか</h2>
+        <div class="seg">
+          <button class="on" onclick="setLv(this,'大分類')">大分類</button>
+          <button onclick="setLv(this,'中分類')">中分類</button>
+          <button onclick="setLv(this,'小分類')">小分類</button>
+        </div>
+      </div>
+      <div class="step-sub" id="lvNote">影響額が大きい順（大分類）</div>
+      <div class="rows">
+        <div class="row" onclick="go(3)" tabindex="0">
+          <span class="flag-dot"></span>
+          <div class="t"><div class="nm">スポーツ</div><div class="meta">機会損失 約¥228,000 ・ 11商品</div></div>
+          <div class="m">アクセス<b class="bad">3,266</b></div>
+          <div class="m">前期比<b class="bad">▼12.4%</b></div>
+        </div>
+        <div class="row dim" onclick="go(3)" tabindex="0">
+          <span class="flag-dot ok"></span>
+          <div class="t"><div class="nm">ファッション（参考）</div><div class="meta">影響 小</div></div>
+          <div class="m">アクセス<b>8,120</b></div>
+          <div class="m">前期比<b class="good">▲2.1%</b></div>
+        </div>
+        <div class="row dim" onclick="go(3)" tabindex="0">
+          <span class="flag-dot ok"></span>
+          <div class="t"><div class="nm">インテリア雑貨（参考）</div><div class="meta">影響 小</div></div>
+          <div class="m">アクセス<b>5,904</b></div>
+          <div class="m">前期比<b class="bad">▼1.0%</b></div>
+        </div>
+      </div>
+      <div class="note">大／中／小の切替は既存API（level=u1/u2/u3）をそのまま使えます。</div>
+    </section>
+
+    <!-- STEP 3 -->
+    <section class="step" id="s3">
+      <div class="step-head"><h2>「スポーツ」の中で、何が悪いか</h2><span class="step-sub">アクセスの前期比が悪い順</span></div>
+      <div class="rows">
+        <div class="row" onclick="go(4)" tabindex="0">
+          <span class="flag-dot"></span>
+          <div class="t"><div class="nm">スポーツバッグ 20L</div><div class="meta">BAG-001 ・ 3指標が基準割れ</div></div>
+          <div class="m">アクセス<b class="bad">202</b></div>
+          <div class="m">CVR<b class="bad">0.99%</b></div>
+          <div class="m">CPO<b class="bad">¥10,582</b></div>
+        </div>
+        <div class="row" onclick="go(4)" tabindex="0">
+          <span class="flag-dot ok"></span>
+          <div class="t"><div class="nm">ランニングシューズ プロモデル</div><div class="meta">RUN-001</div></div>
+          <div class="m">アクセス<b>394</b></div>
+          <div class="m">CVR<b>4.31%</b></div>
+          <div class="m">CPO<b>¥4,179</b></div>
+        </div>
+        <div class="row" onclick="go(4)" tabindex="0">
+          <span class="flag-dot"></span>
+          <div class="t"><div class="nm">スポーツウェア パンツ メンズ</div><div class="meta">SPW-002 ・ CVRが基準割れ</div></div>
+          <div class="m">アクセス<b>317</b></div>
+          <div class="m">CVR<b class="bad">1.26%</b></div>
+          <div class="m">CPO<b>¥2,905</b></div>
+        </div>
+        <div class="row" onclick="go(4)" tabindex="0">
+          <span class="flag-dot ok"></span>
+          <div class="t"><div class="nm">ジムバッグ 大容量</div><div class="meta">BAG-002</div></div>
+          <div class="m">アクセス<b>398</b></div>
+          <div class="m">CVR<b>4.27%</b></div>
+          <div class="m">CPO<b>¥3,066</b></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 4 -->
+    <section class="step" id="s4">
+      <div class="step-head"><h2>スポーツバッグ 20L — 何をすべきか</h2></div>
+      <div class="sku-wrap">
+        <div>
+          <div class="thumb">商品画像</div>
+          <div class="sku-nm">スポーツバッグ 20L</div>
+          <div class="sku-id">BAG-001 ／ SKU: BAG-001-BLK</div>
+          <table class="mt">
+            <tr class="warn"><td>アクセス</td><td>202</td></tr>
+            <tr class="warn"><td>CVR</td><td>0.99%</td></tr>
+            <tr><td>客単価</td><td>¥6,894</td></tr>
+            <tr class="warn"><td>CPO</td><td>¥10,582</td></tr>
+            <tr><td>ROAS</td><td>65.1%</td></tr>
+          </table>
+        </div>
+        <div>
+          <div class="act">
+            <span class="tag">最優先</span>
+            <h3>RPP入札を¥38 → ¥50へ引き上げ、アクセスを積み増す</h3>
+            <p>アクセスが少なく機会が失われています。CPOに対してROASが低いのは転換率の低さが主因のため、入札を上げてもコストが先行しないよう、下の商品ページ改善と並行してください。</p>
+            <div class="stats">
+              <div>想定追加アクセス<b>+180</b></div>
+              <div>追加広告費 目安<b>¥9,600</b></div>
+              <div>所要時間<b>5分</b></div>
+            </div>
+            <button class="btn line">この施策を実施した</button>
+          </div>
+          <div class="act-sub"><span><span class="l">商品ページのサムネイル・訴求を見直す</span> — CVR 0.99%は同ジャンル平均を下回っています</span><span class="who">クリエイティブチームへ</span></div>
+          <div class="act-sub"><span><span class="l">セット販売で客単価を補う</span> — 単体では利益が薄いカテゴリです</span><span class="who">所要30分</span></div>
+        </div>
+      </div>
+    </section>
+
+    <div class="foot">
+      <b>v5の要点：</b> 本文フォントを BIZ UDPGothic（モリサワ設計・日本語ビジネス文書向け）へ、数値のみ Inter に。
+      サイドバーは本体アプリの承認済み仕様（トグル上部・幅切替は即時・折りたたみ時はCSSツールチップ）と同じ挙動。
+      上部の「掘った軌跡」パンくずが階層を常に示す。カードは白＋細罫線＋影なし、色ピルは状態表示（達成/未達・最優先）のみ。
+    </div>
+  </main>
+</div>
+
+<script>
+  function toggleRail(){
+    const rail = document.getElementById('rail');
+    const btn = document.getElementById('railToggle');
+    const collapsed = rail.classList.toggle('collapsed');
+    btn.setAttribute('aria-expanded', String(!collapsed));
+    btn.setAttribute('aria-label', collapsed ? 'サイドバーを展開する' : 'サイドバーを折りたたむ');
+  }
+
+  const pathSteps = {
+    0:['全体'],
+    1:['全体','アクセス'],
+    2:['全体','アクセス'],
+    3:['全体','アクセス','スポーツ（大）'],
+    4:['全体','アクセス','スポーツ（大）','スポーツバッグ 20L']
+  };
+  function go(n){
+    for(let i=1;i<=4;i++){
+      document.getElementById('s'+i).classList.toggle('show', i<=n);
+    }
+    const steps = pathSteps[n] || pathSteps[0];
+    document.getElementById('path').innerHTML =
+      steps.map((s,i)=>`<span class="p${i===steps.length-1?' here':''}">${s}</span>`).join('');
+    if(n>0) document.getElementById('s'+n).scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  function setOk(ok){
+    document.getElementById('bOk').classList.toggle('on', ok);
+    document.getElementById('bGap').classList.toggle('on', !ok);
+    const pill=document.getElementById('pillState'), b=document.getElementById('heroBullet'),
+          v=document.getElementById('heroVal'), m=document.getElementById('heroMsg'),
+          c=document.getElementById('heroCta'), g=document.getElementById('gapAmt');
+    if(ok){
+      pill.className='pill up'; pill.innerText='達成';
+      b.className='bullet up'; b.querySelector('.fill').style.width='108%';
+      v.innerHTML='¥1,221,000<span class="unit">目標 ¥1,130,000</span>';
+      m.innerText='今週は予算を達成しています。特に対応は不要です。';
+      g.className='gap-amt num over'; g.innerText='超過 ¥91,000';
+      c.style.display='none'; go(0);
+    }else{
+      pill.className='pill alert'; pill.innerText='未達';
+      b.className='bullet alert'; b.querySelector('.fill').style.width='65.7%';
+      v.innerHTML='¥742,402<span class="unit">目標 ¥1,130,000</span>';
+      m.innerText='予算に対して売上が届いていません。内訳を確認しましょう。';
+      g.className='gap-amt num'; g.innerText='不足 ¥387,598';
+      c.style.display='block';
+    }
+  }
+
+  function setLv(btn, lbl){
+    btn.parentElement.querySelectorAll('button').forEach(x=>x.classList.toggle('on', x===btn));
+    document.getElementById('lvNote').innerText = '影響額が大きい順（'+lbl+'）';
+  }
+
+  go(0);
+</script>
+</body>
+</html>
