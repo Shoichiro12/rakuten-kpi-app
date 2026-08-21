@@ -284,6 +284,27 @@ CSVパースは `backend/routers/import_csv.py`。エンコーディング/ス�
 - **しきい値の判定は生の数値で行う**（表示用に丸めた文字列で比較しない）
 - 表: 数値は右寄せ＋`tabular-nums`、単位は見出しに1回、**ゼブラ縞は使わない**（背景色は警告行専用に空けておく）
 
+#### デザイントークン（2026-08-22 決定・ダッシュボードのドリルダウン再設計）
+
+**根拠と全文は `docs/jisso_keikaku_dashboard_drilldown_2026-08-22.md`。** `frontend/tailwind.config.js` の `theme.extend.colors` に実装済み。
+
+| トークン | 値 | 用途 |
+|---|---|---|
+| paper | #fdfcf9 | カード地 |
+| bg-alt | #f4f1ea | 画面地・ホバー |
+| line | #e5dfd4 | 罫線・枠 |
+| ink / ink-strong | #383731 / #2e2d29 | 本文 / サイドバー地・主ボタン |
+| sub / muted | #504b42 / #6b6559 | 補足 / 弱い補足 |
+| sage / sage-soft / sage-deep | #78927b / #eef2ec / #4c6850 | 装飾・アクティブ指示 / 淡地 / リンク・テキスト緑 |
+| alert / alert-bg | #c2382f / #fbe9e7 | 未達・悪化 / 未達ピル地 |
+| up / up-bg | #17714d / #e3f0e8 | 達成・改善 / 達成ピル地 |
+
+状態色は予約語（この4系以外に流用しない）。`emerald`/`sky`/`indigo`/`violet`/`orange` 等のTailwind色ファミリは新画面では使用禁止。旧トークンの `rakuten-red`（主ボタン・フォーカスリング・必須マーク・サイドバーのアクティブ表示）は `ink-strong` / `alert` / `sage-deep` / `sage` へ置換済み（2026-08-22、16箇所）。**`rakuten.red`/`rakuten.gold` は削除しない**（LP側との表記整合の参照用に残置。新規使用は禁止）。
+
+フォント: 本文 `font-sans` = BIZ UDPGothic（400/700）、数値 `font-num` = Inter（500/600/700）+ `tabular-nums`。`index.html` の Google Fonts link と `tailwind.config.js` の `fontFamily` に導入済み。`font-display`（Poppins）・`font-mono`（Inconsolata）は既存箇所で使用中のため残置。
+
+商品別KPI/RPP/フォーム系に残る `gray`/`blue` 系の全面移行は区切り5のスコープ（未実施）。
+
 ### `.claude/agents/`（任意）
 
 `backend-engineer` / `frontend-engineer` / `data-analyst`(読取専用) / `qa-debugger` の専門サブエージェント定義あり。担当領域は backend=`/backend`、frontend=`/frontend` に分け、同一ファイルの同時編集を避ける運用。

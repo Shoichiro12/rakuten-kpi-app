@@ -93,11 +93,11 @@ export default function ConsultingInquiryForm({ onClose }: { onClose?: () => voi
       <div className="space-y-3">
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
-            <label className={label}>お名前 <span className="text-rakuten-red">*</span></label>
+            <label className={label}>お名前 <span className="text-alert">*</span></label>
             <input className={input} value={name} onChange={(e) => setName(e.target.value)} placeholder="山田 太郎" maxLength={200} />
           </div>
           <div>
-            <label className={label}>会社名 <span className="text-rakuten-red">*</span></label>
+            <label className={label}>会社名 <span className="text-alert">*</span></label>
             <input className={input} value={company} onChange={(e) => setCompany(e.target.value)} placeholder="株式会社〇〇" maxLength={200} />
           </div>
         </div>
@@ -116,7 +116,7 @@ export default function ConsultingInquiryForm({ onClose }: { onClose?: () => voi
 
         <div className="grid sm:grid-cols-2 gap-3">
           <div>
-            <label className={label}>連絡先メール <span className="text-rakuten-red">*</span></label>
+            <label className={label}>連絡先メール <span className="text-alert">*</span></label>
             <input
               className={input}
               type="email"

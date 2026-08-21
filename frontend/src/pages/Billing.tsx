@@ -283,7 +283,7 @@ export default function Billing() {
               <button
                 onClick={subscribe}
                 disabled={busy === 'checkout'}
-                className="flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 bg-rakuten-red hover:opacity-90 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-opacity"
+                className="flex items-center justify-center gap-2 w-full sm:w-auto px-5 py-2.5 bg-ink-strong hover:opacity-90 disabled:opacity-60 text-white text-sm font-medium rounded-lg transition-opacity"
               >
                 {busy === 'checkout' ? '準備中…' : `${trialDays}日間の無料トライアルを始める`}
               </button>

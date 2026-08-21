@@ -26,9 +26,9 @@ function Notice({ error, info }: { error?: string | null; info?: string | null }
 }
 
 const inputCls =
-  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-rakuten-red'
+  'w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ink-strong'
 const buttonCls =
-  'inline-flex items-center gap-2 px-4 py-2 bg-rakuten-red hover:opacity-90 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-opacity'
+  'inline-flex items-center gap-2 px-4 py-2 bg-ink-strong hover:opacity-90 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-opacity'
 
 export default function AccountSettings({ userEmail }: Props) {
   const [info, setInfo] = useState<AccountInfo | null>(null)
