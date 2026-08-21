@@ -13,10 +13,6 @@ interface Row extends MasterProduct {
   cost_source: 'product' | 'default'
 }
 
-function categoryPath(c: Category): string {
-  return [c.genre_u1, c.genre_u2, c.genre_u3].filter(Boolean).join(' > ') || '（空カテゴリ）'
-}
-
 /** 商品マスタ一覧の1ページあたりの表示件数（縦スクロール対策・2026-08-20） */
 const MASTER_PAGE_SIZE = 50
 
@@ -48,10 +44,8 @@ export default function MasterSettings() {
   const [expensePct, setExpensePct] = useState(15)
   const [restockDays, setRestockDays] = useState(14)
 
-  // カテゴリ管理
-  const [newCat, setNewCat] = useState({ genre_u1: '', genre_u2: '', genre_u3: '' })
-  const [editingCatId, setEditingCatId] = useState<number | null>(null)
-  const [editCat, setEditCat] = useState({ genre_u1: '', genre_u2: '', genre_u3: '' })
+  // カテゴリのCRUD（追加・リネーム・削除）は独立ページへ移設済み（区切り4）。
+  // ここでは商品への割当（FK選択）のために一覧だけ取得して使う。
 
   // ジャンル別ベンチマーク手入力（RMS表示値。診断の基準①として最優先で使われる）
   const [benchmarks, setBenchmarks] = useState<GenreBenchmarkItem[]>([])
@@ -238,36 +232,6 @@ export default function MasterSettings() {
     }
   }
 
-  const addCategory = async () => {
-    if (!newCat.genre_u1.trim() && !newCat.genre_u2.trim() && !newCat.genre_u3.trim()) return
-    try {
-      await api.master.createCategory(newCat)
-      setNewCat({ genre_u1: '', genre_u2: '', genre_u3: '' })
-      await load()
-      flash('カテゴリを作成しました')
-    } catch (e) {
-      console.error('[MasterSettings] カテゴリ作成エラー:', e)
-    }
-  }
-
-  const startEditCat = (c: Category) => {
-    setEditingCatId(c.id)
-    setEditCat({ genre_u1: c.genre_u1 ?? '', genre_u2: c.genre_u2 ?? '', genre_u3: c.genre_u3 ?? '' })
-  }
-
-  const saveEditCat = async () => {
-    if (editingCatId == null) return
-    try {
-      await api.master.updateCategory(editingCatId, editCat)
-      setEditingCatId(null)
-      await load()
-      flash('カテゴリを更新しました')
-    } catch (e) {
-      console.error('[MasterSettings] カテゴリ更新エラー:', e)
-      flash('更新に失敗しました（同名カテゴリの可能性）')
-    }
-  }
-
   const exportCsv = async () => {
     try {
       await api.master.exportCsv()
@@ -284,17 +248,6 @@ export default function MasterSettings() {
     } catch (e) {
       console.error('[MasterSettings] CSVインポートエラー:', e)
       flash('CSV取込みに失敗しました')
-    }
-  }
-
-  const removeCategory = async (c: Category) => {
-    if (!window.confirm(`「${categoryPath(c)}」を削除します。このカテゴリの商品は「未分類」に戻ります。よろしいですか？`)) return
-    try {
-      const res = await api.master.deleteCategory(c.id)
-      await load()
-      flash(`カテゴリを削除しました（${res.detached_products}商品を未分類化）`)
-    } catch (e) {
-      console.error('[MasterSettings] カテゴリ削除エラー:', e)
     }
   }
 
@@ -777,60 +730,7 @@ export default function MasterSettings() {
             原価率は「商品別（個別）→ 店舗デフォルト（既定）」の順で適用されます。値を変更するとRPP売上原価が自動で再計算され、GP・ROI・Rev等に反映されます。
           </p>
 
-          {/* カテゴリ管理 */}
-          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
-            <div className="px-4 py-3 border-b">
-              <h3 className="text-sm font-semibold text-sub">カテゴリ管理</h3>
-              <p className="text-xs text-muted mt-0.5">大分類 &gt; 中分類 &gt; 小分類。取込みで自動生成されたカテゴリの整理や、手動追加ができます。</p>
-            </div>
-
-            {/* 新規作成フォーム（楽天ジャンルマスタから選択＋自由入力） */}
-            <div className="px-4 py-3 border-b bg-bg-alt flex flex-wrap items-center gap-2">
-              <GenrePicker
-                tree={genreTree}
-                value={newCat}
-                onChange={(g) => setNewCat(g)}
-              />
-              <button
-                onClick={addCategory}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-ink-strong hover:bg-ink text-white text-sm font-medium rounded-lg transition-colors"
-              >
-                <Plus size={14} />追加
-              </button>
-            </div>
-
-            {categories.length === 0 ? (
-              <div className="py-8 text-center text-sm text-muted">カテゴリがまだありません</div>
-            ) : (
-              <ul className="divide-y divide-bg-alt">
-                {categories.map((c) => (
-                  <li key={c.id} className="px-4 py-2.5 flex items-center gap-2">
-                    {editingCatId === c.id ? (
-                      <>
-                        <input value={editCat.genre_u1} onChange={(e) => setEditCat({ ...editCat, genre_u1: e.target.value })} placeholder="大分類" className="w-28 border border-line rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep" />
-                        <span className="text-line">&gt;</span>
-                        <input value={editCat.genre_u2} onChange={(e) => setEditCat({ ...editCat, genre_u2: e.target.value })} placeholder="中分類" className="w-28 border border-line rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep" />
-                        <span className="text-line">&gt;</span>
-                        <input value={editCat.genre_u3} onChange={(e) => setEditCat({ ...editCat, genre_u3: e.target.value })} placeholder="小分類" className="w-28 border border-line rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep" />
-                        <div className="ml-auto flex items-center gap-1">
-                          <button onClick={saveEditCat} className="p-1.5 text-green-600 hover:bg-green-50 rounded" title="保存"><Check size={15} /></button>
-                          <button onClick={() => setEditingCatId(null)} className="p-1.5 text-muted hover:bg-bg-alt rounded" title="取消"><X size={15} /></button>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <span className="text-sm text-ink">{categoryPath(c)}</span>
-                        <div className="ml-auto flex items-center gap-1">
-                          <button onClick={() => startEditCat(c)} className="p-1.5 text-muted hover:bg-bg-alt rounded" title="リネーム"><Pencil size={14} /></button>
-                          <button onClick={() => removeCategory(c)} className="p-1.5 text-red-500 hover:bg-red-50 rounded" title="削除"><Trash2 size={14} /></button>
-                        </div>
-                      </>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          {/* カテゴリ管理は独立ページへ移設（マスタCRUD規約2026-08-22 区切り4。/master/categories） */}
 
           {/* ジャンル別ベンチマーク手入力（アクション提案ロジック 3-B / 3-B'） */}
           <div className="bg-white rounded-xl border shadow-sm overflow-hidden">

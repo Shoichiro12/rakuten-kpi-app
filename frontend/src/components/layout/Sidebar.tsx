@@ -15,6 +15,7 @@ import {
   MessageSquarePlus,
   FileDown,
   Boxes,
+  Tags,
   CreditCard,
   LogOut,
   UserCircle,
@@ -31,6 +32,7 @@ const nav = [
   { to: '/rpp', icon: Megaphone, label: 'RPP広告実績' },
   { to: '/import', icon: Upload, label: 'データ取込み' },
   { to: '/master', icon: Boxes, label: '商品マスタ・原価' },
+  { to: '/master/categories', icon: Tags, label: 'カテゴリマスタ' },
   { to: '/targets', icon: Target, label: '目標設定' },
   { to: '/reports', icon: FileDown, label: 'レポート出力' },
   { to: '/billing', icon: CreditCard, label: '請求・プラン' },
@@ -188,7 +190,9 @@ export default function Sidebar({ onOpenHelp, onOpenFeedback, userEmail, onSignO
           <NavLink
             key={to}
             to={to}
-            end={to === '/'}
+            // "/master" は "/master/categories" のプレフィックスになるため、end指定が
+            // 無いと両方のナビ項目が同時にアクティブ表示されてしまう
+            end={to === '/' || to === '/master'}
             aria-label={collapsed ? label : undefined}
             className={({ isActive }) => navRowClass(collapsed, isActive)}
           >

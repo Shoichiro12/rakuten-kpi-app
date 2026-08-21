@@ -13,6 +13,7 @@ import ProductKPI from './pages/ProductKPI'
 import DataImport from './pages/DataImport'
 import TargetSetting from './pages/TargetSetting'
 import MasterSettings from './pages/MasterSettings'
+import CategoryMaster from './pages/CategoryMaster'
 import Billing from './pages/Billing'
 import RppAnalysis from './pages/RppAnalysis'
 import Reports from './pages/Reports'
@@ -41,6 +42,7 @@ function AppRoutes({ userEmail }: { userEmail: string | null }) {
         <Route path="/import" element={<DataImport />} />
         <Route path="/targets" element={<TargetSetting />} />
         <Route path="/master" element={<MasterSettings />} />
+        <Route path="/master/categories" element={<CategoryMaster />} />
         <Route path="/billing" element={<Billing />} />
         <Route path="/rpp" element={<RppAnalysis />} />
         <Route path="/reports" element={<Reports />} />

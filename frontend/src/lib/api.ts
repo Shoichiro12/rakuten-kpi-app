@@ -293,6 +293,21 @@ export const api = {
     /** カテゴリ削除（参照商品は未分類化） */
     deleteCategory: (id: number) =>
       request<{ deleted_id: number; detached_products: number }>(`/master/categories/${id}`, { method: 'DELETE' }),
+    /** カテゴリマスタをCSV（BOM付きUTF-8）でダウンロード */
+    exportCategoriesCsv: () => downloadCsv('/master/categories/export', 'category_master.csv'),
+    /** カテゴリマスタCSVを一括取込み（大/中/小の階層キーにupsert） */
+    importCategoriesCsv: async (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      let r: Response
+      try {
+        r = await fetch(`${BASE}/master/categories/import`, { method: 'POST', body: form, headers: await authHeaders() })
+      } catch (e) {
+        console.error('[API] ネットワークエラー (master.importCategoriesCsv):', e)
+        throw new Error('サーバーに接続できませんでした。バックエンドが起動しているか確認してください。')
+      }
+      return await parseJson(r) as { created: number; updated: number; error_rows: string[] } | undefined
+    },
     /** 商品マスタをCSV（BOM付きUTF-8）でダウンロード */
     exportCsv: () => downloadCsv('/master/products/export', 'product_master.csv'),
     /** 商品マスタCSVを一括取込み（管理番号キーにupsert） */
