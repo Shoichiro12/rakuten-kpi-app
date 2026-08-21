@@ -1,16 +1,21 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Save, CheckCircle } from 'lucide-react'
+import { Save, CheckCircle, Download, Upload, Trash2 } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import Header from '../components/layout/Header'
+import RevenuePlanPanel from '../components/dashboard/RevenuePlanPanel'
+import AccessPlanner from '../components/dashboard/AccessPlanner'
 import { api } from '../lib/api'
 import { getCurrentYearMonth } from '../lib/utils'
-import type { Target, RevenuePlanResponse } from '../types'
+import type { Target, RevenuePlanResponse, AccessPlan } from '../types'
 
 const CONFIDENCE_LABELS: Record<string, { label: string; cls: string }> = {
   high: { label: '精度: 高（2年分以上の実績）', cls: 'bg-green-100 text-green-700' },
   medium: { label: '精度: 中（実績1周分）', cls: 'bg-sage-soft text-sage-deep' },
   low: { label: '均等按分（実績12ヶ月未満）', cls: 'bg-amber-100 text-amber-700' },
 }
+
+// 目標マスタ（12ヶ月グリッド）の編集対象5項目。UIは % 系（CVR・経費率）も百分率の文字列で保持する
+type TargetField = 'target_sales' | 'target_access' | 'target_cvr' | 'target_av' | 'expense_rate'
 
 function Field({ label, description, children }: { label: string; description?: string; children: React.ReactNode }) {
   return (
@@ -27,18 +32,15 @@ function Field({ label, description, children }: { label: string; description?: 
 }
 
 export default function TargetSetting() {
+  // 対象月＝表の基準月（KGI試算・按分プレビュー・アクセス逆算の対象）。
+  // 12ヶ月グリッドの表示範囲もこの月を含む予算年度（店舗のbudget_year_start_month起点）に連動する
   const [yearMonth, setYearMonth] = useState(getCurrentYearMonth())
-  const [form, setForm] = useState<Omit<Target, 'year_month'>>({
-    target_sales: 5_000_000,
-    target_access: 50_000,
-    target_cvr: 1.5,
-    target_av: 7_000,
-    expense_rate: 0.15,
-  })
   const [targets, setTargets] = useState<Target[]>([])
   const [costRate, setCostRate] = useState(0.6)   // 店舗デフォルト原価率（/api/shops/me から取得）
-  const [saved, setSaved] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [savedMsg, setSavedMsg] = useState<string | null>(null)
+  const [gridSaving, setGridSaving] = useState(false)
+  // 12ヶ月グリッドの編集中バッファ（年月→フィールド→入力文字列）
+  const [pending, setPending] = useState<Record<string, Partial<Record<TargetField, string>>>>({})
 
   // アイテム別目標の一括編集は商品マスタ「アイテム別目標」タブへ移設済み
   // （マスタCRUD規約2026-08-22 区切り5。API・ロジックは無変更、置き場所のみ変更）
@@ -51,6 +53,13 @@ export default function TargetSetting() {
   const [budgetSaving, setBudgetSaving] = useState(false)
   // 年間目標プランナーの表示切替（サマリ=5列 / 詳細=9列）
   const [planView, setPlanView] = useState<'summary' | 'detail'>('summary')
+  // アクセス逆算（ダッシュボードから移設。区切り6）
+  const [accessPlan, setAccessPlan] = useState<AccessPlan | null>(null)
+
+  const flash = (msg: string) => {
+    setSavedMsg(msg)
+    setTimeout(() => setSavedMsg(null), 2500)
+  }
 
   const loadPlan = useCallback(async (ym: string) => {
     try {
@@ -62,7 +71,17 @@ export default function TargetSetting() {
     }
   }, [])
 
-  useEffect(() => { loadPlan(yearMonth) }, [yearMonth, loadPlan])
+  const loadAccessPlan = useCallback(async (ym: string) => {
+    try {
+      const res = await api.evaluation.accessPlan('monthly', ym).catch(() => null)
+      setAccessPlan((res as { plan?: AccessPlan } | null)?.plan ?? null)
+    } catch (e) {
+      console.error('[TargetSetting] アクセス逆算取得エラー:', e)
+      setAccessPlan(null)
+    }
+  }, [])
+
+  useEffect(() => { loadPlan(yearMonth); loadAccessPlan(yearMonth) }, [yearMonth, loadPlan, loadAccessPlan])
 
   // 月次売上予算の手動補正（追加指示書2章）: 月ごとにonBlur保存・nullで解除
   const saveOverride = async (ym: string, value: number | null) => {
@@ -91,16 +110,18 @@ export default function TargetSetting() {
     }
   }
 
+  const loadTargets = useCallback(async () => {
+    try {
+      const data = await api.targets.list()
+      setTargets(Array.isArray(data) ? (data as Target[]) : [])
+    } catch (e) {
+      console.error('[TargetSetting] 目標一覧取得エラー:', e)
+      setTargets([])
+    }
+  }, [])
+
   useEffect(() => {
-    api.targets.list()
-      .then((data: unknown) => {
-        const list = Array.isArray(data) ? (data as Target[]) : []
-        setTargets(list)
-      })
-      .catch((e: unknown) => {
-        console.error('[TargetSetting] 目標一覧取得エラー:', e)
-        setTargets([])
-      })
+    loadTargets()
     // 原価率は店舗マスタのデフォルト値を使う（固定の60%仮定をやめる）
     api.shops.me()
       .then((shop) => {
@@ -113,47 +134,123 @@ export default function TargetSetting() {
       .catch((e: unknown) => {
         console.error('[TargetSetting] 店舗設定取得エラー:', e)
       })
-  }, [])
+  }, [loadTargets])
 
-  const loadTarget = (ym: string) => {
-    const existing = targets.find(t => t.year_month === ym)
-    if (existing) {
-      setForm({
-        target_sales: existing.target_sales,
-        target_access: existing.target_access,
-        target_cvr: existing.target_cvr,
-        target_av: existing.target_av,
-        expense_rate: existing.expense_rate,
-      })
+  // ── 目標マスタ12ヶ月グリッド（マスタCRUD規約2026-08-22 区切り6）───────────
+  // 行=年月は revenue-plan が既に計算済みの予算年度（budget_year_start_month起点、
+  // yearMonthを含む12ヶ月）をそのまま使う。年度の月レンジ計算をここで複製しない
+  const gridMonths = plan?.months.map((m) => m.year_month) ?? []
+  const targetsByYm = Object.fromEntries(targets.map((t) => [t.year_month, t]))
+
+  /** そのフィールドの「保存済みの値」を編集欄と同じ単位（文字列）で返す */
+  const savedFieldValue = (ym: string, field: TargetField): string => {
+    const t = targetsByYm[ym]
+    if (!t) return ''
+    if (field === 'expense_rate') return String(Math.round(t.expense_rate * 100))
+    return String(t[field])
+  }
+
+  const displayFieldValue = (ym: string, field: TargetField): string => {
+    const p = pending[ym]?.[field]
+    return p !== undefined ? p : savedFieldValue(ym, field)
+  }
+
+  const setFieldValue = (ym: string, field: TargetField, value: string) => {
+    setPending((prev) => ({ ...prev, [ym]: { ...prev[ym], [field]: value } }))
+  }
+
+  /** その月が未保存の変更を持つか（触れたフィールドの値が保存済みと異なる） */
+  const isRowDirty = (ym: string): boolean => {
+    const p = pending[ym]
+    if (!p) return false
+    return (Object.keys(p) as TargetField[]).some((f) => p[f] !== undefined && p[f] !== savedFieldValue(ym, f))
+  }
+
+  const dirtyMonths = gridMonths.filter(isRowDirty)
+
+  /** 保存済み値＋編集中の値をマージし、POST /api/targets の完全なペイロードを作る
+   * （backendのupsertは全項目を上書きするため、常に5項目そろえて送る）。
+   * 未設定の項目は新規作成時のTargetIn既定値（backend/routers/targets.py）に合わせる */
+  const buildPayload = (ym: string) => {
+    const t = targetsByYm[ym]
+    const val = (field: TargetField, fallback: number): number => {
+      const raw = pending[ym]?.[field] ?? (t ? savedFieldValue(ym, field) : undefined)
+      const n = raw !== undefined ? Number(raw) : NaN
+      return Number.isFinite(n) ? n : fallback
+    }
+    return {
+      year_month: ym,
+      target_sales: val('target_sales', 0),
+      target_access: val('target_access', 0),
+      target_cvr: val('target_cvr', 0),
+      target_av: val('target_av', 0),
+      expense_rate: val('expense_rate', 15) / 100,
     }
   }
 
-  const handleYearMonthChange = (ym: string) => {
-    setYearMonth(ym)
-    loadTarget(ym)
+  const saveAllDirty = async () => {
+    if (dirtyMonths.length === 0) { flash('保存対象の変更がありません'); return }
+    setGridSaving(true)
+    const failed: string[] = []
+    await Promise.all(dirtyMonths.map(async (ym) => {
+      try {
+        await api.targets.upsert(buildPayload(ym))
+      } catch (e) {
+        console.error(`[TargetSetting] ${ym} の目標保存エラー:`, e)
+        failed.push(ym)
+      }
+    }))
+    // 成功した月だけ編集中バッファをクリアする（失敗分は入力内容を残す）
+    setPending((prev) => {
+      const next = { ...prev }
+      for (const ym of dirtyMonths) if (!failed.includes(ym)) delete next[ym]
+      return next
+    })
+    await loadTargets()
+    await loadPlan(yearMonth)
+    setGridSaving(false)
+    flash(
+      failed.length > 0
+        ? `${dirtyMonths.length - failed.length}件保存しました（${failed.length}件失敗: ${failed.join('、')}）`
+        : `${dirtyMonths.length}件の目標を保存しました`,
+    )
   }
 
-  const handleSave = async () => {
-    setLoading(true)
+  const deleteMonth = async (ym: string) => {
+    if (!window.confirm(`${ym} の目標を削除します。よろしいですか？`)) return
     try {
-      await api.targets.upsert({ year_month: yearMonth, ...form })
-      const data = await api.targets.list()
-      const list = Array.isArray(data) ? (data as Target[]) : []
-      setTargets(list)
-      setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      await api.targets.remove(ym)
+      await loadTargets()
+      await loadPlan(yearMonth)
+      flash(`${ym} の目標を削除しました`)
     } catch (e) {
-      console.error('[TargetSetting] 目標保存エラー:', e)
-    } finally {
-      setLoading(false)
+      console.error('[TargetSetting] 目標削除エラー:', e)
     }
   }
 
-  const set = (key: keyof typeof form, value: number) => {
-    setForm(f => ({ ...f, [key]: value }))
+  const exportCsv = async () => {
+    try {
+      await api.targets.exportCsv()
+    } catch (e) {
+      console.error('[TargetSetting] CSVエクスポートエラー:', e)
+    }
   }
 
-  const estimatedGP = form.target_sales * (1 - (form.expense_rate + costRate))
+  const importCsv = async (file: File) => {
+    try {
+      const res = await api.targets.importCsv(file)
+      await loadTargets()
+      await loadPlan(yearMonth)
+      flash(`CSV取込み完了（新規${res?.created ?? 0} / 更新${res?.updated ?? 0}件）`)
+    } catch (e) {
+      console.error('[TargetSetting] CSVインポートエラー:', e)
+      flash('CSV取込みに失敗しました')
+    }
+  }
+
+  // 対象月（フォーカス行）の試算。編集中の値があれば即時反映する
+  const focus = buildPayload(yearMonth)
+  const estimatedGP = focus.target_sales * (1 - (focus.expense_rate + costRate))
 
   return (
     <div className="flex flex-col h-full">
@@ -161,75 +258,193 @@ export default function TargetSetting() {
         title="目標設定"
         subtitle="KGI（売上目標）・KPI目標値・経費率の設定"
         actions={
-          <button
-            onClick={handleSave}
-            disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 bg-ink-strong hover:bg-ink disabled:opacity-40 text-white text-sm font-medium rounded-lg transition-colors"
-          >
-            {saved ? <CheckCircle size={15} /> : <Save size={15} />}
-            {saved ? '保存しました' : '保存'}
-          </button>
+          savedMsg && <span className="flex items-center gap-1.5 text-sm text-green-600"><CheckCircle size={15} />{savedMsg}</span>
         }
       />
 
       <div className="flex-1 overflow-auto p-6 bg-bg-alt">
         {/* 幅の上限は付けない（他の表示系画面と同じ全幅）。
-            年間目標プランナーの表が画面幅を使い切れるようにするため。max-w-* を戻さないこと */}
+            12ヶ月グリッド・年間目標プランナーの表が画面幅を使い切れるようにするため。max-w-* を戻さないこと */}
         <div className="space-y-6">
-          {/* 対象月 */}
-          {/* フォーム系カードは読みやすい幅で止める（CLAUDE.md「画面幅の規約」） */}
+          {/* 入力順ガイド（マスタCRUD規約2026-08-22 区切り6） */}
+          <div className="bg-sage-soft border border-sage-soft rounded-xl px-4 py-3 max-w-3xl text-sm text-sage-deep">
+            <span className="font-semibold">① まずここで店舗全体の目標を月ごとに設定</span>
+            <span className="mx-1.5">→</span>
+            <Link to="/master" className="underline hover:no-underline">② 商品マスタでアイテム別目標を設定</Link>
+          </div>
+
+          {/* 対象月（基準月） */}
           <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
             <h3 className="text-sm font-semibold text-sub mb-4">対象月</h3>
             <input
               type="month"
               value={yearMonth}
-              onChange={e => handleYearMonthChange(e.target.value)}
+              onChange={e => setYearMonth(e.target.value)}
               className="border border-line rounded-lg px-3 py-2 text-sm text-sub focus:outline-none focus:ring-2 focus:ring-sage-deep"
             />
+            <p className="text-xs text-muted mt-2">
+              この月を含む予算年度を、下の目標マスタ・年間目標プランナーの表示範囲に使います。
+            </p>
           </div>
 
-          {/* KGI。入力の直下に試算を置き、入力→結果の因果を同じカード内で見せる
-              （2026-08-20 レビュー採用。試算を離れた別カードに戻さないこと） */}
-          <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
-            <h3 className="text-sm font-semibold text-sub mb-1">KGI（最終目標）</h3>
-            <p className="text-xs text-muted mb-4">月次売上の目標値を設定します</p>
-            <Field label="月次売上目標" description="RPP売上ベース">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted">¥</span>
-                <input
-                  type="number"
-                  value={form.target_sales}
-                  onChange={e => set('target_sales', Number(e.target.value))}
-                  step={100000}
-                  className="border border-line rounded-lg px-3 py-2 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-sage-deep"
-                />
+          {/* KGI試算（対象月の効いている値。編集中はここに即時反映される） */}
+          <div className="bg-sage-soft border border-sage-soft rounded-xl p-4 max-w-3xl">
+            <p className="text-sm font-semibold text-sage-deep mb-3">
+              {yearMonth} の試算（原価率{Math.round(costRate * 100)}%・経費率{Math.round(focus.expense_rate * 100)}%を適用）
+            </p>
+            <div className="grid grid-cols-2 gap-3 text-sm">
+              <div>
+                <p className="text-sage-deep text-xs">推定GP（利益）</p>
+                <p className="font-bold text-sage-deep tabular-nums">¥{Math.round(estimatedGP).toLocaleString()}</p>
               </div>
-            </Field>
-
-            {/* 試算（この売上目標のとき何が起こるか。値は入力に即時追従する） */}
-            <div className="mt-4 bg-sage-soft border border-sage-soft rounded-xl p-4 max-w-3xl">
-              <p className="text-sm font-semibold text-sage-deep mb-3">
-                この目標のときの試算（原価率{Math.round(costRate * 100)}%・経費率{Math.round(form.expense_rate * 100)}%を適用）
-              </p>
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div>
-                  <p className="text-sage-deep text-xs">推定GP（利益）</p>
-                  <p className="font-bold text-sage-deep tabular-nums">¥{Math.round(estimatedGP).toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-sage-deep text-xs">店舗運営経費</p>
-                  <p className="font-bold text-sage-deep tabular-nums">¥{Math.round(form.target_sales * form.expense_rate).toLocaleString()}</p>
-                </div>
-                <div>
-                  <p className="text-sage-deep text-xs">KGI達成時CV試算</p>
-                  <p className="font-bold text-sage-deep tabular-nums">{form.target_av > 0 ? Math.round(form.target_sales / form.target_av).toLocaleString() : '—'}件</p>
-                </div>
-                <div>
-                  <p className="text-sage-deep text-xs">目標客単価（下のKPI目標値）</p>
-                  <p className="font-bold text-sage-deep tabular-nums">{form.target_av > 0 ? `¥${form.target_av.toLocaleString()}` : '未設定'}</p>
-                </div>
+              <div>
+                <p className="text-sage-deep text-xs">店舗運営経費</p>
+                <p className="font-bold text-sage-deep tabular-nums">¥{Math.round(focus.target_sales * focus.expense_rate).toLocaleString()}</p>
+              </div>
+              <div>
+                <p className="text-sage-deep text-xs">目標CV試算</p>
+                <p className="font-bold text-sage-deep tabular-nums">{focus.target_av > 0 ? Math.round(focus.target_sales / focus.target_av).toLocaleString() : '—'}件</p>
+              </div>
+              <div>
+                <p className="text-sage-deep text-xs">目標客単価</p>
+                <p className="font-bold text-sage-deep tabular-nums">{focus.target_av > 0 ? `¥${focus.target_av.toLocaleString()}` : '未設定'}</p>
               </div>
             </div>
+          </div>
+
+          {/* 目標マスタ（12ヶ月グリッド）。1ヶ月ずつのフォーム入力から置き換え（区切り6） */}
+          <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b flex items-center justify-between gap-3 flex-wrap">
+              <div>
+                <h3 className="text-sm font-semibold text-sub">目標マスタ（{gridMonths[0] ?? '—'} 〜 {gridMonths[gridMonths.length - 1] ?? '—'}）</h3>
+                <p className="text-xs text-muted mt-0.5">売上 = アクセス × CVR × 客単価。セルを直接編集し、まとめて一括保存できます</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={exportCsv}
+                  className="flex items-center gap-1.5 text-xs text-sub border rounded-lg px-2.5 py-1.5 hover:bg-bg-alt transition-colors"
+                >
+                  <Download size={13} />CSVエクスポート
+                </button>
+                <label className="flex items-center gap-1.5 text-xs text-sub border rounded-lg px-2.5 py-1.5 hover:bg-bg-alt cursor-pointer transition-colors">
+                  <Upload size={13} />CSVインポート
+                  <input
+                    type="file"
+                    accept=".csv"
+                    className="hidden"
+                    onChange={(e) => { const f = e.target.files?.[0]; if (f) importCsv(f); e.target.value = '' }}
+                  />
+                </label>
+                {dirtyMonths.length > 0 && (
+                  <span className="text-xs text-amber-600">未保存 {dirtyMonths.length}件</span>
+                )}
+                <button
+                  onClick={saveAllDirty}
+                  disabled={dirtyMonths.length === 0 || gridSaving}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-sage-deep hover:bg-sage-deep disabled:bg-line disabled:cursor-not-allowed text-white text-sm font-medium rounded"
+                >
+                  <Save size={14} />{gridSaving ? '保存中…' : '一括保存'}
+                </button>
+              </div>
+            </div>
+
+            {gridMonths.length === 0 ? (
+              <div className="py-8 text-center text-sm text-muted">読み込み中…</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm tabular-nums">
+                  <thead className="bg-bg-alt text-xs text-muted">
+                    <tr>
+                      <th className="px-3 py-2.5 text-left">年月</th>
+                      <th className="px-3 py-2.5 text-right">目標売上（円）</th>
+                      <th className="px-3 py-2.5 text-right">目標アクセス（UU）</th>
+                      <th className="px-3 py-2.5 text-right">目標CVR（%）</th>
+                      <th className="px-3 py-2.5 text-right">目標客単価（円）</th>
+                      <th className="px-3 py-2.5 text-right">経費率（%）</th>
+                      <th className="px-3 py-2.5 text-center">操作</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-bg-alt">
+                    {gridMonths.map((ym) => {
+                      const dirty = isRowDirty(ym)
+                      const hasTarget = targetsByYm[ym] != null
+                      const cellCls = (field: TargetField) =>
+                        `w-full text-right border rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-sage-deep ${
+                          pending[ym]?.[field] !== undefined && pending[ym]?.[field] !== savedFieldValue(ym, field)
+                            ? 'border-amber-400 bg-white'
+                            : 'border-line'
+                        }`
+                      return (
+                        <tr
+                          key={ym}
+                          className={dirty ? 'bg-amber-50/60' : ym === yearMonth ? 'bg-sage-soft' : undefined}
+                        >
+                          <td className="px-3 py-2 font-medium text-ink-strong whitespace-nowrap">{ym}</td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number" min={0} step={100000} placeholder="未設定"
+                              value={displayFieldValue(ym, 'target_sales')}
+                              onFocus={() => setYearMonth(ym)}
+                              onChange={(e) => setFieldValue(ym, 'target_sales', e.target.value)}
+                              className={cellCls('target_sales')}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number" min={0} step={1000} placeholder="未設定"
+                              value={displayFieldValue(ym, 'target_access')}
+                              onFocus={() => setYearMonth(ym)}
+                              onChange={(e) => setFieldValue(ym, 'target_access', e.target.value)}
+                              className={cellCls('target_access')}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number" min={0} max={100} step={0.1} placeholder="未設定"
+                              value={displayFieldValue(ym, 'target_cvr')}
+                              onFocus={() => setYearMonth(ym)}
+                              onChange={(e) => setFieldValue(ym, 'target_cvr', e.target.value)}
+                              className={cellCls('target_cvr')}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number" min={0} step={100} placeholder="未設定"
+                              value={displayFieldValue(ym, 'target_av')}
+                              onFocus={() => setYearMonth(ym)}
+                              onChange={(e) => setFieldValue(ym, 'target_av', e.target.value)}
+                              className={cellCls('target_av')}
+                            />
+                          </td>
+                          <td className="px-3 py-2">
+                            <input
+                              type="number" min={0} max={100} step={1} placeholder="15"
+                              value={displayFieldValue(ym, 'expense_rate')}
+                              onFocus={() => setYearMonth(ym)}
+                              onChange={(e) => setFieldValue(ym, 'expense_rate', e.target.value)}
+                              className={cellCls('expense_rate')}
+                            />
+                          </td>
+                          <td className="px-3 py-2 text-center">
+                            {hasTarget ? (
+                              <button
+                                onClick={() => deleteMonth(ym)}
+                                className="inline-flex items-center gap-1 px-2 py-1 border border-line text-muted hover:text-red-600 hover:border-red-300 hover:bg-red-50 text-xs rounded transition-colors"
+                                title="この月の目標を削除します"
+                              >
+                                <Trash2 size={11} />削除
+                              </button>
+                            ) : (
+                              <span className="text-xs text-line">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
           {/* 年間売上予算（売上予算プラン・第4段階v2） */}
@@ -388,13 +603,13 @@ export default function TargetSetting() {
                               {planView === 'detail' && (
                                 <td className="px-2 py-1.5 text-right text-sub whitespace-nowrap" title={m.basis_detail ?? undefined}>
                                   {m.target_cvr != null ? String(m.target_cvr) : '—'}
-                                  {m.target_cvr_basis === 'manual' && <span className="ml-0.5 text-xs text-violet-600" title="目標設定画面の手入力を採用">手</span>}
+                                  {m.target_cvr_basis === 'manual' && <span className="ml-0.5 text-xs text-violet-600" title="目標マスタの手入力を採用">手</span>}
                                 </td>
                               )}
                               {planView === 'detail' && (
                                 <td className="px-2 py-1.5 text-right text-sub whitespace-nowrap" title={m.basis_detail ?? undefined}>
                                   {m.target_av != null ? Math.round(m.target_av).toLocaleString() : '—'}
-                                  {m.target_av_basis === 'manual' && <span className="ml-0.5 text-xs text-violet-600" title="目標設定画面の手入力を採用">手</span>}
+                                  {m.target_av_basis === 'manual' && <span className="ml-0.5 text-xs text-violet-600" title="目標マスタの手入力を採用">手</span>}
                                 </td>
                               )}
                               <td
@@ -452,68 +667,9 @@ export default function TargetSetting() {
             )}
           </div>
 
-          {/* KPI */}
-          <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
-            <h3 className="text-sm font-semibold text-sub mb-1">KPI目標値</h3>
-            <p className="text-xs text-muted mb-4">売上 = アクセス × CVR × 客単価</p>
-            <Field label="アクセス目標（UU）" description="月間ユニークユーザー数">
-              <input
-                type="number"
-                value={form.target_access}
-                onChange={e => set('target_access', Number(e.target.value))}
-                step={1000}
-                className="border border-line rounded-lg px-3 py-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-sage-deep"
-              />
-            </Field>
-            <Field label="CVR目標（%）" description="注文率">
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={form.target_cvr}
-                  onChange={e => set('target_cvr', Number(e.target.value))}
-                  step={0.1}
-                  min={0}
-                  max={100}
-                  className="border border-line rounded-lg px-3 py-2 text-sm w-32 focus:outline-none focus:ring-2 focus:ring-sage-deep"
-                />
-                <span className="text-sm text-muted">%</span>
-              </div>
-            </Field>
-            <Field label="客単価目標（Av）" description="1注文あたり平均売上">
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-muted">¥</span>
-                <input
-                  type="number"
-                  value={form.target_av}
-                  onChange={e => set('target_av', Number(e.target.value))}
-                  step={100}
-                  className="border border-line rounded-lg px-3 py-2 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-sage-deep"
-                />
-              </div>
-            </Field>
-          </div>
-
-          {/* 経費率 */}
-          <div className="bg-white rounded-xl border shadow-sm p-6 max-w-3xl">
-            <h3 className="text-sm font-semibold text-sub mb-1">経費設定</h3>
-            <p className="text-xs text-muted mb-4">Steady Cost = RPP売上 × 経費率</p>
-            <Field label="店舗運営経費率" description="楽天出店料・ポイント等">
-              <div className="flex items-center gap-2">
-                <input
-                  type="number"
-                  value={Math.round(form.expense_rate * 100)}
-                  onChange={e => set('expense_rate', Number(e.target.value) / 100)}
-                  step={1}
-                  min={0}
-                  max={100}
-                  className="border border-line rounded-lg px-3 py-2 text-sm w-24 focus:outline-none focus:ring-2 focus:ring-sage-deep"
-                />
-                <span className="text-sm text-muted">%</span>
-              </div>
-            </Field>
-          </div>
-
-          {/* 試算はKGIカード内へ移動した（入力と結果の因果を切らない。2026-08-20） */}
+          {/* 売上予算プラン・アクセス逆算（ダッシュボードから移設。区切り6 Q5承認済み） */}
+          <RevenuePlanPanel yearMonth={yearMonth} />
+          {accessPlan && <AccessPlanner plan={accessPlan} />}
 
           {/* アイテム別目標は商品マスタへ移設済み（マスタCRUD規約2026-08-22 区切り5） */}
           <div className="bg-white rounded-xl border shadow-sm p-4 max-w-3xl flex items-center justify-between gap-3">
@@ -527,43 +683,6 @@ export default function TargetSetting() {
               商品マスタを開く
             </Link>
           </div>
-
-          {/* 設定済み目標一覧 */}
-          {targets.length > 0 && (
-            // 4〜5列の表。全幅だと最も間延びするのでカード側で止める（CLAUDE.md「画面幅の規約」）
-            <div className="bg-white rounded-xl border shadow-sm overflow-hidden max-w-3xl">
-              <div className="px-4 py-3 border-b">
-                <h3 className="text-sm font-semibold text-sub">設定済み目標一覧</h3>
-              </div>
-              <table className="w-full text-sm">
-                <thead className="bg-bg-alt text-xs text-muted">
-                  <tr>
-                    <th className="px-4 py-2 text-left">対象月</th>
-                    <th className="px-4 py-2 text-right">売上目標（円）</th>
-                    <th className="px-4 py-2 text-right">CVR目標（%）</th>
-                    <th className="px-4 py-2 text-right">客単価目標（円）</th>
-                    <th className="px-4 py-2 text-right">経費率（%）</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-bg-alt">
-                  {targets.map(t => (
-                    <tr
-                      key={t.year_month}
-                      onClick={() => { setYearMonth(t.year_month); loadTarget(t.year_month) }}
-                      className="cursor-pointer hover:bg-sage-soft transition-colors"
-                    >
-                      <td className="px-4 py-2.5 font-medium text-ink-strong">{t.year_month}</td>
-                      {/* 単位は見出しに1回だけ。数値は右寄せ＋等幅（規約 1-2） */}
-                      <td className="px-4 py-2.5 text-right tabular-nums">{t.target_sales.toLocaleString()}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{t.target_cvr}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{t.target_av.toLocaleString()}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{Math.round(t.expense_rate * 100)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
         </div>
       </div>
     </div>

@@ -7,8 +7,6 @@ import KPIChart, { MultiLineChart } from '../components/dashboard/KPIChart'
 import PeriodSelector from '../components/PeriodSelector'
 import EmptyState from '../components/EmptyState'
 import EvaluationMatrix from '../components/EvaluationMatrix'
-import AccessPlanner from '../components/dashboard/AccessPlanner'
-import RevenuePlanPanel from '../components/dashboard/RevenuePlanPanel'
 import ActionOutcomes from '../components/dashboard/ActionOutcomes'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
@@ -18,7 +16,7 @@ import DrillDown from '../components/diagnosis/DrillDown'
 import { usePeriodState } from '../lib/usePeriodState'
 import { FOCUS_RING, TAP_TARGET } from '../lib/a11y'
 import type {
-  DashboardData, Alert, TrendPoint, EvaluationResult, AccessPlan, RecommendationsResponse, OutcomesResponse, KPITree, KPIs,
+  DashboardData, Alert, TrendPoint, EvaluationResult, RecommendationsResponse, OutcomesResponse, KPITree, KPIs,
 } from '../types'
 
 export default function Dashboard() {
@@ -27,7 +25,6 @@ export default function Dashboard() {
   const [alerts, setAlerts] = useState<Alert[]>([])
   const [trend, setTrend] = useState<TrendPoint[]>([])
   const [evaluation, setEvaluation] = useState<EvaluationResult | null>(null)
-  const [accessPlan, setAccessPlan] = useState<AccessPlan | null>(null)
   const [recos, setRecos] = useState<RecommendationsResponse | null>(null)
   const [outcomes, setOutcomes] = useState<OutcomesResponse | null>(null)
   // 段2（KpiTriage）用。月次・年次は目標比較あり、週次は target_comparable=false
@@ -63,12 +60,11 @@ export default function Dashboard() {
       // 年次は表示系のみ対応。診断・アラート・提案系は月次前提の設計のため呼ばない
       // （UIバックログ2026-08-03 区切りB。画面には注記を出す）。
       const yearly = period === 'yearly'
-      const [dash, als, tr, evalRes, planRes, recoRes, outcomeRes, shopGap, tree] = await Promise.all([
+      const [dash, als, tr, evalRes, recoRes, outcomeRes, shopGap, tree] = await Promise.all([
         api.dashboard.get(period, dateParam) as Promise<DashboardData | null>,
         yearly ? Promise.resolve(null) : api.dashboard.alerts(period, dateParam) as Promise<{ alerts?: Alert[] } | null>,
         api.dashboard.trend(8) as Promise<{ trend?: TrendPoint[] } | null>,
         yearly ? Promise.resolve(null) : api.evaluation.matrix(period, dateParam).catch(() => null),
-        yearly ? Promise.resolve(null) : api.evaluation.accessPlan(period, dateParam).catch(() => null),
         yearly ? Promise.resolve(null) : api.recommendations.get(period, dateParam).catch(() => null) as Promise<RecommendationsResponse | null>,
         api.recommendations.outcomes().catch(() => null) as Promise<OutcomesResponse | null>,
         // 3分解の前期比（月次・年次のみ。週次はdashboard本体のRPP軸changesを使う）
@@ -95,7 +91,6 @@ export default function Dashboard() {
       setAlerts((als as { alerts?: Alert[] } | null)?.alerts ?? [])
       setTrend(tr?.trend ?? [])
       setEvaluation((evalRes as { evaluation?: EvaluationResult } | null)?.evaluation ?? null)
-      setAccessPlan((planRes as { plan?: AccessPlan } | null)?.plan ?? null)
       setRecos((recoRes as RecommendationsResponse | null) ?? null)
       setOutcomes(outcomeRes ?? null)
     } catch (e) {
@@ -105,7 +100,6 @@ export default function Dashboard() {
       setAlerts([])
       setTrend([])
       setEvaluation(null)
-      setAccessPlan(null)
       setRecos(null)
       setOutcomes(null)
       setDecomp(null)
@@ -510,22 +504,8 @@ export default function Dashboard() {
           </div>
         </details>
 
-        {/* ═══ 3層(c): 計画系パネル（売上予算プラン・アクセス逆算）。既定で畳む ═══
-            月次予算の按分パネルのため年次表示では出さない（年間予算そのものはKGIに反映済み） */}
-        {!isYearly && (
-          <details className="bg-white rounded-xl border shadow-sm group">
-            <summary className="px-4 py-3 text-sm font-semibold text-gray-600 cursor-pointer select-none list-none flex items-center justify-between hover:bg-gray-50 rounded-xl group-open:rounded-b-none">
-              <span>計画（売上予算プラン・アクセス逆算）</span>
-              <span className="text-xs text-gray-400 group-open:hidden">クリックで展開</span>
-              <span className="text-xs text-gray-400 hidden group-open:inline">閉じる</span>
-            </summary>
-            <div className="border-t p-4 space-y-6 bg-gray-50/50 rounded-b-xl">
-              <RevenuePlanPanel yearMonth={dateValue.slice(0, 7)} />
-              {accessPlan && <AccessPlanner plan={accessPlan} />}
-            </div>
-          </details>
-        )}
-        {/* 年次は accessPlan を取得しない（診断系を呼ばない方針）ため、計画ブロックごと出さない */}
+        {/* 計画パネル（売上予算プラン・アクセス逆算）は目標設定画面へ移設済み
+            （マスタCRUD規約2026-08-22 区切り6。年間予算の入力・按分と同じ画面にまとまる） */}
         </div>} {/* kpis && ... */}
       </div>
     </div>
