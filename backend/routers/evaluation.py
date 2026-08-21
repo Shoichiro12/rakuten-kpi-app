@@ -6,7 +6,6 @@
 ダッシュボードとGAP分析の両方から参照される。
 """
 
-import calendar
 from datetime import date, timedelta
 from typing import Literal, Optional
 
@@ -19,6 +18,7 @@ from evaluation import judge_metric, evaluate_matrix
 from matrix_actions import build_matrix_actions
 from access_definitions import is_reliable, min_access_for
 from shop_metrics import get_shop_monthly
+from period_utils import prorate_weekly_target_field
 
 router = APIRouter(prefix="/api/evaluation", tags=["evaluation"])
 
@@ -131,18 +131,20 @@ def get_matrix(
     target = db.query(Target).filter(Target.year_month == year_month).first()
 
     # 目標値の期間換算。
-    # 売上・アクセスはフロー量なので週次では日割り按分（×7/当月日数）。
+    # 売上・アクセスはフロー量なので週次では日割り按分。月をまたぐ週は各日が属する月の
+    # 日数比率で合算する（period_utils.prorate_weekly_target_field が単一の真実。
+    # ダッシュボード段1のHeroKgiもここと同じ関数を呼ぶ。二重実装しないこと）。
     # CVR・客単価は比率・単価なので按分せずそのまま使う。
     t_sales = t_access = t_cvr = t_av = None
-    if target:
-        if period == "weekly":
-            days_in_month = calendar.monthrange(int(year_month[:4]), int(year_month[5:7]))[1]
-            ratio = 7 / days_in_month
-            t_sales = target.target_sales * ratio if target.target_sales > 0 else None
-            t_access = target.target_access * ratio if target.target_access > 0 else None
-        else:
-            t_sales = target.target_sales if target.target_sales > 0 else None
-            t_access = target.target_access if target.target_access > 0 else None
+    if period == "weekly":
+        t_sales = prorate_weekly_target_field(db, current_week, "target_sales")
+        t_access = prorate_weekly_target_field(db, current_week, "target_access")
+        if target:
+            t_cvr = target.target_cvr if target.target_cvr > 0 else None
+            t_av = target.target_av if target.target_av > 0 else None
+    elif target:
+        t_sales = target.target_sales if target.target_sales > 0 else None
+        t_access = target.target_access if target.target_access > 0 else None
         t_cvr = target.target_cvr if target.target_cvr > 0 else None
         t_av = target.target_av if target.target_av > 0 else None
 
@@ -186,7 +188,6 @@ def get_access_plan(
     db: Session = Depends(get_db),
 ):
     """アクセス逆算プラン（目標売上→必要アクセス→不足分→想定追加広告費）。"""
-    import calendar as _cal
     today = date.today()
 
     if period == "weekly":
@@ -213,18 +214,19 @@ def get_access_plan(
             }
     target = db.query(Target).filter(Target.year_month == year_month).first()
 
-    if not current or not target or target.target_sales <= 0:
+    # 週次目標按分は period_utils.prorate_weekly_target_field が単一の真実（/matrix と同じ関数）。
+    if period == "weekly":
+        t_sales = prorate_weekly_target_field(db, current_week, "target_sales")
+    else:
+        t_sales = target.target_sales if target and target.target_sales > 0 else None
+
+    if not current or not t_sales or t_sales <= 0:
         return {
             "period": period, "period_label": period_label,
             "has_data": current is not None,
-            "has_target": target is not None and (target.target_sales or 0) > 0,
+            "has_target": t_sales is not None and t_sales > 0,
             "plan": None,
         }
-
-    t_sales = target.target_sales
-    if period == "weekly":
-        days_in_month = _cal.monthrange(int(year_month[:4]), int(year_month[5:7]))[1]
-        t_sales = t_sales * 7 / days_in_month
 
     gross = current["gross"]; ct = current["access"]; cvr = current["cvr"]; av = current["av"]
     rows_ad_cost = sum(r.ad_cost for r in rows)
