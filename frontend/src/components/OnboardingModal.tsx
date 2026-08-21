@@ -14,7 +14,7 @@ interface OnboardingModalProps {
 
 /** サイドバーの並び順に合わせた画面一覧（「毎日見る」と「設定・取込み」に分類）。 */
 const SCREENS_DAILY = [
-  { icon: LayoutDashboard, label: 'ダッシュボード', desc: 'KPIサマリ・達成率・⚠️アラート・今日やるべきこと' },
+  { icon: LayoutDashboard, label: 'ダッシュボード', desc: 'KPIサマリ・達成率・⚠️アラート・ドリルダウンで次のアクションまで' },
   { icon: TrendingUp, label: 'GAP分析', desc: 'ショップ→ジャンル→商品の3段階で課題を特定' },
   { icon: Package, label: '商品別KPI', desc: '商品ごとのKPI一覧・LimitCPO超過を警告' },
   { icon: Megaphone, label: 'RPP広告実績', desc: '取込み済み広告データの週次・月次閲覧と診断' },
