@@ -150,17 +150,26 @@ export default function Dashboard() {
     return Math.round(actual / elapsedRatio)
   })()
 
-  // ── 按分目標（段1のバー・達成率・不足額の基準）。修正指示2026-08-22 B ────
-  // 週次=週按分、月次=月目標×経過日数按分（過去月はフル）、年次=年目標×経過月按分（過去年はフル）。
-  // 達成率・不足額（超過額）・バーのfill%はすべてこの値を基準に統一する（軸の混線防止）。
+  // ── 按分目標（段1のバー・達成率・不足額の基準）。修正指示2026-08-22 その2 ────
+  // 週次: バックエンドが KPI評価マトリクス（routers/evaluation.py）と同じ
+  //       period_utils.prorate_weekly_target_field で日割り按分済みの値を返す
+  //       （月をまたぐ週は日数按分で合算）。ここでさらに経過割合を掛けると二重按分になるため、
+  //       data.target_sales をそのまま使う。フロントで独自計算しないこと。
+  // 月次・年次: バックエンドはフル目標を返すため、フロントで経過割合按分する（現状維持）。
   const proratedTarget = (() => {
     const target = data?.target_sales
-    if (target == null || target <= 0 || elapsedRatio == null) return null
+    if (target == null || target <= 0) return null
+    if (period === 'weekly') return target
+    if (elapsedRatio == null) return null
     return target * Math.min(1, elapsedRatio)
   })()
 
   const periodBasisLabel = period === 'weekly' ? '週按分' : period === 'monthly' ? '月按分' : '年按分'
-  const fullTargetBasisLabel = period === 'weekly' ? '週目標比' : period === 'monthly' ? '月目標比' : '年目標比'
+
+  // 着地見込みの比較基準。週次は按分目標（週目標比）、月次・年次はフル目標（月目標比/年目標比）
+  // ── 分母をラベルと一致させる（修正指示2026-08-22 その2・3）。
+  const forecastBasisValue = period === 'weekly' ? proratedTarget : (data?.target_sales ?? null)
+  const forecastBasisLabel = period === 'weekly' ? '週目標比' : period === 'monthly' ? '月目標比' : '年目標比'
 
   // ── 売上3分解（1層ヒーロー用）。軸を混ぜない ─────────────────
   // 週次: dashboard本体（RPP軸: ct/cvr/av + changes）
@@ -246,11 +255,11 @@ export default function Dashboard() {
         <HeroKgi
           actualSales={actualSales}
           proratedTarget={proratedTarget}
-          fullTarget={data?.target_sales ?? null}
           forecast={forecast}
+          forecastBasisValue={forecastBasisValue}
+          forecastBasisLabel={forecastBasisLabel}
           sourceLabel={shop ? '商品分析（店舗全体）' : 'RPP経由売上'}
           periodBasisLabel={periodBasisLabel}
-          fullTargetBasisLabel={fullTargetBasisLabel}
           recoCount={(recos?.recommendations?.length ?? 0) + (recos?.product_recommendations?.length ?? 0)}
         >
           {/* ═══ 段2〜5: ドリルダウン本体（要因→ジャンル→商品→アクション）═══ */}

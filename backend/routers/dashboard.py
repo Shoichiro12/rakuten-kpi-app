@@ -8,7 +8,7 @@ from database import get_db
 from models import RppWeekly, Shop, Target
 from calculations import calc_kpis, calc_change_rate
 from access_definitions import MIN_ACCESS_SAMPLE, is_reliable, min_access_for
-from period_utils import parse_year, year_bounds
+from period_utils import parse_year, year_bounds, prorate_weekly_target_field
 from shop_metrics import get_shop_monthly, get_shop_yearly
 
 router = APIRouter(prefix="/api/dashboard", tags=["dashboard"])
@@ -211,7 +211,13 @@ def get_dashboard(
 
     target = db.query(Target).filter(Target.year_month == year_month).first()
     expense_rate = target.expense_rate if target else 0.15
-    target_sales = target.target_sales if target else 0
+    # 週次目標は日割り按分（月をまたぐ週は日数按分で合算）。KPI評価マトリクス
+    # （routers/evaluation.py）と同じ period_utils.prorate_weekly_target_field を使う。
+    # ここで独自に計算すると同一画面で達成率が2種類出る不整合が起きる（二重実装しないこと）。
+    if period == "weekly":
+        target_sales = prorate_weekly_target_field(db, current_week, "target_sales") or 0
+    else:
+        target_sales = target.target_sales if target else 0
 
     # KGI売上は商品分析レポート（店舗全体売上）を正とする（月次のみ）。
     # RPP経由売上はRPP広告実績として別掲。データが無い月はRPP売上へフォールバック。

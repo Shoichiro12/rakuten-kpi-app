@@ -7,8 +7,47 @@
 年次のスコープは表示系のみ（dashboard / gap / products / export）。
 診断・アラート・提案系は月次のまま（母数ゲート等が月次前提のため）。
 """
-from datetime import date
+import calendar
+from collections import Counter
+from datetime import date, timedelta
 from typing import Optional
+
+
+def prorate_weekly_target_field(db, week_start: date, field: str) -> Optional[float]:
+    """週（7日間）の目標値を、各日が属する月の目標を日割りして合算する。
+
+    ダッシュボード段1（HeroKgi）とKPI評価マトリクス（`routers/evaluation.py`）が
+    週次目標を別々に計算していた不整合（同一画面で達成率が2種類出る）を解消するため、
+    週次目標按分のロジックはここに一本化する。**フロント・他エンドポイントで
+    週次目標を再計算しないこと。** 新しく週次目標が要る場所はこの関数を呼ぶ。
+
+    月をまたがない週では `target.<field> * 7 / days_in_month` という単純比率と同じ結果になる
+    （evaluation.py の旧実装と同値）。月をまたぐ週は、各日が属する月の日数比率で
+    合算する（例: 8/30〜9/5 なら 8月分2日 + 9月分5日をそれぞれの月の日数で日割り）。
+
+    field: `models.Target` の属性名（例: "target_sales" / "target_access"）。
+    戻り値: 対象週にかかる月のいずれにも目標が無ければ None。
+    """
+    from models import Target  # 遅延importで循環参照を避ける
+
+    month_days: Counter = Counter()
+    for i in range(7):
+        d = week_start + timedelta(days=i)
+        month_days[d.strftime("%Y-%m")] += 1
+
+    total = 0.0
+    any_target = False
+    for year_month, days in month_days.items():
+        target = db.query(Target).filter(Target.year_month == year_month).first()
+        value = getattr(target, field, 0) if target else 0
+        if not value or value <= 0:
+            continue
+        any_target = True
+        year, month = int(year_month[:4]), int(year_month[5:7])
+        days_in_month = calendar.monthrange(year, month)[1]
+        total += value * days / days_in_month
+
+    return round(total, 0) if any_target else None
 
 
 def year_bounds(year: int) -> tuple[date, date]:

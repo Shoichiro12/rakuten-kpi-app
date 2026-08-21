@@ -1,24 +1,27 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { formatYen, formatYenExact } from '../../lib/format'
+import { formatYen } from '../../lib/format'
 import { formatCurrency } from '../../lib/utils'
 import { FOCUS_RING } from '../../lib/a11y'
 
 interface HeroKgiProps {
   /** 実績（RPP経由 or 商品分析の売上） */
   actualSales: number | null
-  /** 按分目標（週按分/月按分/年按分）。バーの100%・達成率・不足額の基準（修正指示2026-08-22 B） */
+  /** 按分目標。バーの100%・達成率・不足額の基準（修正指示2026-08-22）。
+   *  週次はバックエンドが日割り合算按分済みの値を返す（KPI評価マトリクスと同一ソース）、
+   *  月次・年次はフロントで経過割合按分した値（現状維持）。 */
   proratedTarget: number | null
-  /** フル目標（期間の満額）。3行目の着地見込み比較の分母にのみ使う */
-  fullTarget: number | null
   /** このペースの着地見込み */
   forecast: number | null
+  /** 着地見込みの比較分母（週次=按分目標そのもの、月次・年次=フル目標）。
+   *  forecastBasisLabel と分母が必ず一致すること（ラベルと実際の分母がズレていた不整合の修正）。 */
+  forecastBasisValue: number | null
+  /** 着地見込みの比較基準ラベル（週目標比/月目標比/年目標比） */
+  forecastBasisLabel: string
   /** 実績の出所ラベル（RPP経由売上 / 商品分析（店舗全体）） */
   sourceLabel: string
   /** 按分方式のラベル（週按分/月按分/年按分）。大数字の右に按分目標と併記する（確認事項Q5） */
   periodBasisLabel: string
-  /** 着地見込みの比較基準ラベル（週目標比/月目標比/年目標比） */
-  fullTargetBasisLabel: string
   /** 今日やるべきことの件数（区切り4でTodayActionsを撤去し、バッジだけここに残す。確認事項Q2） */
   recoCount?: number
   /** 展開時にだけ出す内訳（売上3分解カード等） */
@@ -38,11 +41,11 @@ interface HeroKgiProps {
 export default function HeroKgi({
   actualSales,
   proratedTarget,
-  fullTarget,
   forecast,
+  forecastBasisValue,
+  forecastBasisLabel,
   sourceLabel,
   periodBasisLabel,
-  fullTargetBasisLabel,
   recoCount,
   children,
 }: HeroKgiProps) {
@@ -83,7 +86,7 @@ export default function HeroKgi({
       <p className="font-num text-[40px] leading-[1.05] font-semibold text-ink mt-2 tracking-tight tabular-nums">
         {formatYen(actualSales)}
         {hasTarget && (
-          <span className="font-sans text-base font-normal text-muted ml-2" title={fullTarget != null ? `満額 ${formatYenExact(fullTarget)}` : undefined}>
+          <span className="font-sans text-base font-normal text-muted ml-2">
             目標 {formatYen(proratedTarget)}（{periodBasisLabel}）
           </span>
         )}
@@ -121,8 +124,8 @@ export default function HeroKgi({
             <span className="font-num font-medium text-sub tabular-nums">
               {forecast != null
                 ? `${formatCurrency(forecast)}${
-                    fullTarget != null && fullTarget > 0
-                      ? `（${fullTargetBasisLabel} ${Math.round((forecast / fullTarget) * 100)}%）`
+                    forecastBasisValue != null && forecastBasisValue > 0
+                      ? `（${forecastBasisLabel} ${Math.round((forecast / forecastBasisValue) * 100)}%）`
                       : ''
                   }`
                 : '—'}
