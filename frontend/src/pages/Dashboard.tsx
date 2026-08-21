@@ -13,8 +13,8 @@ import TodayActions from '../components/dashboard/TodayActions'
 import ActionOutcomes from '../components/dashboard/ActionOutcomes'
 import { api } from '../lib/api'
 import { formatCurrency, formatPercent, formatNumber } from '../lib/utils'
-import { formatYen, formatYenAxis, pointDiffFromChangeRate } from '../lib/format'
-import BulletChart from '../components/kpi/BulletChart'
+import { formatYen, pointDiffFromChangeRate } from '../lib/format'
+import HeroKgi from '../components/diagnosis/HeroKgi'
 import { usePeriodState } from '../lib/usePeriodState'
 import { FOCUS_RING, TAP_TARGET } from '../lib/a11y'
 import type {
@@ -223,95 +223,41 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* ═══ 1層: KGIヒーロー（売上 vs 目標・達成率・着地見込み ＋ 売上3分解）═══
-            「売上目標に対して今どうか」をファーストビューで完結させる（区切りC・案A）。 */}
-        <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
-          {/* KGIブロック */}
-          <div className="lg:col-span-2 bg-white rounded-xl border shadow-sm p-4 flex flex-col">
-            <div className="flex items-center gap-2">
-              <p className="text-sm font-medium text-gray-600">売上{data?.target_sales ? ' vs 目標' : ''}</p>
-              <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${
-                shop ? 'bg-violet-100 text-violet-700' : 'bg-blue-100 text-blue-700'
-              }`}>
-                {shop ? '商品分析（店舗全体）' : 'RPP経由売上'}
-              </span>
-            </div>
-            {/* 金額はカード上では万・億で丸める（規約: docs/ui_number_and_chart_rules_2026-08-04.md 1-1）。
-                表・ツールチップ・CSVは丸めない */}
-            <p className="text-[40px] leading-[1.05] font-bold text-gray-900 mt-1.5 tracking-tight">
-              {formatYen(shop ? shop.sales : kpis?.gross)}
-            </p>
-            {data?.target_sales != null && data.target_sales > 0 ? (
-              <>
-                {/* 進捗バーではなく弾丸グラフ（規約 3-3）。進捗バーは上限100%で目標超過を表現できない。
-                    ペーサー = 目標 × 経過割合。経過割合は forecast（実績÷経過割合）から逆算できる */}
-                <div className="mt-3">
-                  <BulletChart
-                    value={actualSales ?? 0}
-                    target={data.target_sales}
-                    pace={pacer}
-                    projection={forecast}
-                    lowerIsBetter={false}
-                    formatTick={(v) => formatYenAxis(v)}
-                    valueLabel={formatYen(actualSales)}
-                    projectionLabel={forecast != null ? `着地見込 ${formatYen(forecast)}` : undefined}
-                    ariaLabel={`売上の弾丸グラフ。実績 ${formatYen(actualSales)}、目標 ${formatYen(data.target_sales)}`}
-                    height={86}
-                  />
+        {/* ═══ 段1: HeroKgi（売上 vs 目標・達成率・不足額/超過額）═══
+            ドリルダウンの入口（計画書 docs/jisso_keikaku_dashboard_drilldown_2026-08-22.md）。
+            開いた瞬間に見えるのは「予算 vs 売上」だけ。達成していれば既定では何も足さない。
+            未達のときだけ「詳しく見る」で売上3分解（アクセス/CVR/客単価）に掘れる。 */}
+        <HeroKgi
+          actualSales={actualSales}
+          targetSales={data?.target_sales ?? null}
+          pacer={pacer}
+          forecast={forecast}
+          achievementRate={data?.achievement_rate ?? null}
+          sourceLabel={shop ? '商品分析（店舗全体）' : 'RPP経由売上'}
+          periodBasisNote={period === 'weekly' ? '目標（週按分）' : undefined}
+        >
+          {decompCards && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {decompCards.map((c) => (
+                <div key={c.label} className="bg-bg-alt rounded-lg p-3 flex flex-col justify-between">
+                  <p className="text-xs font-medium text-sub">{c.label}</p>
+                  <div>
+                    <p className="font-num text-2xl font-bold text-ink tabular-nums">{c.value}</p>
+                    {/* 割合の指標は pt、中立の指標（アクセス）は色を付けない（規約 1-4 / 1-7） */}
+                    <p className={`text-xs mt-1 ${
+                      c.change == null || c.neutral ? 'text-muted'
+                        : c.change >= 0 ? 'text-up' : 'text-alert'
+                    }`}>
+                      {c.change == null
+                        ? '前期のデータなし'
+                        : `${c.change >= 0 ? '+' : ''}${c.change.toFixed(c.unit === 'pt' ? 2 : 1)}${c.unit} 前期比`}
+                    </p>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between text-xs text-gray-500 mt-1">
-                  <span>
-                    {pacer != null && actualSales != null && (
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-semibold ${
-                          actualSales >= pacer
-                            ? 'border-success/30 bg-success/10 text-success-ink'
-                            : 'border-danger/30 bg-danger/10 text-danger'
-                        }`}
-                      >
-                        {actualSales >= pacer ? '順調' : '遅れ'}
-                      </span>
-                    )}
-                  </span>
-                  <span className="font-bold text-gray-900 text-sm tabular-nums">
-                    達成率 {data.achievement_rate?.toFixed(1)}%
-                  </span>
-                </div>
-              </>
-            ) : (
-              <p className="text-xs text-gray-500 mt-3">目標未設定（目標設定画面で売上目標を入力すると達成率が出ます）</p>
-            )}
-            <div className="flex items-center justify-between text-xs mt-auto pt-2 border-t border-gray-100">
-              <span className="text-gray-500">
-                {forecast != null ? 'このペースの着地見込み' : shop && kpis ? 'RPP経由' : ''}
-              </span>
-              <span className="font-medium text-gray-700 tabular-nums">
-                {forecast != null
-                  ? `${formatCurrency(forecast)}${data?.target_sales ? `（目標比 ${Math.round(forecast / data.target_sales * 100)}%）` : ''}`
-                  : shop && kpis ? formatCurrency(kpis.gross) : '—'}
-              </span>
+              ))}
             </div>
-          </div>
-
-          {/* 売上3分解: 売上 = アクセス × CVR × 客単価 */}
-          {decompCards?.map((c) => (
-            <div key={c.label} className="bg-white rounded-xl border shadow-sm p-4 flex flex-col justify-between">
-              <p className="text-xs font-medium text-gray-500">{c.label}</p>
-              <div>
-                <p className="text-2xl font-bold text-gray-900 tabular-nums">{c.value}</p>
-                {/* 割合の指標は pt、中立の指標（アクセス）は色を付けない（規約 1-4 / 1-7） */}
-                <p className={`text-xs mt-1 ${
-                  c.change == null || c.neutral ? 'text-gray-500'
-                    : c.change >= 0 ? 'text-success-ink' : 'text-danger'
-                }`}>
-                  {c.change == null
-                    ? '前期のデータなし'
-                    : `${c.change >= 0 ? '+' : ''}${c.change.toFixed(c.unit === 'pt' ? 2 : 1)}${c.unit} 前期比`}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
+          )}
+        </HeroKgi>
 
         {/* ═══ 2層: アクション帯（今日やること・アラート・評価マトリクス）═══ */}
         {!isYearly && <TodayActions data={recos} onChanged={load} />}
