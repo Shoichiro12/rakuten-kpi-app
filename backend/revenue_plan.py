@@ -128,7 +128,9 @@ def build_context(db: Session, months: list[str]) -> dict:
         "rpp_months": _collect_rpp_months(db),
         "targets_by_ym": {
             t.year_month: t
-            for t in db.query(Target).filter(Target.year_month.in_(months)).all()
+            for t in db.query(Target).filter(
+                Target.year_month.in_(months), Target.archived_at.is_(None)
+            ).all()
         },
     }
 

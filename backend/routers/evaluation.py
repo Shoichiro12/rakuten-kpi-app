@@ -128,7 +128,7 @@ def get_matrix(
             "evaluation": None,
         }
 
-    target = db.query(Target).filter(Target.year_month == year_month).first()
+    target = db.query(Target).filter(Target.year_month == year_month, Target.archived_at.is_(None)).first()
 
     # 目標値の期間換算。
     # 売上・アクセスはフロー量なので週次では日割り按分。月をまたぐ週は各日が属する月の
@@ -212,7 +212,7 @@ def get_access_plan(
                 "gross": shop_cur["sales"], "access": shop_cur["access"],
                 "cvr": shop_cur["cvr"], "av": shop_cur["av"],
             }
-    target = db.query(Target).filter(Target.year_month == year_month).first()
+    target = db.query(Target).filter(Target.year_month == year_month, Target.archived_at.is_(None)).first()
 
     # 週次目標按分は period_utils.prorate_weekly_target_field が単一の真実（/matrix と同じ関数）。
     if period == "weekly":

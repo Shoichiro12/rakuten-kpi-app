@@ -6,6 +6,7 @@
 """
 import csv
 import io
+from datetime import datetime
 from typing import Optional
 from urllib.parse import quote
 
@@ -43,8 +44,12 @@ def list_master_products(
     category_id: Optional[int] = Query(None),
     db: Session = Depends(get_db),
 ):
-    """商品マスタ一覧（フィルタ: is_active, category_id）。"""
-    q = db.query(Product)
+    """商品マスタ一覧（フィルタ: is_active, category_id）。
+
+    削除済み（archived_at設定）は既定で除外する。「廃盤」は分析対象として残すユーザー
+    概念のため is_active=False でも一覧には出る（Q7）。
+    """
+    q = db.query(Product).filter(Product.archived_at.is_(None))
     if is_active is not None:
         q = q.filter(Product.is_active == is_active)
     if category_id is not None:
@@ -93,9 +98,11 @@ def update_master_product(
     payload: ProductUpdatePayload,
     db: Session = Depends(get_db),
 ):
-    """product_name / category_id / is_active を編集する。"""
+    """product_name / category_id / is_active を編集する。削除済み商品は編集できない。"""
     mno = (management_no or "").strip()
-    prod = db.query(Product).filter(Product.management_no == mno).first()
+    prod = db.query(Product).filter(
+        Product.management_no == mno, Product.archived_at.is_(None)
+    ).first()
     if prod is None:
         raise HTTPException(status_code=404, detail=f"商品が見つかりません: {mno}")
 
@@ -125,6 +132,26 @@ def update_master_product(
         "page_ready": prod.page_ready,
         "investment_intent": prod.investment_intent,
     }
+
+
+@router.delete("/products/{management_no}")
+def delete_master_product(management_no: str, db: Session = Depends(get_db)):
+    """商品マスタから削除する（ソフトデリート。マスタCRUD規約2026-08-22）。
+
+    ユーザー概念は「販売中／廃盤」の2値のみ（Q7）。「削除」はこの2値とは別軸で、
+    一覧・診断・提案・ドリルダウンの母集団から完全に除外する（masters.inactive_management_nos
+    が is_active=False と同じ経路で判定する）。実績データ（RppWeekly等）は保持され、
+    集計・過去の分析結果は変わらない。復元UIは無い（要望が出たら別チケット）。
+    """
+    mno = (management_no or "").strip()
+    prod = db.query(Product).filter(Product.management_no == mno).first()
+    if prod is None:
+        raise HTTPException(status_code=404, detail=f"商品が見つかりません: {mno}")
+    if prod.archived_at is not None:
+        raise HTTPException(status_code=400, detail="この商品は既に削除されています")
+    prod.archived_at = datetime.utcnow()
+    db.commit()
+    return {"deleted_management_no": mno}
 
 
 # ── 商品マスタ入力支援（自動提案キュー）────────────────────────────────────
@@ -240,8 +267,8 @@ def genre_tree():
 
 @router.get("/categories")
 def list_categories(db: Session = Depends(get_db)):
-    """カテゴリ一覧。"""
-    rows = db.query(ProductCategory).order_by(
+    """カテゴリ一覧（削除済みは除外）。"""
+    rows = db.query(ProductCategory).filter(ProductCategory.archived_at.is_(None)).order_by(
         ProductCategory.genre_u1, ProductCategory.genre_u2, ProductCategory.genre_u3
     ).all()
     return {
@@ -290,12 +317,20 @@ def _find_category(db: Session, u1, u2, u3) -> Optional[ProductCategory]:
 
 @router.post("/categories")
 def create_category(payload: CategoryPayload, db: Session = Depends(get_db)):
-    """カテゴリを作成する（同一階層が既にあれば既存を返す＝find-or-create）。"""
+    """カテゴリを作成する（同一階層が既にあれば既存を返す＝find-or-create）。
+
+    削除済み（archived_at設定）の同一階層が見つかった場合は復活させて再利用する
+    （user_id, genre_u1/2/3 のユニーク制約があるため、削除済み行を残したまま同じ
+    キーで新規作成すると制約違反になる。復元UIは無いが、同名再作成は自然に復元される）。
+    """
     u1, u2, u3 = _norm(payload.genre_u1), _norm(payload.genre_u2), _norm(payload.genre_u3)
     if not any([u1, u2, u3]):
         raise HTTPException(status_code=400, detail="大/中/小のいずれかを入力してください")
     existing = _find_category(db, u1, u2, u3)
     if existing:
+        if existing.archived_at is not None:
+            existing.archived_at = None
+            db.commit()
         return _cat_dict(existing)
     cat = ProductCategory(genre_u1=u1, genre_u2=u2, genre_u3=u3)
     db.add(cat)
@@ -305,8 +340,10 @@ def create_category(payload: CategoryPayload, db: Session = Depends(get_db)):
 
 @router.put("/categories/{category_id}")
 def update_category(category_id: int, payload: CategoryPayload, db: Session = Depends(get_db)):
-    """カテゴリの階層名をリネームする。"""
-    cat = db.query(ProductCategory).filter(ProductCategory.id == category_id).first()
+    """カテゴリの階層名をリネームする。削除済みカテゴリは編集できない。"""
+    cat = db.query(ProductCategory).filter(
+        ProductCategory.id == category_id, ProductCategory.archived_at.is_(None)
+    ).first()
     if cat is None:
         raise HTTPException(status_code=404, detail="カテゴリが見つかりません")
     u1, u2, u3 = _norm(payload.genre_u1), _norm(payload.genre_u2), _norm(payload.genre_u3)
@@ -322,17 +359,96 @@ def update_category(category_id: int, payload: CategoryPayload, db: Session = De
 
 @router.delete("/categories/{category_id}")
 def delete_category(category_id: int, db: Session = Depends(get_db)):
-    """カテゴリを削除する。参照している商品は未分類（category_id=None）に戻す。"""
+    """カテゴリを削除する（ソフトデリート。マスタCRUD規約2026-08-22）。
+    参照している商品は未分類（category_id=None）に戻す。
+    """
     cat = db.query(ProductCategory).filter(ProductCategory.id == category_id).first()
     if cat is None:
         raise HTTPException(status_code=404, detail="カテゴリが見つかりません")
+    if cat.archived_at is not None:
+        raise HTTPException(status_code=400, detail="このカテゴリは既に削除されています")
     # 参照商品を先に未分類化（user_id スコープは自動適用）
     detached = db.query(Product).filter(Product.category_id == category_id).update(
         {Product.category_id: None}
     )
-    db.delete(cat)
+    cat.archived_at = datetime.utcnow()
     db.commit()
     return {"deleted_id": category_id, "detached_products": detached}
+
+
+# ── カテゴリマスタ CSV 一括入出力（商品マスタと同じ作法。マスタCRUD規約2026-08-22）────
+_CATEGORY_CSV_HEADER = ["ジャンル大", "ジャンル中", "ジャンル小"]
+
+
+@router.get("/categories/export")
+def export_categories(db: Session = Depends(get_db)):
+    """カテゴリマスタをCSV（BOM付きUTF-8）でエクスポートする。削除済みは含めない。"""
+    rows = db.query(ProductCategory).filter(ProductCategory.archived_at.is_(None)).order_by(
+        ProductCategory.genre_u1, ProductCategory.genre_u2, ProductCategory.genre_u3
+    ).all()
+    buf = io.StringIO()
+    buf.write("﻿")
+    writer = csv.writer(buf, lineterminator="\r\n")
+    writer.writerow(_CATEGORY_CSV_HEADER)
+    for c in rows:
+        writer.writerow([c.genre_u1 or "", c.genre_u2 or "", c.genre_u3 or ""])
+    buf.seek(0)
+    disposition = (
+        "attachment; filename=\"category_master.csv\"; "
+        f"filename*=UTF-8''{quote('カテゴリマスタ.csv')}"
+    )
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": disposition},
+    )
+
+
+@router.post("/categories/import")
+async def import_categories(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """カテゴリマスタCSVを一括取込みする（ジャンル大/中/小の組み合わせキーにupsert）。
+
+    インポートは追加・更新のみ（マスタCRUD規約: 行の削除は絶対にしない）。
+    削除済みの同一階層が見つかった場合は復活させる（create_category と同じ思想）。
+    """
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="ファイルが空です")
+    text = None
+    for enc in ["utf-8-sig", "utf-8", "cp932", "shift_jis"]:
+        try:
+            text = content.decode(enc)
+            break
+        except Exception:
+            continue
+    if text is None:
+        raise HTTPException(status_code=400, detail="ファイルのエンコードを判別できませんでした")
+
+    try:
+        df = pd.read_csv(io.StringIO(text), dtype=str).fillna("")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"CSV解析エラー: {e}")
+    df.columns = [str(c).strip() for c in df.columns]
+
+    created = updated = 0
+    error_rows: list[str] = []
+    for idx, row in df.iterrows():
+        u1 = _norm(str(row.get("ジャンル大", "")))
+        u2 = _norm(str(row.get("ジャンル中", "")))
+        u3 = _norm(str(row.get("ジャンル小", "")))
+        if not any([u1, u2, u3]):
+            error_rows.append(f"{idx + 2}行目: ジャンル大/中/小のいずれかが必要です")
+            continue
+        existing = _find_category(db, u1, u2, u3)
+        if existing:
+            if existing.archived_at is not None:
+                existing.archived_at = None
+            updated += 1
+        else:
+            db.add(ProductCategory(genre_u1=u1, genre_u2=u2, genre_u3=u3))
+            created += 1
+    db.commit()
+    return {"created": created, "updated": updated, "error_rows": error_rows}
 
 
 # ── 商品マスタ CSV 一括入出力 ─────────────────────────────────────────────
@@ -351,7 +467,7 @@ def export_master_products(db: Session = Depends(get_db)):
     cost_map = {pc.management_no: pc.cost_rate for pc in db.query(ProductCost).all() if pc.management_no}
 
     rows: list[list] = []
-    for p in db.query(Product).order_by(Product.management_no).all():
+    for p in db.query(Product).filter(Product.archived_at.is_(None)).order_by(Product.management_no).all():
         cat = cats.get(p.category_id) if p.category_id else None
         rate = cost_map.get(p.management_no)
         rows.append([

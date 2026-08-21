@@ -5,9 +5,14 @@
 - 目標CVR・客単価・必要アクセス数は target_calc.py の確定公式で自動算出
 - 実績が無い商品は推定値（参考値）＋承認フロー。承認まで診断・逆算には使わない
 """
+import csv
+import io
 from typing import List, Optional
+from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import pandas as pd
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
@@ -250,3 +255,116 @@ def delete_item_target(
     db.delete(row)
     db.commit()
     return {"deleted": management_no, "year_month": ym}
+
+
+# ── アイテム別目標 CSV 一括入出力（商品マスタと同じ作法。マスタCRUD規約2026-08-22）────
+# 行に「対象月」列を持たせ、複数月を1ファイルで扱える（エクスポートは選択中の月のみ出力）。
+_ITEM_TARGET_CSV_HEADER = [
+    "対象月", "管理番号", "商品名", "目標売上", "目標CVR(%)", "目標客単価", "必要アクセス(参考)",
+]
+
+
+@router.get("/export")
+def export_item_targets(
+    year_month: str = Query(..., description="YYYY-MM"),
+    db: Session = Depends(get_db),
+):
+    """アイテム別目標をCSV（BOM付きUTF-8）でエクスポートする。指定月のみ・削除済み商品は除外。
+
+    目標CVR/客単価/必要アクセスは算出済みの参考値として出力する。インポート時は
+    無視して常に再算出する（手入力は目標売上のみという既存方針を維持するため）。
+    """
+    ym = _validate_ym(year_month)
+    inactive = inactive_management_nos(db)
+    rows = db.query(ItemTarget).filter(ItemTarget.year_month == ym).all()
+    products = {p.management_no: p for p in db.query(Product).all() if p.management_no}
+
+    buf = io.StringIO()
+    buf.write("﻿")
+    writer = csv.writer(buf, lineterminator="\r\n")
+    writer.writerow(_ITEM_TARGET_CSV_HEADER)
+    for t in rows:
+        if t.management_no in inactive:
+            continue
+        p = products.get(t.management_no)
+        writer.writerow([
+            ym,
+            t.management_no,
+            (p.product_name if p else "") or "",
+            t.target_sales,
+            t.target_cvr if t.target_cvr is not None else "",
+            t.target_av if t.target_av is not None else "",
+            t.required_access if t.required_access is not None else "",
+        ])
+    buf.seek(0)
+    disposition = (
+        "attachment; filename=\"item_target_master.csv\"; "
+        f"filename*=UTF-8''{quote(f'アイテム別目標_{ym}.csv')}"
+    )
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": disposition},
+    )
+
+
+@router.post("/import")
+async def import_item_targets(file: UploadFile = File(...), db: Session = Depends(get_db)):
+    """アイテム別目標CSVを一括取込みする（対象月列を持つため複数月を1ファイルで扱える）。
+
+    確定公式の算出は _upsert_one を通し、単発・一括保存と同じコードパスを共有する。
+    1行の検証エラーは SAVEPOINT でその行だけロールバックし、他行の取込は継続する
+    （商品マスタと違い target_sales<=0 等の厳密な検証があるため、1行の不備で
+    ファイル全体が巻き戻ると大きいCSVで実用的でない）。
+    """
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="ファイルが空です")
+    text = None
+    for enc in ["utf-8-sig", "utf-8", "cp932", "shift_jis"]:
+        try:
+            text = content.decode(enc)
+            break
+        except Exception:
+            continue
+    if text is None:
+        raise HTTPException(status_code=400, detail="ファイルのエンコードを判別できませんでした")
+
+    try:
+        df = pd.read_csv(io.StringIO(text), dtype=str).fillna("")
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"CSV解析エラー: {e}")
+    df.columns = [str(c).strip() for c in df.columns]
+
+    created = updated = 0
+    error_rows: list[str] = []
+    for idx, row in df.iterrows():
+        ym = str(row.get("対象月", "")).strip()
+        mno = str(row.get("管理番号", "")).strip()
+        if len(ym) != 7 or ym[4] != "-" or not (ym[:4] + ym[5:]).isdigit():
+            error_rows.append(f"{idx + 2}行目: 対象月はYYYY-MM形式で指定してください")
+            continue
+        if not mno:
+            error_rows.append(f"{idx + 2}行目: 管理番号が空です")
+            continue
+        try:
+            sales = float(row.get("目標売上") or 0)
+        except (ValueError, TypeError):
+            error_rows.append(f"{idx + 2}行目: 目標売上が数値ではありません")
+            continue
+
+        existed = db.query(ItemTarget.id).filter(
+            ItemTarget.management_no == mno, ItemTarget.year_month == ym,
+        ).first() is not None
+        try:
+            with db.begin_nested():
+                _upsert_one(db, mno, ym, sales)
+        except HTTPException as e:
+            error_rows.append(f"{idx + 2}行目: {e.detail}")
+            continue
+        if existed:
+            updated += 1
+        else:
+            created += 1
+    db.commit()
+    return {"created": created, "updated": updated, "error_rows": error_rows}

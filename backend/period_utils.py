@@ -38,7 +38,9 @@ def prorate_weekly_target_field(db, week_start: date, field: str) -> Optional[fl
     total = 0.0
     any_target = False
     for year_month, days in month_days.items():
-        target = db.query(Target).filter(Target.year_month == year_month).first()
+        target = db.query(Target).filter(
+            Target.year_month == year_month, Target.archived_at.is_(None)
+        ).first()
         value = getattr(target, field, 0) if target else 0
         if not value or value <= 0:
             continue

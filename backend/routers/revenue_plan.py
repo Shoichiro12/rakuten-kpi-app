@@ -67,7 +67,7 @@ def upsert_budget_override(payload: BudgetOverridePayload, db: Session = Depends
         # 0以下は「解除」として扱う（UI上は空欄=解除だが、0入力も同じ意図とみなす）
         value = None
 
-    row = db.query(Target).filter(Target.year_month == ym).first()
+    row = db.query(Target).filter(Target.year_month == ym, Target.archived_at.is_(None)).first()
     if row is None:
         if value is None:
             return {"year_month": ym, "sales_budget": None, "message": "補正はありません"}

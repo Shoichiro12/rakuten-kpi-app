@@ -8,6 +8,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import Header from '../components/layout/Header'
 import ErrorBanner from '../components/ErrorBanner'
+import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 import { supabase, authEnabled } from '../lib/supabase'
 import { api } from '../lib/api'
 // 表示用の数値は format.ts を通す（金額は万・億、件数は3桁区切り）。
@@ -568,9 +569,12 @@ export default function DataImport() {
     }
   }
 
+  // 全削除系の確認モーダル（マスタCRUD規約2026-08-22: window.confirmではなく
+  // チェックボックス必須の確認画面を挟む）。'sample' | 'reset' | null
+  const [confirmModal, setConfirmModal] = useState<'sample' | 'reset' | null>(null)
+
   /** サンプルだけ削除（実データ・設定は保持）。全削除とは別の安全な導線 */
   const handleSampleDelete = async () => {
-    if (!window.confirm('サンプルデータだけを削除します（取り込んだ実データ・目標設定は残ります）。よろしいですか？')) return
     setLoading(true); setStatus(null)
     try {
       const result = await api.sampleDataDelete() as { message: string }
@@ -579,11 +583,11 @@ export default function DataImport() {
       flash({ type: 'error', message: e instanceof Error ? e.message : 'サンプルデータの削除に失敗しました' })
     } finally {
       setLoading(false)
+      setConfirmModal(null)
     }
   }
 
   const handleReset = async () => {
-    if (!window.confirm('登録済みの実績データをすべて削除します（サンプルだけでなく、取り込んだ実データも消えます）。サンプルだけ消したい場合はキャンセルして「サンプルだけ削除」を使ってください。よろしいですか？')) return
     setLoading(true); setStatus(null)
     try {
       const result = await api.resetData() as { message: string }
@@ -592,6 +596,7 @@ export default function DataImport() {
       flash({ type: 'error', message: e instanceof Error ? e.message : '削除に失敗しました' })
     } finally {
       setLoading(false)
+      setConfirmModal(null)
     }
   }
 
@@ -1079,7 +1084,7 @@ export default function DataImport() {
             {/* サンプルだけ削除（実データ保持）。全削除より先＝安全な選択肢を目立たせる */}
             {dataStatus?.has_sample && (
               <button
-                onClick={handleSampleDelete}
+                onClick={() => setConfirmModal('sample')}
                 disabled={loading}
                 className="flex items-center gap-1.5 px-3 py-2 border border-amber-300 text-amber-700 hover:bg-amber-100 disabled:opacity-50 text-sm rounded-lg transition-colors"
               >
@@ -1088,7 +1093,7 @@ export default function DataImport() {
             )}
             {hasData && (
               <button
-                onClick={handleReset}
+                onClick={() => setConfirmModal('reset')}
                 disabled={loading}
                 title="サンプルだけでなく、取り込んだ実データも削除されます"
                 className="flex items-center gap-1.5 px-3 py-2 border border-line hover:bg-bg-alt disabled:opacity-50 text-sub text-sm rounded-lg transition-colors"
@@ -1100,6 +1105,25 @@ export default function DataImport() {
         </div>
         </details>
       </div>
+
+      <ConfirmDeleteModal
+        open={confirmModal === 'sample'}
+        title="サンプルデータだけを削除します"
+        message="取り込んだ実データ・目標設定は残ります。サンプル生成で作った商品・実績・目標だけを削除します。"
+        confirmLabel="サンプルを削除する"
+        onConfirm={handleSampleDelete}
+        onCancel={() => setConfirmModal(null)}
+        loading={loading}
+      />
+      <ConfirmDeleteModal
+        open={confirmModal === 'reset'}
+        title="登録済みの実績データをすべて削除します"
+        message={'サンプルだけでなく、取り込んだ実データも消えます。目標設定・商品マスタの実データ分は保持されます。\nサンプルだけ消したい場合はキャンセルして「サンプルだけ削除」を使ってください。'}
+        confirmLabel="実績データを全削除する"
+        onConfirm={handleReset}
+        onCancel={() => setConfirmModal(null)}
+        loading={loading}
+      />
     </div>
   )
 }

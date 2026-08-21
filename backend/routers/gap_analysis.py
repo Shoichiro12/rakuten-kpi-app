@@ -795,7 +795,9 @@ def get_kpi_tree(
         ).all()
 
     target = (
-        db.query(Target).filter(Target.year_month == year_month).first()
+        db.query(Target).filter(
+            Target.year_month == year_month, Target.archived_at.is_(None)
+        ).first()
         if year_month else None
     )
 
@@ -852,7 +854,8 @@ def get_kpi_tree(
             t_sales = sum(
                 t.target_sales or 0
                 for t in db.query(Target).filter(
-                    Target.year_month >= f"{year}-01", Target.year_month <= f"{year}-12"
+                    Target.year_month >= f"{year}-01", Target.year_month <= f"{year}-12",
+                    Target.archived_at.is_(None),
                 ).all()
             )
         t_access = 0
