@@ -195,6 +195,24 @@ export const api = {
     list: () => request('/targets'),
     upsert: (data: object) =>
       request('/targets', { method: 'POST', body: JSON.stringify(data) }),
+    /** 月の目標をクリア（ソフトデリート） */
+    remove: (yearMonth: string) =>
+      request<{ deleted_year_month: string }>(`/targets/${encodeURIComponent(yearMonth)}`, { method: 'DELETE' }),
+    /** 目標マスタをCSV（BOM付きUTF-8）でダウンロード */
+    exportCsv: () => downloadCsv('/targets/export', 'target_master.csv'),
+    /** 目標マスタCSVを一括取込み（年月キーにupsert） */
+    importCsv: async (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      let r: Response
+      try {
+        r = await fetch(`${BASE}/targets/import`, { method: 'POST', body: form, headers: await authHeaders() })
+      } catch (e) {
+        console.error('[API] ネットワークエラー (targets.importCsv):', e)
+        throw new Error('サーバーに接続できませんでした。バックエンドが起動しているか確認してください。')
+      }
+      return await parseJson(r) as { created: number; updated: number; error_rows: string[] } | undefined
+    },
   },
   /* ─── アイテム別目標（3-B''・第3段階） ─────────────── */
   itemTargets: {
