@@ -90,6 +90,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | **LPをエッセイ型に全面刷新（計画書 `docs/jisso_keikaku_lp_essay_2026-08-23.md`／正モック `docs/mockups/ureshiru_lp_proposal_v2_2026-08-22.html`）**: チャットでのデザイン検討（v1→v2）を経てオーナー承認済みの内容。620px一本コラムで「月曜の朝」を追体験させる構成に全面刷新し、旧「5つの工程」セクションは廃止（内容はエッセイ本文に吸収）。ヒーローは静止画スクショではなく、新ダッシュボードの予算vs売上→KPI分解→商品アクションの2段ドリルをvanilla JSで再現した「触れるライブデモ」。書体をアプリと統一（本文BIZ UDPGothic／数字Inter。Zen Maru Gothic・Zen Kaku Gothic Newはワードマーク含め`index.html`で廃止。**`lp/style.css`＝下層ページ（about/help/privacy/terms/tokushoho）は今回スコープ外のため未変更**、旧書体のまま）。配色はC案トークン維持。「安い」の独立セクションは置かず、料金ブロック下に1行のみ（1日¥733＝RPP広告クリック約7回分）。デモ・本文の打ち手例は本番アプリの実出力に準拠（架空のアクション文言は使用禁止）。SEO/AI検索対応としてJSON-LDをFAQPage込みの2本に拡張し、FAQPageスキーマとページ上のFAQ（5問）は一言一句完全一致させる規約。`llms.txt`をサイトルート新設（JSON-LDのdescription・featureList・FAQ・料金を平文化。新情報の創作禁止）。**現行LPから流用・維持したもの**: 導入事例（実際に開示許可済みの実績値。中身は現行のまま）・フッター（法的ページへのリンク一式）・CTA遷移先（`https://app.ureshiru.com/billing?signup=1`）・GA計測タグ。**モックにも計画書にも明記が無く実装判断で追加/削除したもの**: ①アクセシビリティのスキップリンク（`本文へスキップ`）は現行機能を維持のまま追加②og:imageは新ヒーロー用画像が無いため暫定で旧ヒーロー画像(`shot-hero.jpg`)を流用しTODOコメントを残した（1200×630での撮り直しは別タスク）③「ECコンサルティング」upsellブロックと「そのほかの画面」の仕様表はモック・流用リストいずれにも無かったため削除（エッセイ構成への一本化を優先）。 | 2026-08-24 | 実装済み・本番反映済み（[PR #37](https://github.com/Shoichiro12/rakuten-kpi-app/pull/37)、mainマージ`a8a4d02`）。**検証済み**: JSON-LD 2本の構文OK・FAQPage文言とページ上FAQ5問の完全一致をスクリプトで実測、主要タグ（div/a/header/main/footer/details）の開閉数一致、ヘッドレスブラウザでライブデモの2段展開（「詳しく見る」→KPI行クリック→打ち手表示）と「最初から見る」リセットの動作確認、375px幅・1280px幅とも横オーバーフロー0、BIZ UDPGothic(400/700)・Inter(600/700)が実際に読み込まれ描画に使用されていることを確認、コンソールエラー0。**⚠️ 一度、実装が本番未反映のまま「区切り1が飛ばされた」と誤認される事故が発生した（2026-08-24）**——原因は実装漏れではなく、作業ツリー内の変更をコミット・push・マージするまでの承認待ちだった段階でオーナーが本番URLを直接検証したこと。**教訓: 実装完了の報告と本番反映（コミット・push・マージ）は別のマイルストーンとして明示的に区別して伝えること。** その後コミット・push・PR作成・mainマージまで完了。マージ後の本番目視（オーナー確認）は別途実施予定——`/llms.txt`が実ファイルとして`text/plain`で配信されるか、Cloudflare PagesのSPAフォールバックでHTMLが200返却されないかを含めて確認すること。 |
 
+| **「ウレシル社」サブエージェント体制の導入（`filesv4.zip` 経由でオーナーが提供・README `.claude/README.md` の組織図に従い導入）**: 経営企画室(pmo)・設計(planner)・実装(developer)・レビュー(reviewer)・品質保証(qa)・セキュリティ(security)・デザイン(designer)・データ分析(kpi-analyst)・法務経理(legal-finance)・カスタマーサクセス(customer-success)・インフラ運用(infra-ops) の11サブエージェント（`.claude/agents/`）と、`/kickoff` `/jisso-keikaku` `/release-check` `/security-check` `/price-check` の5定例スキル（`.claude/skills/`）を追加。**導入時に判明した点**: 旧CLAUDE.mdが参照していた `backend-engineer`/`frontend-engineer`/`data-analyst`/`qa-debugger` の4エージェントはこのリポジトリのどのブランチ・worktreeにも実体が無い「幽霊参照」だった（申し送りルール6が警告する事故の実例。該当箇所は本ファイル「`.claude/agents/`」節に訂正済み）。**`.claude/skills/` はリポジトリの `.gitignore`（18-19行目）で追跡除外**なので、新設した5スキルの `SKILL.md` はこのマシン上のみ有効でコミットされない（`.claude/agents/` は無視対象外なのでコミットされる）。**別環境でこの体制を使うには `.claude/skills/{kickoff,jisso-keikaku,release-check,security-check,price-check}/` を都度コピーする必要がある**（design-systemスキルと同様の運用）。 | 2026-08-24 | 実装済み（`.claude/agents/*.md` 11ファイル・`.claude/skills/{5スキル}/SKILL.md`・`.claude/README.md`・本ファイルへの追記。動作確認はセッション開始時のスキル一覧に5スキルが認識されたことのみ実測、11エージェントの実際の呼び出し動作は未検証） |
+
+## 🏢 社内体制（サブエージェントと定例）
+
+このリポジトリには `.claude/agents/` に部署ごとのサブエージェント、`.claude/skills/` に定例業務がある。
+メインセッションはPMO役として、仕事を該当部署に振り分ける。詳細は `.claude/README.md`（組織図）。
+
+- 機能を触る前: `/jisso-keikaku`（planner）で計画書 → オーナー承認 → developer
+- デプロイ前: `/release-check`（reviewer → qa → pmo → sagyou-houkoku）
+- 毎週月曜: `/security-check`
+- 価格・法的文面を触ったら: `/price-check`
+- 方針が決まった瞬間に pmo が申し送り台帳へ1行追加する（実装は後でもよい）
+
 ## ⚠️ セキュリティ最優先事項: 新しいテーブルには必ずRLSを（顧客データ漏洩の防止）
 
 **このプロダクトは他社（EC事業者）の売上データを預かる。データ漏洩は一度でも起こしてはならない。**
@@ -324,9 +337,9 @@ CSVパースは `backend/routers/import_csv.py`。エンコーディング/ス�
 - **1行の検証エラーで全体をロールバックしない実装（アイテム別目標等、行ごとの厳密な検証があるCSV）は `db.begin_nested()`（SAVEPOINT）で1行ずつ隔離する。** 他行の取込を継続しつつ `error_rows` にエラー行番号と理由を返す
 - **全削除系（実績データ全削除・サンプル削除等）は `ConfirmDeleteModal`（`components/ConfirmDeleteModal.tsx`）を使う。** `window.confirm` ではなくチェックボックス必須の確認画面を挟む（誤操作防止をもう1段強める）。1件ずつの行削除（商品・カテゴリ等）はここまで要求しない
 
-### `.claude/agents/`（任意）
+### `.claude/agents/`
 
-`backend-engineer` / `frontend-engineer` / `data-analyst`(読取専用) / `qa-debugger` の専門サブエージェント定義あり。担当領域は backend=`/backend`、frontend=`/frontend` に分け、同一ファイルの同時編集を避ける運用。
+**⚠️ 2026-08-24訂正:** 以前ここには `backend-engineer` / `frontend-engineer` / `data-analyst`(読取専用) / `qa-debugger` という4エージェント構成を記載していたが、実体（`.claude/agents/*.md`）がこのリポジトリのどのブランチ・worktreeにも存在しないことが判明した（申し送り台帳ルール6が警告する「幽霊参照」の実例）。**「ウレシル社」体制（`pmo` / `planner` / `developer` / `reviewer` / `qa` / `security` / `designer` / `kpi-analyst` / `legal-finance` / `customer-success` / `infra-ops` の11エージェント + `kickoff` / `jisso-keikaku` / `release-check` / `security-check` / `price-check` の5定例スキル）を2026-08-24に導入し、この節はそちらに置き換えた。** 詳細・組織図は `.claude/README.md`、冒頭「🏢 社内体制」節も参照。
 
 ## 楽天RMS CSVフォーマット仕様（インポート処理の実装時は必ず参照）
 
