@@ -52,6 +52,7 @@ CLAUDE.md 申し送り表のルール4「調査・監査・設計の成果物は
 | 2026-08-18 | npm audit / CSP / consulting.py上限の3件対応 | 作業報告書: `docs/作業報告_2026-08-18.md` 参照。[PR #16](https://github.com/Shoichiro12/rakuten-kpi-app/pull/16) マージ（`61346e3`）で本番反映済み。コミット: フロント依存更新・CSPヘッダー追加・consulting.py上限追加・ドキュメント（4コミットに分割） |
 | 2026-08-18 | react-router-dom v7へのメジャー移行 | 作業報告書: `docs/作業報告_2026-08-18_2.md` 参照。[PR #18](https://github.com/Shoichiro12/rakuten-kpi-app/pull/18) マージ（`f22a854`）で本番反映済み。npm audit 2件→0件（フロント依存の残件すべて解消） |
 | 2026-08-24 | 週次セキュリティチェック（f22a854..main 42コミット精査） | 報告書: `security/security_check_2026-08-24.md`。前回指摘4件はすべて維持（退行なし）。新規テーブル追加なし（既存テーブルへの`is_sample`/`archived_at`列追加のみ）でRLS適用漏れなし。新規指摘2件（CSVインジェクション対策欠如=中、新設CSVインポートのサイズ上限欠如=低）。`npm audit`0件・`pip-audit`0件（環境に無かったため今回導入）、`npm run build`型エラー0、`from main import app`OK、秘密情報の残置なしを実測 |
+| 2026-08-24（追加分） | 同日追加チェック（`6ca14cf..HEAD` 9コミット。夜勤体制導入・render.yaml削除・office_map.html新設等） | 報告書: `security/security_check_2026-08-24.md` 末尾「追記」節。バックエンド・フロントエンドのソースコード変更なし（ドキュメント・運用設定のみ）。新規指摘なし。重大度「高」なし。前回未解決2件（CSVインジェクション対策欠如=中、CSVインポートのサイズ上限欠如=低）は対象範囲外のため変化なし。`docs/office_map.html`（静的HTML新規487行）はハードコード定数のみをinnerHTML描画・外部送信APIなし・アプリから配信されないことを確認。`.claude/commands/yakin.md`（無人自動実行プロンプト）に権限拡大の記述なし（mainへの直push禁止・外部ダッシュボード禁止等を明記）。`npm audit`0件・`pip-audit`0件を再実測 |
 
 ## RLS（行レベルセキュリティ）について
 
