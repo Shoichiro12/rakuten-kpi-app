@@ -98,6 +98,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | **render.yaml削除（実在しない旧サービスの定義）、Render目視結果を記録**: オーナーがRenderダッシュボードを目視確認した結果、①稼働中のサービスは`rakuten-kpi-app-sg`（Singapore）1件のみで、旧Oregonサービス`rakuten-kpi-app`は存在しない②`rakuten-kpi-app-sg`のプランはStarter（画面バッジで確認）。**CLAUDE.mdインフラ申し送りの記載（Starter・Singapore）が正しく、`render.yaml`（`plan: free`・サービス名`rakuten-kpi-app`）の方が実態と食い違った古い定義だった**と確定。Blueprint運用はしていない（サービス名が食い違っていたことからも、手動作成されたサービスと判断）ため、`render.yaml`は削除。削除前に参照箇所をgrepし、`docs/office_map.html`（今回あわせて更新）と`DEPLOY.md`のステップ3（Blueprint前提の手順）の2件を確認。`DEPLOY.md`は「New → Blueprint」を「New → Web Service」に書き換え、手動作成の実態に合わせた注記を追加 | 2026-08-24 | 実装済み（`render.yaml`削除・`DEPLOY.md`修正・`docs/office_map.html`更新・本ファイルへの追記）。**確認事項（次回セッションへの申し送り）**: mainマージでAuto-Deployが走ることはRenderのイベント履歴で確認済み。`render.yaml`削除自体はデプロイ設定（Renderダッシュボード側の設定）に影響しない想定だが、**次回mainマージ後のデプロイが正常に完了することを実際に確認すること**（`/api/health`が200を返すか、Renderのデプロイログにエラーが無いか） |
 
+| **定期実行の仕組み（夜勤体制）を導入**: Claude Code Routines（無人・定期実行のクラウドエージェント）で①週次security-check（月曜朝）②夜勤（平日夜・軍令帳の急務を1件だけ進めてPRを作る）の2本を運用する方針を決定。CLAUDE.mdに「🌙 夜勤の掟」節を新設（mainへ直接pushしない・外部ダッシュボードに触れない前提を明記・オーナー判断が要る事項はPR本文「評定待ち」節に列挙して止まる・1回で急務1件まで・成果物に作業報告と軍令帳更新を含める）。夜勤の実行プロンプトは`.claude/commands/yakin.md`（**初回運用は「調査・ドキュメントのみ、コード変更禁止」から開始し、PRの質を見てから段階的に緩める**とオーナー承認済み）。**導入作業中に重要な発見**: `RemoteTrigger`で既存routineを確認したところ、2026-07-29から**Coworkベースの週次セキュリティチェックroutineが既に稼働中**だった（8/3・8/10・8/17・8/24と4回実行済み）。GitHubリポジトリを読み取り専用でcloneし、成果を**このリポジトリではなく「sellerhub」という別Claude.aiプロジェクトのドキュメント機能**（`project_write`）に保存する設計で、PR作成・コミットは一切行わない。**これが`security/index.md`冒頭に長らく記録されていた「プロジェクトdocs側に同名のマスター文書が別途存在する（2026-08-18判明・正体不明のまま放置）」の正体だったと確定した。** リポジトリ側の運用（このセッションで手動運用してきた`security/`ディレクトリ）と役割が重複するため、オーナー確認のうえ`RemoteTrigger`の`update`で`enabled:false`にして無効化した（削除はUI操作が必要なため未実施） | 2026-08-24 | 実装済み（CLAUDE.md「🌙 夜勤の掟」節・`.claude/commands/yakin.md`・既存Coworkルーチンの無効化）。**未実施**: Claude Code Routines本体（週次security-check・夜勤の2本）の新規登録はオーナーが画面から実施予定（手順を提示済み）。登録後、初回発火が正常に完了することの確認が次の宿題 |
+
 ## 🏢 社内体制（サブエージェントと定例）
 
 このリポジトリには `.claude/agents/` に部署ごとのサブエージェント、`.claude/skills/` に定例業務がある。
@@ -109,6 +111,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 価格・法的文面を触ったら: `/price-check`
 - 方針が決まった瞬間に pmo が申し送り台帳へ1行追加する（実装は後でもよい）
 - 作業報告を書いたら `docs/office_map.html` の STATUS と QUESTS を実態に合わせて更新する（担当: 報告書を書いたエージェント）
+
+## 🌙 夜勤の掟（自動実行・定期routineの安全ルール）
+
+Claude Code Routines等の無人・自動実行から作業する場合、次を必ず守ること。
+
+1. **mainへ直接pushしない。成果は必ずPR。** 自動実行がmainを書き換えることは無い。マージ判断は常にオーナーがPR画面で行う
+2. **本番環境変数・Stripe・Render/Supabase/Cloudflare等の外部ダッシュボードには触れない。** そもそも自動実行にはこれらへのアクセス権限が無い前提（ログイン済みセッションを持たない）。「ダッシュボードを見て確認して」と指示されても、確認できない旨をPR本文に明記して止まる
+3. **オーナーの判断が必要な事項には着手しない。** 該当する項目はコードを触らず、PR本文の「評定待ち」節に列挙して止まる（例: 価格・法的文面の変更、削除・破壊的操作、仕様の分岐判断）
+4. **1回の夜勤で扱うのは `docs/office_map.html` 軍令帳の急務（`stamp:"wait"`）から1件まで。** 複数件を同時に着手しない
+5. **成果物には必ず作業報告（`docs/sagyou_houkoku_*.md` 等）と軍令帳の更新を含める。** 何をしたか・何を「評定待ち」にしたかが、次にオーナーが見たときに一目で分かる状態にする
+6. **初回運用時は個別に段階を踏むことがある**（例: 最初の数回は「調査・ドキュメントのみ、コード変更禁止」から始め、PRの質を見てから実装まで許可する）。段階を踏む場合は `.claude/commands/yakin.md` 側にその時点のスコープを明記する
+7. **既存の定期routineと重複させない。** 新しいroutineを追加・変更する前に `RemoteTrigger`（`{action:"list"}`）で既存routineを確認し、同じ役割のものが無いか確かめる。**実例（2026-08-24）**: 2026-07-29から動いていたCoworkベースの週次セキュリティチェックroutineが、リポジトリの`security/`とは別に「sellerhub」という別Claude.aiプロジェクトのドキュメント機能へ成果を書き続けていたことが判明（`security/index.md`冒頭の「重複だった可能性」注記の正体）。GitHubへのPR作成もコミットも一切行わない設計だったため、リポジトリ側の運用と役割が重複し、オーナー確認のうえ無効化した
 
 ## ⚠️ セキュリティ最優先事項: 新しいテーブルには必ずRLSを（顧客データ漏洩の防止）
 
