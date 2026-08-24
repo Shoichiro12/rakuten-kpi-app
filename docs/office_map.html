@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ウレシル家 家臣団</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Yuji+Syuku&family=Shippori+Mincho:wght@500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --washi:#efe6d0;        /* 和紙 */
+    --washi-dark:#e2d5b8;
+    --sumi:#2b2320;         /* 墨 */
+    --urushi:#1a1512;       /* 漆黒 */
+    --shu:#a53225;          /* 朱 */
+    --kin:#b8933e;          /* 金 */
+    --matsu:#4a5d3a;        /* 松葉 */
+    --ai:#33506b;           /* 藍 */
+    --cha:#6b4e35;          /* 茶 */
+    --hai:#8c8274;          /* 灰 */
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{background:var(--urushi)}
+  body{
+    font-family:'Shippori Mincho', serif;
+    color:var(--sumi);
+    line-height:1.8;
+    padding:16px;
+    background:
+      radial-gradient(ellipse 120% 60% at 50% -10%, rgba(184,147,62,.12), transparent 60%),
+      var(--urushi);
+  }
+  .frame{max-width:980px;margin:0 auto}
+
+  /* 題字 */
+  .plaque{text-align:center;margin:10px 0 22px;color:var(--washi)}
+  .plaque .kamon{
+    width:64px;height:64px;margin:0 auto 10px;
+    border:3px solid var(--kin);border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Yuji Syuku', serif;font-size:30px;color:var(--kin);
+    box-shadow:0 0 0 2px var(--urushi), 0 0 0 4px rgba(184,147,62,.4);
+  }
+  .plaque h1{
+    font-family:'Yuji Syuku', serif;
+    font-weight:normal;
+    font-size:clamp(26px,5vw,40px);
+    letter-spacing:.35em;
+    text-indent:.35em;
+    color:var(--washi);
+  }
+  .plaque .sub{color:var(--hai);font-size:13px;letter-spacing:.25em;margin-top:6px}
+
+  /* 国力（ステータス） */
+  .statusbar{display:flex;flex-wrap:wrap;gap:10px;justify-content:center;margin-bottom:20px}
+  .chip{
+    font-size:12px;padding:5px 14px;letter-spacing:.1em;
+    background:var(--sumi);color:var(--washi);
+    border:1px solid var(--kin);
+  }
+  .chip b{font-weight:500;color:var(--kin);margin-left:6px}
+  .chip.ok b{color:#8aa06a}
+  .chip.warn b{color:#d1705f}
+
+  .cols{display:grid;grid-template-columns:1fr 300px;gap:16px}
+  @media(max-width:860px){.cols{grid-template-columns:1fr}}
+
+  /* 領国絵図 */
+  .map{
+    background:
+      repeating-linear-gradient(0deg, transparent 0 3px, rgba(43,35,32,.025) 3px 4px),
+      radial-gradient(ellipse at 20% 10%, rgba(255,255,255,.5), transparent 50%),
+      var(--washi);
+    border:2px solid var(--cha);
+    box-shadow:inset 0 0 0 5px var(--washi), inset 0 0 0 6px var(--cha), 0 6px 18px rgba(0,0,0,.5);
+    padding:20px 16px 16px;
+  }
+  .region-label{
+    display:inline-block;
+    font-family:'Yuji Syuku', serif;
+    font-size:15px;letter-spacing:.3em;
+    color:var(--washi);background:var(--sumi);
+    padding:3px 16px 4px;
+    margin-bottom:12px;
+    border-left:4px solid var(--shu);
+  }
+  .river{
+    height:10px;margin:16px 8px;
+    background:repeating-linear-gradient(90deg, var(--ai) 0 26px, transparent 26px 34px);
+    opacity:.35;border-radius:5px;
+  }
+  .fiefs{
+    display:grid;grid-template-columns:repeat(4,1fr);gap:12px;
+  }
+  @media(max-width:640px){.fiefs{grid-template-columns:repeat(2,1fr)}}
+
+  /* 家臣札 */
+  .retainer{
+    background:linear-gradient(var(--washi), var(--washi-dark));
+    border:1px solid var(--cha);
+    box-shadow:0 2px 0 rgba(107,78,53,.4);
+    cursor:pointer;text-align:center;
+    padding:12px 8px 10px;
+    position:relative;
+    outline:none;
+    font-family:inherit;
+    transition:transform .12s ease;
+  }
+  .retainer:hover,.retainer:focus-visible{transform:translateY(-3px)}
+  .retainer:focus-visible{box-shadow:0 0 0 2px var(--shu)}
+  .retainer.active{
+    background:linear-gradient(#fbf5e6, var(--washi));
+    border-color:var(--shu);
+    box-shadow:0 0 0 1px var(--shu), 0 2px 0 rgba(165,50,37,.4);
+  }
+  .retainer.active::after{
+    content:"評定中";
+    position:absolute;top:-11px;right:-6px;
+    font-size:10px;letter-spacing:.15em;
+    color:var(--washi);background:var(--shu);
+    padding:1px 8px;
+    transform:rotate(4deg);
+  }
+
+  /* ドット絵の家臣 */
+  .sprite{
+    position:relative;
+    width:48px;height:60px;
+    margin:0 auto 8px;
+    image-rendering:pixelated;
+  }
+  .px{position:absolute}
+  .retainer:hover .sprite,.retainer.active .sprite{transform:translateY(-1px)}
+
+  .retainer .name{font-size:14px;letter-spacing:.08em;font-weight:700}
+  .retainer .yaku{
+    font-size:11px;color:var(--shu);letter-spacing:.15em;margin-top:1px;
+  }
+  .retainer .job{font-size:10px;color:var(--hai)}
+
+  /* 軍令掲示（クエスト） */
+  .board{
+    background:var(--sumi);
+    border:1px solid var(--kin);
+    box-shadow:inset 0 0 0 4px var(--sumi), inset 0 0 0 5px rgba(184,147,62,.5);
+    padding:14px 12px;
+  }
+  .board h2{
+    font-family:'Yuji Syuku', serif;font-weight:normal;
+    font-size:17px;text-align:center;letter-spacing:.4em;text-indent:.4em;
+    color:var(--kin);margin-bottom:12px;
+  }
+  .quest{
+    background:var(--washi);color:var(--sumi);
+    font-size:12px;line-height:1.6;
+    padding:9px 10px;margin-bottom:9px;
+    border-left:4px solid var(--shu);
+    position:relative;
+  }
+  .quest .qtitle{letter-spacing:.03em;font-weight:700}
+  .quest .qmeta{font-size:10px;color:var(--cha);margin-top:2px}
+  .quest.sealed{background:#d9cfb8;color:#7d7462;border-left-color:var(--ai)}
+  .quest.sealed .qmeta{color:#8c8274}
+  .quest .stamp{
+    float:right;margin-left:8px;
+    font-family:'Yuji Syuku', serif;
+    font-size:11px;padding:1px 6px;
+    border:2px solid currentColor;border-radius:3px;
+    transform:rotate(-6deg);letter-spacing:.1em;
+  }
+  .quest .stamp.wait{color:var(--shu)}
+  .quest .stamp.later{color:var(--ai)}
+
+  /* 評定の間（メッセージ窓） */
+  .msgwin{
+    margin-top:16px;
+    background:var(--sumi);
+    color:var(--washi);
+    border:1px solid var(--kin);
+    box-shadow:inset 0 0 0 4px var(--sumi), inset 0 0 0 5px rgba(184,147,62,.5), 0 6px 18px rgba(0,0,0,.5);
+    padding:18px 22px;
+    min-height:158px;
+    font-size:14.5px;
+  }
+  .msgwin .head{display:flex;align-items:flex-end;gap:14px;margin-bottom:8px}
+  .msgwin .portrait{
+    flex:none;
+    background:var(--washi);
+    border:1px solid var(--kin);
+    padding:6px 6px 2px;
+  }
+  .msgwin .portrait .sprite{margin:0}
+  .msgwin .who{
+    font-family:'Yuji Syuku', serif;
+    color:var(--kin);letter-spacing:.15em;font-size:16px;
+  }
+  .msgwin .who small{
+    font-family:'Shippori Mincho', serif;
+    color:var(--hai);letter-spacing:.02em;margin-left:12px;font-size:11px;
+  }
+  .msgwin .talk{white-space:pre-wrap}
+  .bars{display:flex;gap:18px;flex-wrap:wrap;margin-top:12px;font-size:11.5px;color:var(--hai);letter-spacing:.1em}
+  .bar{display:flex;align-items:center;gap:7px}
+  .bar .track{width:96px;height:7px;background:#0d0a08;border:1px solid #4a4038}
+  .bar .fill{height:100%}
+  .cmds{margin-top:10px;font-size:12px;letter-spacing:.05em}
+  .cmds code{
+    font-family:inherit;
+    background:transparent;border:1px solid var(--kin);
+    padding:1px 9px;margin-right:8px;color:var(--kin);
+  }
+  .cursor{display:inline-block;color:var(--shu);animation:blink 1.1s steps(1) infinite}
+  @keyframes blink{50%{opacity:0}}
+  @media(prefers-reduced-motion:reduce){.cursor{animation:none}}
+
+  footer{
+    text-align:center;color:var(--hai);font-size:11px;margin-top:24px;letter-spacing:.2em;
+  }
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <div class="plaque">
+    <div class="kamon">嬉</div>
+    <h1>ウレシル家</h1>
+    <div class="sub">楽天KPI管理SaaSを治める一人城主 ── 家臣は皆AIなり</div>
+  </div>
+
+  <div class="statusbar" id="statusbar"></div>
+
+  <div class="cols">
+    <div>
+      <div class="map">
+        <span class="region-label">北方 ─ 本丸（経営・開発）</span>
+        <div class="fiefs" id="rooms2f"></div>
+        <div class="river"></div>
+        <span class="region-label">南方 ─ 城下（事業・民政）</span>
+        <div class="fiefs" id="rooms1f"></div>
+      </div>
+
+      <div class="msgwin" id="msgwin">
+        <div class="head">
+          <div class="portrait" id="msgportrait" hidden></div>
+          <div class="who" id="msgwho">小姓</div>
+        </div>
+        <div class="talk" id="msgtalk"></div>
+        <div class="bars" id="msgbars"></div>
+        <div class="cmds" id="msgcmds"></div>
+      </div>
+    </div>
+
+    <aside class="board">
+      <h2>軍令帳</h2>
+      <div id="quests"></div>
+    </aside>
+  </div>
+
+  <footer>家臣十一名 ─ .claude/agents/ に在り ｜ 札を選べば評定が始まる</footer>
+</div>
+
+<script>
+// ============================================================
+// データはここだけ直せば更新できる（Claude Codeに編集させてOK）
+// 最終更新: 2026-08-24
+// gear: eboshi(烏帽子) / kabuto(兜) / zukin(頭巾) / hachimaki(鉢巻)
+//       / ninja(忍装束) / hime(束ね髪) / kasa(陣笠)
+// ============================================================
+const STATUS = [
+  {label:"領国", value:"安泰（本番稼働中）", cls:"ok"},
+  {label:"評定", value:"PR #39 裁可待ち", cls:"warn"},
+  {label:"守り", value:"8/24検分 高0", cls:"ok"},
+  {label:"軍費", value:"月 約$33", cls:""},
+];
+
+const AGENTS = [
+  // ---- 北方・本丸 ----
+  {floor:2, id:"pmo", name:"経営企画室", yaku:"筆頭家老", job:"pmo",
+   gear:"eboshi", kimono:"#7d2a20",
+   talk:"殿、御下命は それがしが捌き申す。\n何を為さぬかを定めるのも、家老の務め。\n台帳に幽霊の名を残すこと、二度とござらぬ。",
+   stats:{知略:90, 武勇:20}, cmds:["/kickoff"]},
+  {floor:2, id:"planner", name:"設計室", yaku:"軍師", job:"planner",
+   gear:"zukin", kimono:"#33506b",
+   talk:"半日を超える戦は、まず絵図を描き申す。\n「現状・方針・区切り・確認事項」── この四つが布陣の要。\n図なくして攻めるは、夜討ちより危のうござる。",
+   stats:{知略:85, 武勇:35}, cmds:["/jisso-keikaku"]},
+  {floor:2, id:"developer", name:"開発部", yaku:"普請奉行", job:"developer",
+   gear:"kabuto", kimono:"#4a5d3a",
+   talk:"FastAPIとReactが それがしの槍にござる。\n当家でBash全権を預かるは それがし一人。\nゆえにRLSと認証の門は、命に代えても破らせ申さぬ。",
+   stats:{知略:75, 武勇:95}, cmds:[]},
+  {floor:2, id:"reviewer", name:"レビュー室", yaku:"御目付", job:"reviewer",
+   gear:"eboshi", kimono:"#5a3d6b",
+   talk:"普請奉行の仕事は、それがしが検め申す。\n生SQLに他人の言葉が混ざっておらぬか、\n率の指標を足して均しておらぬか。そこが検分の勘所。",
+   stats:{知略:88, 武勇:30}, cmds:[]},
+  // ---- 南方・城下 ----
+  {floor:1, id:"qa", name:"品質保証部", yaku:"検分役", job:"qa",
+   gear:"hachimaki", kimono:"#8a6d1f",
+   talk:"「動いた」だけでは 検分は終わり申さぬ。\n何を確かめ、何が未検分か、帳面に残すが務め。\n未実施を隠すは、武士にあるまじき所業にござる。",
+   stats:{知略:80, 武勇:60}, cmds:["/release-check"]},
+  {floor:1, id:"security", name:"セキュリティ室", yaku:"御庭番", job:"security",
+   gear:"ninja", kimono:"#3a3230",
+   talk:"七日ごとに城の守りを検め、security/ に書き残しており申す。\n八月二十四日の検分、「高」は無し。\nされどCSVインジェクションの手薄な口が広がったは気掛かり。\n油断は禁物にござる。",
+   stats:{知略:92, 武勇:45}, cmds:["/security-check"]},
+  {floor:1, id:"designer", name:"デザイン部", yaku:"意匠奉行", job:"designer",
+   gear:"hime", kimono:"#8f4a63",
+   talk:"評定の間に二十もの札が並ぶは、乱世の極み。\n光らせるは一点のみ、他は沈める。\nそれが意匠の兵法にござりまする。",
+   stats:{知略:78, 武勇:50}, cmds:[]},
+  {floor:1, id:"kpi-analyst", name:"データ分析部", yaku:"算術方", job:"kpi-analyst",
+   gear:"eboshi", kimono:"#1a6862",
+   talk:"アクセスはUU、診断は月次、\n率は分子分母を合わせてのち割り直す。\n古き帳面（原本スプレッドシート）の数式の誤り三箇条、\nアプリにて直っておるか、常に目を光らせており申す。",
+   stats:{知略:95, 武勇:25}, cmds:[]},
+  {floor:1, id:"legal-finance", name:"法務経理部", yaku:"勘定奉行", job:"legal-finance",
+   gear:"eboshi", kimono:"#485870",
+   talk:"値を改めるときは五箇所同時、これ家法にござる。\nLPの三巻・billing.py・Stripe。\n税込を主表記から外さば、御家取り潰しと心得られよ。\n仕上げは他国の目利き（専門家）の検めを。",
+   stats:{知略:87, 武勇:20}, cmds:["/price-check"]},
+  {floor:1, id:"customer-success", name:"CS部", yaku:"町奉行", job:"customer-success",
+   gear:"hachimaki", kimono:"#9c5a1f",
+   talk:"民（お客さま）の訴えは種別に分け、\n不具合は再現の手順を添えて普請奉行へ回し申す。\n解約の沙汰は御定書どおり「二、三営業日の内」。\n守れぬ期日は、書かぬが信義にござる。",
+   stats:{知略:70, 武勇:65}, cmds:[]},
+  {floor:1, id:"infra-ops", name:"インフラ運用部", yaku:"兵站奉行", job:"infra-ops",
+   gear:"kasa", kimono:"#3a4a7d",
+   talk:"render.yamlに「free」の古文書が残るを見つけたは それがし。\n実態と違う帳面は、謀反の火種にござる。\n兵糧（プラン）は後で増やせるが、陣地（リージョン)は動かせぬ。\nこの理、ゆめゆめお忘れなきよう。",
+   stats:{知略:82, 武勇:55}, cmds:[]},
+];
+
+const QUESTS = [
+  {t:"PR #39 御裁可のこと", m:"体制導入と週次検分 ─ 殿の御手にて", stamp:"wait"},
+  {t:"Render城 実地検分のこと", m:"旧陣の有無 / SGの兵糧（プラン）確認", stamp:"wait"},
+  {t:"render.yaml 帳面改めのこと", m:"検分の結果次第で 破棄か書き直しか", stamp:"wait"},
+  {t:"CSVインジェクション普請のこと", m:"重要度:中 / 8/24検分で手薄な口が拡大", stamp:"wait"},
+  {t:"四万SKU取込 実測のこと", m:"約定により資料入手は十月朔日以降", stamp:"later", sealed:true},
+  {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
+  {t:"旧Render・Vercel 廃城のこと", m:"新城の安泰を見届けてのち", stamp:"later", sealed:true},
+];
+
+// ============================================================
+// ドット絵（4px格子・12×15）
+// ============================================================
+const U=4; // 1マス=4px
+function P(x,y,w,h,c){return `<i class="px" style="left:${x*U}px;top:${y*U}px;width:${w*U}px;height:${h*U}px;background:${c}"></i>`;}
+
+function spriteHTML(a){
+  const skin="#e8c9a0", dark="#2b2320", white="#efe6d0",
+        kimono=a.kimono, kin="#b8933e", shu="#a53225";
+  let s="";
+
+  // --- 頭部（かぶりものごとに描き分け） ---
+  switch(a.gear){
+    case "eboshi": // 烏帽子（後ろへ傾く黒い立て帽）
+      s+=P(5,0,3,1,dark)+P(4,1,4,2,dark)+P(3,3,6,1,dark);
+      s+=P(3,4,6,3,skin);
+      break;
+    case "kabuto": // 兜（鍬形つき）
+      s+=P(5,0,2,1,kin)+P(3,0,1,2,kin)+P(8,0,1,2,kin);       // 前立て
+      s+=P(3,1,6,2,"#4a4440")+P(2,3,8,1,"#3a3430");           // 鉢と眉庇
+      s+=P(3,4,6,3,skin);
+      s+=P(2,4,1,3,"#4a4440")+P(9,4,1,3,"#4a4440");           // しころ
+      break;
+    case "zukin": // 軍師頭巾
+      s+=P(3,0,6,2,kimono)+P(2,2,8,2,kimono);
+      s+=P(2,4,1,3,kimono)+P(9,4,1,3,kimono);
+      s+=P(3,4,6,3,skin);
+      break;
+    case "hachimaki": // 鉢巻＋髷
+      s+=P(5,0,2,1,dark);                                     // 髷
+      s+=P(3,1,6,2,dark);                                     // 髪
+      s+=P(3,3,6,1,white);                                    // 鉢巻
+      s+=P(3,4,6,3,skin);
+      break;
+    case "ninja": // 忍び頭巾（目だけ出す）
+      s+=P(3,1,6,3,dark)+P(2,3,8,4,dark);
+      s+=P(3,4,6,2,skin);                                     // 目のまわりだけ
+      break;
+    case "hime": // 束ね髪
+      s+=P(5,0,2,1,dark)+P(3,1,6,2,dark);
+      s+=P(2,3,1,5,dark)+P(9,3,1,5,dark);                     // 横の髪
+      s+=P(3,3,6,4,skin);
+      s+=P(7,1,1,1,shu);                                      // 簪
+      break;
+    case "kasa": // 陣笠
+      s+=P(5,0,2,1,"#6b5636")+P(2,1,8,1,"#8a7248")+P(1,2,10,1,"#6b5636");
+      s+=P(3,3,6,4,skin);
+      break;
+    default:
+      s+=P(3,1,6,2,dark)+P(3,3,6,4,skin);
+  }
+
+  // --- 目（忍びは位置が上） ---
+  const eyeY = a.gear==="ninja" ? 4 : 5;
+  s+=P(4,eyeY,1,1,dark)+P(7,eyeY,1,1,dark);
+
+  // --- 着物 ---
+  s+=P(2,7,8,4,kimono);
+  s+=P(5,7,1,1,white)+P(6,8,1,1,white);                       // 襟あわせ
+  s+=P(2,9,8,1,dark);                                          // 帯
+  // 袖と手
+  s+=P(1,7,1,3,kimono)+P(10,7,1,3,kimono);
+  s+=P(1,10,1,1,skin)+P(10,10,1,1,skin);
+
+  // --- 袴・足 ---
+  s+=P(3,11,6,2,"#3a342e");
+  s+=P(3,13,2,1,dark)+P(7,13,2,1,dark);
+
+  // --- 得物（ちょい足し） ---
+  if(a.gear==="kabuto") s+=P(11,2,1,10,"#6b5636")+P(11,1,1,1,"#9aa0a8"); // 槍
+  if(a.gear==="zukin")  s+=P(0,8,1,4,white)+P(0,7,1,1,kin);              // 軍配もどき
+  if(a.gear==="hime")   s+=P(0,8,1,3,shu);                               // 筆
+
+  return `<div class="sprite">${s}</div>`;
+}
+
+// ============================================================
+// 描画
+// ============================================================
+const statusbar = document.getElementById("statusbar");
+STATUS.forEach(s=>{
+  const c=document.createElement("span");
+  c.className="chip "+(s.cls||"");
+  c.innerHTML=`${s.label}<b>${s.value}</b>`;
+  statusbar.appendChild(c);
+});
+
+function cardHTML(a){
+  const el=document.createElement("button");
+  el.className="retainer";
+  el.setAttribute("data-id",a.id);
+  el.innerHTML=`
+    ${spriteHTML(a)}
+    <div class="name">${a.name}</div>
+    <div class="yaku">${a.yaku}</div>
+    <div class="job">${a.job}</div>`;
+  el.addEventListener("click",()=>select(a.id));
+  return el;
+}
+
+const r2=document.getElementById("rooms2f"), r1=document.getElementById("rooms1f");
+AGENTS.forEach(a=>{(a.floor===2?r2:r1).appendChild(cardHTML(a));});
+
+const qwrap=document.getElementById("quests");
+QUESTS.forEach(q=>{
+  const d=document.createElement("div");
+  d.className="quest"+(q.sealed?" sealed":"");
+  d.innerHTML=`<span class="stamp ${q.stamp}">${q.stamp==="wait"?"急務":"後日"}</span>
+    <div class="qtitle">一、${q.t}</div><div class="qmeta">${q.m}</div>`;
+  qwrap.appendChild(d);
+});
+
+// 評定の間（タイプライター表示）
+const who=document.getElementById("msgwho"),
+      talk=document.getElementById("msgtalk"),
+      bars=document.getElementById("msgbars"),
+      cmds=document.getElementById("msgcmds"),
+      portrait=document.getElementById("msgportrait");
+let typing=null;
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+function typeText(text){
+  clearInterval(typing);
+  if(reduced){ talk.innerHTML=text+' <span class="cursor">▍</span>'; return; }
+  talk.textContent="";
+  let i=0;
+  typing=setInterval(()=>{
+    talk.textContent=text.slice(0,++i);
+    if(i>=text.length){
+      clearInterval(typing);
+      talk.innerHTML=talk.textContent+' <span class="cursor">▍</span>';
+    }
+  },26);
+}
+
+function barHTML(label,val,color){
+  return `<span class="bar">${label}<span class="track"><span class="fill" style="width:${val}%;background:${color}"></span></span></span>`;
+}
+
+function select(id){
+  document.querySelectorAll(".retainer").forEach(r=>r.classList.toggle("active", r.dataset.id===id));
+  const a=AGENTS.find(x=>x.id===id);
+  portrait.hidden=false;
+  portrait.innerHTML=spriteHTML(a);
+  who.innerHTML=`${a.yaku} ─ ${a.name} <small>.claude/agents/${a.job}.md</small>`;
+  typeText(a.talk);
+  bars.innerHTML = barHTML("知略",a.stats.知略,"var(--kin)") + barHTML("武勇",a.stats.武勇,"var(--shu)");
+  cmds.innerHTML = a.cmds.length ? "采配: "+a.cmds.map(c=>`<code>${c}</code>`).join("") : "";
+}
+
+// 初期口上
+who.textContent="小姓";
+typeText("殿、お戻りなされませ。\n家臣の札を選べば、評定の間にて口上を聞けまする。\n右の軍令帳は、目下の急務と後日の沙汰にございます。");
+</script>
+</body>
+</html>

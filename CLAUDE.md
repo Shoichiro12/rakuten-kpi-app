@@ -49,7 +49,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | Supabase Redirect URLs に `https://app.ureshiru.com/**` を追加（旧URLと併存） | 2026-07-29 | 実装済み（Total URLs: 2。Site URL も https://app.ureshiru.com に切替済み） |
 | Render カスタムドメイン app.ureshiru.com 有効化＋Stripe Webhook URL を https://app.ureshiru.com/api/stripe/webhook に変更（whsec不変） | 2026-07-29 | 実装済み（Verified/Certificate Issued、/api/health 200確認） |
 | 旧Render(Oregon)・旧Vercelプロジェクトの削除 | 2026-07-29 | **未実施**（新環境の安定運用を数日確認してから） |
-| 4万SKU CSV取込のメモリ実測 → Render Starter で不足なら Standard へ | 2026-07-29 | **未実施** |
+| 4万SKU CSV取込のメモリ実測 → Render Starter で不足なら Standard へ | 2026-07-29 | **未実施（延期）**。契約の都合でデータ入手が10/1以降のため延期。10月に再開 |
 | テスト・デモ用アカウントのカード登録除外: env `EXEMPT_TEST_EMAILS`（カンマ区切り・既定 `test@gmail.com`・空文字設定で無効化）に載ったメールは `/api/billing/checkout` で Stripe Checkout を通さず trialing をDBに直接作成する。判定はJWT検証済みメールのみ。**このメールの受信箱を持つ人は無料で全機能を使えるため、本番は自社管理のメールに差し替えること** | 2026-07-30 | 実装済み（backend/billing.py `is_exempt_test_email` / routers/billing.py `create_checkout`）。**本番envは差し替え済み（2026-07-30）**: Render `EXEMPT_TEST_EMAILS=demo@ureshiru.com` を設定・再デプロイし、demo@ureshiru.com の本番サインアップでカード登録なしtrialing作成・ダッシュボード表示を確認。※exemptアカウントはStripe契約を持たないため `/api/billing/diagnose` に「DBに subscription ID がありません」warnが出るが仕様どおり |
 | 本番Stripe設定の確認（セキュリティ報告書2026-07-29のフォロー）: `STRIPE_WEBHOOK_SECRET` はRender envに設定済みで、`/api/billing/diagnose` は ok:true・webhook未設定警告なし（=webhook_secret_set true）。税率は10%・内税（総額¥22,000のまま内訳表示）で契約にも付与済み | 2026-07-30 | 確認済み |
 | LPフォーカス状態（Hallmark audit punch list対応）: `:focus-visible` はC案刷新時に導入済みだったが、暗色地（CTAバンド・フッター）でリングが背景に同化していたため紙色に反転、`lp/style.css`（privacy/terms/tokushoho）にも追加 | 2026-07-30 | 実装済み（955f95f） |
@@ -94,6 +94,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | **週次セキュリティチェック（2026-08-24）の新規指摘2件（バックログ・優先度: 中/低）**: ①CSVエクスポート（`backend/routers/masters.py` の商品・カテゴリexport、`backend/routers/item_targets.py` のexport、既存 `backend/routers/export.py`）にCSVインジェクション（数式注入）対策が無い。既存 `export.py` の未対策パターンが今回のマスタ設計統一（区切り2〜5）で3ルーター分に広がった。重大度「中」。**テナント分離（`UserScopedMixin`）により影響は「自分自身がエクスポートしたCSVを自分で開いたとき」に限定される**ため緊急対応は不要と判断（`security/security_check_2026-08-24.md` の結論）。対応するときは共通ヘルパー（`csv_safe_cell()`等）化を推奨——セル値が `=`/`+`/`-`/`@` で始まる場合に先頭へシングルクォート等の無害化を挟む方式。②新設CSVインポート3本（カテゴリ・目標・アイテム別目標）にファイルサイズ上限が無い（重大度「低」・既存の商品マスタCSVインポート等と同じ既存パターンの踏襲、`_paid`ガード配下のため悪用インセンティブは低いと判断）。**出典**: `security/security_check_2026-08-24.md`（結論サマリ・詳細）、`security/index.md`（未解決の指摘事項テーブル・実施記録） | 2026-08-24 | 未実装（バックログ。詳細は `security/index.md`・`security/security_check_2026-08-24.md` 参照） |
 
+| 社内マップ `docs/office_map.html` を導入、作業報告時の更新をルール化 | 2026-08-24 | 実装済み（`docs/office_map.html`。家臣団＝サブエージェント体制と残作業＝軍令帳を可視化する自己完結HTML。ブラウザで家臣札クリック→評定の間に肖像・口上・知略武勇バー・采配コマンドが表示されることを実機確認済み。更新ルールは本ファイル「🏢 社内体制」節に追加） |
+
 ## 🏢 社内体制（サブエージェントと定例）
 
 このリポジトリには `.claude/agents/` に部署ごとのサブエージェント、`.claude/skills/` に定例業務がある。
@@ -104,6 +106,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - 毎週月曜: `/security-check`
 - 価格・法的文面を触ったら: `/price-check`
 - 方針が決まった瞬間に pmo が申し送り台帳へ1行追加する（実装は後でもよい）
+- 作業報告を書いたら `docs/office_map.html` の STATUS と QUESTS を実態に合わせて更新する（担当: 報告書を書いたエージェント）
 
 ## ⚠️ セキュリティ最優先事項: 新しいテーブルには必ずRLSを（顧客データ漏洩の防止）
 
