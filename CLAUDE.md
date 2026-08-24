@@ -106,6 +106,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | **【宿題】sellerhub側に残る旧「security/index.md」マスター文書の扱い**: 無効化したCoworkルーチンが`project_write`で書き続けていたsellerhub側のドキュメント（`security/index.md`・`security/security_check_YYYY-MM-DD.md`×4）は、ルーチン停止後も**削除・注記なしのまま残存**している。将来別のセッションがこれを見つけると、また「これは何だ」の調査が発生するおそれがある。**理想は文書冒頭に「Coworkルーチン時代の遺物・正はgit側`security/index.md`・参照不要」と注記を入れること**だが、sellerhub側のドキュメント編集（`project_write`/`doc_edit`相当）は今回のClaude Codeセッションのツールセットに無く実施できなかった。次にCowork側のセッション（`project_write`が使える環境）が動く機会があれば、その冒頭注記の追加を検討すること | 2026-08-24 | **未実施（宿題として記録のみ）**。対応するツール・セッションが無いため、今回は本ファイルへの記録で代替 |
 
+| **CSVインジェクション対策（`security_check_2026-08-24.md`の中優先度指摘）の修正方針を下書き**: 夜勤（無人・定期実行）の初回タスク消化。現行スコープ（コード変更禁止）のため実装はせず、影響範囲の実地調査（`masters.py`商品名/カテゴリ名・`item_targets.py`商品名の3箇所が未サニタイズ。`export.py`の共通ヘルパー`_csv_response()`は他3ファイルと共有されていないことを確認）と、共通ヘルパー`backend/csv_utils.py`の`csv_safe_cell()`による対策方針を計画書化した | 2026-08-25 | **計画書のみ・未実装**（`docs/jisso_keikaku_csv_injection_fix_2026-08-25.md`）。オーナー確認事項3点（targets.pyを対象に含めるか／マスタCRUD規約への追記文言／既存データへの遡及対応が不要か）は計画書内「評定待ち」を参照 |
+
 ## 🏢 社内体制（サブエージェントと定例）
 
 このリポジトリには `.claude/agents/` に部署ごとのサブエージェント、`.claude/skills/` に定例業務がある。
