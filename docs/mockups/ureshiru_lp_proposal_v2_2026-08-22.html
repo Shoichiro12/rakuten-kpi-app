@@ -1,32 +1,17 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<!-- Google tag (gtag.js) -->
-<script async src="https://www.googletagmanager.com/gtag/js?id=G-GWJX39LWJY"></script>
-<script>
-  window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
-  gtag("js", new Date());
-  gtag("config", "G-GWJX39LWJY");
-</script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ウレシル | 楽天市場RPP広告のKPI管理・診断ツール — 月曜の朝、5分だけ。</title>
 <meta name="description" content="楽天市場のRPP広告を運用する店長のためのKPI管理・診断ツール。RMSのCSVを放り込むだけで、売上を「アクセス×転換率×客単価」に分解し、不足額と商品ごとの打ち手まで3クリックで出します。月額22,000円（税込）・14日間無料。">
 <link rel="canonical" href="https://ureshiru.com/">
-
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="ウレシル">
 <meta property="og:title" content="ウレシル | 楽天市場RPP広告のKPI管理・診断ツール">
 <meta property="og:description" content="RMSのCSVを放り込むだけ。売上の不足額と、商品ごとの打ち手まで3クリック。月額22,000円（税込）・14日間無料トライアル。">
 <meta property="og:url" content="https://ureshiru.com/">
-<!-- TODO: 新デザイン（ライブデモ主体のヒーロー）に合わせた og:image（1200×630）を撮り直して差し替える。
-     暫定で旧デザインのヒーロー画像を流用（無いよりはまし、という判断。docs/jisso_keikaku_lp_essay_2026-08-23.md 区切り2参照） -->
-<meta property="og:image" content="https://ureshiru.com/shot-hero.jpg">
-<meta property="og:locale" content="ja_JP">
 <meta name="twitter:card" content="summary_large_image">
-
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=&#39;http://www.w3.org/2000/svg&#39; viewBox=&#39;0 0 64 64&#39;%3E%3Crect width=&#39;64&#39; height=&#39;64&#39; rx=&#39;14&#39; fill=&#39;%2316324f&#39;/%3E%3Ctext x=&#39;30&#39; y=&#39;44&#39; font-size=&#39;32&#39; font-family=&#39;sans-serif&#39; font-weight=&#39;bold&#39; fill=&#39;%23ffffff&#39; text-anchor=&#39;middle&#39;%3E%E3%82%A6%3C/text%3E%3Ccircle cx=&#39;53&#39; cy=&#39;47&#39; r=&#39;5&#39; fill=&#39;%23e8443a&#39;/%3E%3C/svg%3E">
 
 <!-- AI検索・検索エンジン向けの機械可読情報（画面には表示されません） -->
 <script type="application/ld+json">
@@ -96,14 +81,9 @@
   ]
 }
 </script>
-
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=BIZ+UDPGothic:wght@400;700&family=Inter:wght@500;600;700&display=swap" rel="stylesheet">
-
 <style>
-  /* 書体はアプリと統一（2026-08-23 決定）。Zen Maru/Zen Kaku Gothic New・Quicksand は index.html では廃止。
-     lp/style.css（下層ページ用）は今回スコープ外のため変更していない。 */
   :root{
     --ink:#383731; --ink-strong:#2e2d29; --sub:#504b42; --muted:#6b6559;
     --paper:#fdfcf9; --bg-alt:#f4f1ea; --line:#e5dfd4;
@@ -111,7 +91,7 @@
     --alert:#c2402f; --alert-bg:#fbe9e7; --up:#17714d;
   }
   *{ box-sizing:border-box; }
-  html{ -webkit-font-smoothing:antialiased; overflow-x:clip; }
+  html{ -webkit-font-smoothing:antialiased; }
   body{
     margin:0; background:var(--paper); color:var(--ink);
     font-family:"BIZ UDPGothic","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;
@@ -127,17 +107,9 @@
 
   header{ border-bottom:1px solid var(--line); }
   .head-in{ display:flex; align-items:center; justify-content:space-between; padding:18px 0; }
-  .brand{ font-weight:700; font-size:16px; letter-spacing:.06em; text-decoration:none; }
+  .brand{ font-weight:700; font-size:16px; letter-spacing:.06em; }
   .brand .dot{ color:var(--sage); }
   .head-cta{ font-size:13px; text-decoration:underline; text-underline-offset:3px; cursor:pointer; }
-
-  .skip{ position:absolute; left:-9999px; }
-  .skip:focus{
-    position:fixed; left:16px; top:16px; z-index:100;
-    background:var(--paper); color:var(--ink);
-    padding:10px 18px; border-radius:8px;
-    border:2px solid var(--ink); text-decoration:none; font-weight:700;
-  }
 
   .essay{ padding:72px 0 40px; }
   h1{ font-size:27px; line-height:1.9; font-weight:700; margin:0 0 34px; letter-spacing:.01em; }
@@ -176,19 +148,6 @@
   .d-reset{ background:none; border:none; color:var(--muted); font-size:11px; cursor:pointer; text-decoration:underline; font-family:inherit; }
   .cap{ font-size:11.5px; color:var(--muted); margin:0 0 40px; }
 
-  /* 導入事例: デモと同じ枠のトーンで、静かに */
-  .case-card{ border:1px solid var(--line); border-radius:8px; padding:22px 24px; background:var(--bg-alt); margin:8px 0 6px; }
-  .case-label{ font-size:11.5px; color:var(--muted); display:block; margin-bottom:8px; }
-  .case-metric{ display:flex; align-items:baseline; gap:12px; margin:0 0 18px; flex-wrap:wrap; }
-  .case-before{ font-size:22px; color:var(--muted); font-weight:700; }
-  .case-arrow{ font-size:18px; color:var(--sage-deep); }
-  .case-after{ font-size:30px; color:var(--up); font-weight:700; }
-  .case-cond{ margin:0 0 18px; padding-top:14px; border-top:1px solid var(--line); font-size:12.5px; }
-  .case-cond dt{ font-weight:700; color:var(--ink); margin-top:8px; }
-  .case-cond dt:first-of-type{ margin-top:0; }
-  .case-cond dd{ margin:2px 0 0; color:var(--sub); }
-  .case-note{ font-size:11.5px; line-height:1.8; color:var(--muted); margin:0; padding-top:14px; border-top:1px solid var(--line); }
-
   /* 料金: 一枚を静かに */
   .price{ border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:34px 0; margin:56px 0 40px; }
   .price .big{ font-size:26px; font-weight:700; }
@@ -211,32 +170,19 @@
   .faq summary{ cursor:pointer; color:var(--sub); }
   .faq details p{ margin:10px 0 4px; font-size:13px; color:var(--sub); }
 
-  footer{ background:var(--ink-strong); color:#b8b2a6; font-size:13.5px; padding:52px 0 32px; }
-  .foot-mast{ display:flex; align-items:baseline; gap:20px; flex-wrap:wrap; }
-  .foot-mast .wordmark{ color:#fdfcf9; font-size:20px; font-weight:700; letter-spacing:.06em; }
-  .foot-mast .wordmark .dot{ color:var(--sage); }
-  .foot-tagline{ color:#b8b2a6; font-size:13px; }
-  .foot-links{ display:flex; flex-wrap:wrap; gap:0 24px; margin:32px 0 12px; padding-top:8px; border-top:1px solid #4a473f; }
-  .foot-links a{ display:inline-block; padding-block:11px; color:#d9d4c9; text-decoration:none; }
-  .foot-links a:hover{ color:#fff; }
-  .foot-legal{ color:#8d8880; font-size:12.5px; margin:0; }
-  footer :focus-visible{ outline-color:var(--paper); }
-
-  @media (max-width:40rem){
-    .cta{ display:block; text-align:center; }
-  }
+  .memo{ background:var(--bg-alt); border-top:1px solid var(--line); padding:44px 0 80px; }
+  .memo h2{ margin-top:0; font-size:15px; }
+  .memo p{ font-size:12.5px; color:var(--sub); line-height:2.1; }
+  .memo b{ color:var(--ink); }
 </style>
 </head>
 <body>
 
-<a class="skip" href="#main">本文へスキップ</a>
-
 <header><div class="col head-in">
-  <a class="brand" href="./">ウレシル<span class="dot">。</span></a>
-  <a class="head-cta js-signup" href="https://app.ureshiru.com/billing?signup=1">14日間無料で試す</a>
+  <span class="brand">ウレシル<span class="dot">。</span></span>
+  <span class="head-cta">14日間無料で試す</span>
 </div></header>
 
-<main id="main">
 <div class="col essay">
 
   <h1>月曜の朝、RMSからCSVを落として、<br>そのまま放り込む。<br>見るのは、これだけです。</h1>
@@ -282,26 +228,7 @@
   <h2>面倒な準備は、ありません。</h2>
   <p>API連携の申請も、列の並べ替えも要りません。RMSからダウンロードしたCSVを、そのまま放り込むだけ。契約した日の朝から使えます。</p>
 
-  <!-- 導入事例（現行の内容をそのまま移設。数値は実際にオーナーが開示許可済みの実績で「例」ではない） -->
-  <h2>導入事例</h2>
-  <p class="mut">ウレシルの診断結果をもとに広告運用を見直した店舗の実績です。</p>
-  <div class="case-card">
-    <span class="case-label">RPP広告のROAS</span>
-    <p class="case-metric">
-      <span class="case-before num">200%台</span>
-      <span class="case-arrow" aria-hidden="true">→</span>
-      <span class="case-after num">300%以上</span>
-    </p>
-    <dl class="case-cond">
-      <dt>店舗</dt>
-      <dd>靴ジャンルのショップ（A社・匿名）</dd>
-      <dt>期間</dt>
-      <dd>2026年6月〜7月</dd>
-      <dt>実施したこと</dt>
-      <dd>ウレシルを導入し、診断結果に基づいて広告運用を見直し</dd>
-    </dl>
-    <p class="case-note">※ 掲載については当該企業の許可を得ています。上記は特定の店舗・特定の期間における実績であり、効果を保証するものではありません。成果は商材・価格帯・競合状況・広告予算などによって変わります。</p>
-  </div>
+  <p class="small">（この下に現行の「導入事例」をそのまま置く想定です）</p>
 
   <div class="price">
     <div class="big num">¥22,000<small>（税込）/ 月　プランはこれだけ</small></div>
@@ -317,11 +244,10 @@
 
   <div class="last">
     <p>来週の月曜から、どうぞ。</p>
-    <a class="cta js-signup" href="https://app.ureshiru.com/billing?signup=1">14日間無料で試す</a>
-    <p class="small" style="margin-top:14px;">導入前に相談したい方は <a class="js-booking" href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E7%84%A1%E6%96%99%E3%83%87%E3%83%A2%E5%B8%8C%E6%9C%9B">無料デモ（30分）</a>もご利用いただけます。</p>
+    <a class="cta">14日間無料で試す</a>
+    <p class="small" style="margin-top:14px;">導入前に相談したい方は 無料デモ（30分）もご利用いただけます。</p>
   </div>
-
-  <div class="faq" id="faq">
+  <div class="faq">
     <h2>よくある質問</h2>
     <details><summary>ウレシルとは何ですか？</summary><p>楽天市場のRPP広告を運用する店舗のためのKPI管理・診断ツールです。RMSのCSVを取り込むと、売上を「アクセス×転換率×客単価」に分解し、予算への不足額から商品ごとの打ち手まで提示します。</p></details>
     <details><summary>料金はいくらですか？</summary><p>月額22,000円（税込）の単一プランです。全機能・データ保存無制限・ユーザー数無制限。14日間の無料トライアルがあり、期間中に解約すれば料金はかかりません。</p></details>
@@ -329,28 +255,20 @@
     <details><summary>どんな分析ができますか？</summary><p>予算vs売上の達成率と不足額、アクセス×転換率×客単価のKPI分解、ジャンル（大・中・小分類）から商品へのドリルダウン、CPOと限界CPOの比較に基づく商品別の改善アクション提案、実施した施策の記録と翌月実績との突き合わせができます。</p></details>
     <details><summary>誰のためのツールですか？</summary><p>RPP広告を運用している楽天市場店舗の店長・運営担当者向けです。数字の集計にかける時間を減らし、商品をお客様に届ける仕事に集中できるようにするために作られています。</p></details>
   </div>
-
 </div>
-</main>
 
-<footer>
-  <div class="col">
-    <div class="foot-mast">
-      <span class="wordmark">ウレシル<span class="dot">.</span></span>
-      <span class="foot-tagline">楽天市場の売上とRPP広告を、次の一手に変える。</span>
-    </div>
-    <nav class="foot-links" aria-label="フッター">
-      <a href="#faq">よくある質問</a>
-      <a href="about.html">私たちについて</a>
-      <a href="help.html">ヘルプ・使い方ガイド</a>
-      <a href="tokushoho.html">特定商取引法に基づく表記</a>
-      <a href="privacy.html">プライバシーポリシー</a>
-      <a href="terms.html">利用規約</a>
-      <a href="mailto:shoichiro.nakamura.0601@gmail.com?subject=%E3%82%A6%E3%83%AC%E3%82%B7%E3%83%AB%E3%81%AB%E3%81%A4%E3%81%84%E3%81%A6%E3%81%AE%E3%81%8A%E5%95%8F%E3%81%84%E5%90%88%E3%82%8F%E3%81%9B">お問い合わせ</a>
-    </nav>
-    <p class="foot-legal">© 2026 ウレシル</p>
-  </div>
-</footer>
+<div class="memo"><div class="col">
+  <h2>v1からの変更メモ（なぜ書き直したか）</h2>
+  <p>
+    <b>v1がAIっぽかった理由：</b>「テキスト左・製品右」のヒーロー骨格／同じ3カラム行の反復／「安い」の換算3連発／アイブロウ・ブラウザ風の飾り。売り込みの道具立てが揃うほど、テンプレに見える。<br><br>
+    <b>v2の方針：</b>セクションの羅列をやめ、620pxの一本のコラムで「ある月曜の朝」を追体験させるエッセイに。デモは冒頭に一つだけ、飾りなしで。
+    「安い」の独立セクションは撤去し、料金の下に1行（1日¥733＝クリック7回分）だけ残した。数値はすべて例（実数は使わない方針）。
+    見出しの階層は h1一つ＋小さめのh2三つ。最後は「来週の月曜から、どうぞ。」——読んだ人が月曜の自分を想像した状態でCTAに着く構成。<br><br>
+    <b>実装時の追加要素：</b>導入事例（現行流用）／フッター（特商法等は現行のまま）。<br><br>
+    <b>アクション文言の実物合わせ（2026-08-22追記）：</b>デモと本文の打ち手例は、本番アプリの実出力（「原価・価格を見直す」CPO/限界CPO/超過分/所要30分）に差し替えた。モック初版の「RPP入札¥38→¥50」は実物に存在しない創作だったため撤回。<br><br>
+    <b>SEO・AI検索対策（同追記）：</b>①JSON-LD構造化データ2本（SoftwareApplication＝製品・価格・機能一覧、FAQPage＝よくある質問5問）をheadに埋め込み。画面には表示されないが、Google・ChatGPT・Perplexity等のクローラーが読む標準形式。②meta description・OGP・canonicalを整備。③FAQPageのガイドライン（掲載内容と一致が必須）を満たすため、折りたたみ式の「よくある質問」をCTA下に静かに併設。④隠しテキスト・不可視キーワードは検索エンジンのペナルティ対象のため使用しない。⑤別途フォローアップ：サイトルートに llms.txt（AIクローラー向けのサイト説明ファイル）を設置するのを推奨——これはHTML外のファイルのため実装時に対応。
+  </p>
+</div></div>
 
 <script>
   function demo(n){
@@ -359,28 +277,5 @@
     document.getElementById('demoBtn').style.display = n>=1 ? 'none' : 'inline-block';
   }
 </script>
-
-<script>
-  // ===== CONFIG =====
-  // bookingUrl: デモ予約ページ（Googleカレンダー予約ページ等）のURLを入れると
-  //   デモ予約系CTA（.js-booking）が差し替わります。空のままならメール（mailto）に
-  //   フォールバックします。
-  // signupUrl: メインCTA（.js-signup）の飛び先。アプリの登録・トライアル開始フロー
-  //   （サインアップ→/billingのCheckout）に直接つなぐ。?signup=1 でアカウント作成
-  //   フォームが最初から表示される。
-  const CONFIG = {
-    bookingUrl: "",
-    signupUrl: "https://app.ureshiru.com/billing?signup=1"
-  };
-
-  const ctaHref = CONFIG.bookingUrl || "mailto:shoichiro.nakamura.0601@gmail.com?subject=ウレシル無料デモ希望";
-  document.querySelectorAll('.js-booking').forEach(function (a) {
-    a.href = ctaHref;
-    if (CONFIG.bookingUrl) { a.target = '_blank'; a.rel = 'noopener'; }
-  });
-  document.querySelectorAll('.js-signup').forEach(function (a) {
-    a.href = CONFIG.signupUrl;
-  });
-</script>
-
-</body></html>
+</body>
+</html>
