@@ -42,6 +42,8 @@ CLAUDE.md 申し送り表のルール4「調査・監査・設計の成果物は
 | npm audit: react-router / react-router-dom（moderate 3件、うち1件は2026-08-18のaudit時点で新規検出） | 2026-08-17（推定） | ✅ 解決（2026-08-18、本番デプロイ・実測確認済み） | react-router-dom@7.18.2へメジャー移行し解消（npm audit 0件）。段階1でv6のままfuture flagを先取り有効化し挙動不変を確認、段階2でv7へ更新。使用APIがBrowserRouter/Routes/Route/useLocation/useNavigate/Link/NavLinkのみでデータルーターAPI未使用のため挙動変更なし。PR #18（`f22a854`）でmainへマージ・本番デプロイ・本番実画面確認済み |
 | `backend/main.py` の `security_headers` にCSPが無い | 2026-08-17（推定） | ✅ 解決（2026-08-18、本番デプロイ・実測確認済み） | 外部依存を棚卸しのうえ追加。ポリシー全文・本番検証結果は作業報告書参照 |
 | `backend/routers/consulting.py` の `InquiryPayload` に文字数上限が無い | 2026-08-17（推定） | ✅ 解決（2026-08-18） | `feedback.py` と同じ方式（サーバ側手動チェック＋400）に統一。name/company_name=200、scale_hint/contact_phone=100、message=5000 |
+| CSVエクスポート（商品名・カテゴリ名）にCSVインジェクション対策が無い | 2026-08-24 | **未着手（中）** | `masters.py`（商品・カテゴリexport）・`item_targets.py`（export）・既存`export.py`が対象。テナント分離により影響は自分自身のエクスポートに限定されるため緊急度は中止まり。共通ヘルパー`csv_safe_cell()`化を推奨。詳細: `security/security_check_2026-08-24.md` |
+| 新設CSVインポート3本（カテゴリ・目標・アイテム別目標）にファイルサイズ上限が無い | 2026-08-24 | **継続監視（低）** | 既存の商品マスタCSVインポート等と同じ既存パターンの踏襲。`_paid`ガード配下のため悪用インセンティブ低。詳細: `security/security_check_2026-08-24.md` |
 
 ## 実施記録
 
@@ -49,6 +51,7 @@ CLAUDE.md 申し送り表のルール4「調査・監査・設計の成果物は
 |---|---|---|
 | 2026-08-18 | npm audit / CSP / consulting.py上限の3件対応 | 作業報告書: `docs/作業報告_2026-08-18.md` 参照。[PR #16](https://github.com/Shoichiro12/rakuten-kpi-app/pull/16) マージ（`61346e3`）で本番反映済み。コミット: フロント依存更新・CSPヘッダー追加・consulting.py上限追加・ドキュメント（4コミットに分割） |
 | 2026-08-18 | react-router-dom v7へのメジャー移行 | 作業報告書: `docs/作業報告_2026-08-18_2.md` 参照。[PR #18](https://github.com/Shoichiro12/rakuten-kpi-app/pull/18) マージ（`f22a854`）で本番反映済み。npm audit 2件→0件（フロント依存の残件すべて解消） |
+| 2026-08-24 | 週次セキュリティチェック（f22a854..main 42コミット精査） | 報告書: `security/security_check_2026-08-24.md`。前回指摘4件はすべて維持（退行なし）。新規テーブル追加なし（既存テーブルへの`is_sample`/`archived_at`列追加のみ）でRLS適用漏れなし。新規指摘2件（CSVインジェクション対策欠如=中、新設CSVインポートのサイズ上限欠如=低）。`npm audit`0件・`pip-audit`0件（環境に無かったため今回導入）、`npm run build`型エラー0、`from main import app`OK、秘密情報の残置なしを実測 |
 
 ## RLS（行レベルセキュリティ）について
 
