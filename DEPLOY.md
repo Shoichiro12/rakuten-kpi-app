@@ -51,8 +51,10 @@ git push -u origin main
 
 ## ステップ3: Render でデプロイ
 
+**⚠️ 2026-08-24時点の実態: 本番サービスはBlueprint（render.yaml）ではなく、Renderダッシュボードで手動作成したWeb Serviceとして運用されている。** かつて存在した `render.yaml` は実在しない旧サービス（サービス名・プランとも実態と食い違っていた）の定義だったため削除済み。新規に環境を作る場合は以下を「New → Web Service」で手動指定すること（Runtime: Docker / Region: Singapore / Plan: Starter以上 / Health Check Path: `/api/health`）。
+
 1. https://render.com に登録 → GitHub連携。
-2. **New → Blueprint** でこのリポジトリを選択（`render.yaml` が読まれる）。
+2. **New → Web Service** でこのリポジトリを選択。
 3. 環境変数（`sync:false` のもの）をダッシュボードで設定:
    - `DATABASE_URL`           = ステップ1-3 の psycopg 接続文字列
    - `SUPABASE_JWT_SECRET`    = ステップ1-2 の JWT Secret
