@@ -14,7 +14,7 @@ Thumbs.db
 .env
 .env.*
 
-# AIエージェント用スキル（npx skills add で導入・第三者コンテンツのためコミットしない）
+# AIエージェント用スキル（npx skills add / typeui.sh で導入・第三者コンテンツのためコミットしない）
 .agents/
-.claude/skills/
+.claude/skills/design-system/
 skills-lock.json
