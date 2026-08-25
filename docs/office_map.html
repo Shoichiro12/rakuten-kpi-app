@@ -171,6 +171,9 @@
   }
   .quest .stamp.wait{color:var(--shu)}
   .quest .stamp.later{color:var(--ai)}
+  .quest .stamp.kouho{color:var(--hai)}
+  .quest.kouho{background:#e7e2d6;color:#5c564c;border-left-color:var(--hai)}
+  .quest.kouho .qmeta{color:#6b6459}
 
   /* 評定の間（メッセージ窓） */
   .msgwin{
@@ -433,10 +436,11 @@ const r2=document.getElementById("rooms2f"), r1=document.getElementById("rooms1f
 AGENTS.forEach(a=>{(a.floor===2?r2:r1).appendChild(cardHTML(a));});
 
 const qwrap=document.getElementById("quests");
+const STAMP_LABEL = {wait:"急務", later:"後日", kouho:"候補"};
 QUESTS.forEach(q=>{
   const d=document.createElement("div");
-  d.className="quest"+(q.sealed?" sealed":"");
-  d.innerHTML=`<span class="stamp ${q.stamp}">${q.stamp==="wait"?"急務":"後日"}</span>
+  d.className="quest"+(q.sealed?" sealed":"")+(q.stamp==="kouho"?" kouho":"");
+  d.innerHTML=`<span class="stamp ${q.stamp}">${STAMP_LABEL[q.stamp]||q.stamp}</span>
     <div class="qtitle">一、${q.t}</div><div class="qmeta">${q.m}</div>`;
   qwrap.appendChild(d);
 });
