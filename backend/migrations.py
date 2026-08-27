@@ -47,6 +47,10 @@ _USER_SCOPED_TABLES = {
     "genre_benchmarks": [("uq_genre_benchmark", ("genre_u1", "genre_u2", "genre_u3", "metric"))],
     # アイテム別目標（アクション提案ロジック 3-B''。第3段階）
     "item_targets": [("uq_item_target", ("management_no", "year_month"))],
+    # 管理者閲覧セッション（監査ログ。ユニーク制約なし。user_id 列・インデックスの
+    # 冪等付与とRLS対象化のため登録。session_token_hash のunique制約は
+    # モデル定義のColumn(unique=True)がcreate_all時に作るので別途ここでは扱わない）
+    "admin_view_sessions": [],
 }
 
 

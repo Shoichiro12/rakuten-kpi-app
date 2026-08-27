@@ -477,3 +477,29 @@ class Feedback(Base, UserScopedMixin):
     user_agent = Column(String)              # ブラウザ情報（不具合の再現用）
     status = Column(String, default="new")   # new / triaged / done（今は new 固定・将来の管理用）
     created_at = Column(DateTime, default=func.now())
+
+
+class AdminViewSession(Base, UserScopedMixin):
+    """管理者による顧客アカウントの閲覧セッション（監査ログ）。
+
+    計画書 docs/jisso_keikaku_admin_viewer_2026-08-26.md 区切り2。
+
+    UserScopedMixin の user_id は「閲覧を行った管理者自身のID」を表す
+    （通常のtenancy運用と同じ意味）。対象顧客は user_id とは別に target_user_id 列で
+    持つ（こちらはtenancyの絞り込み対象ではない、単なる識別子）。
+
+    sample_data.py の対象にはしない（店舗のKPIデータではなく管理者の運用ログのため。
+    評定Q4で確定。is_sample 列も持たない）。
+    """
+    __tablename__ = "admin_view_sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    admin_email = Column(String)            # 開始時点のメールを保存（読みやすさのため）
+    target_user_id = Column(String, index=True, nullable=False)
+    target_email = Column(String)           # 開始時点のメールを保存（退会等で後から引けなくなる対策）
+    session_token_hash = Column(String, index=True, unique=True)  # 生トークンはDBに保存しない
+    started_at = Column(DateTime, default=func.now())
+    ended_at = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=False)   # 自動失効（安全網）
+    ip_address = Column(String, nullable=True)
+    user_agent = Column(String, nullable=True)

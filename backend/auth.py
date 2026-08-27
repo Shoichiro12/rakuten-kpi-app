@@ -27,7 +27,9 @@ from typing import Optional
 
 from fastapi import HTTPException, Request
 from starlette.concurrency import run_in_threadpool
+from starlette.responses import JSONResponse
 
+import admin_view
 from tenancy import current_user_id
 
 logger = logging.getLogger("auth")
@@ -150,6 +152,23 @@ class UserContextMiddleware:
       せずに使えるようにする。
     - トークンが無い/無効でもここでは 401 にしない（公開エンドポイントを壊さないため）。
       認可の強制は従来どおり get_current_user（各 /api ルーターの依存関係）が行う。
+
+    管理者閲覧モード（view-as。計画書 docs/jisso_keikaku_admin_viewer_2026-08-26.md 区切り2）:
+    - リクエストに X-Admin-View-Session ヘッダがあり、かつ Authorization の本人が
+      現時点でも管理者（admin_guard.is_admin_user_id）であれば、そのヘッダの
+      トークンに対応する有効な閲覧セッションを検索する。
+    - 見つかれば、GET/HEAD/OPTIONS 以外は 403（読み取り専用）で即座に終了し、
+      アプリ本体を一切呼ばない。GET/HEAD/OPTIONS なら current_user_id を
+      「管理者自身のID」ではなく「対象ユーザーのID」に上書きする。これにより
+      既存の _paid エンドポイント群（ダッシュボード・GAP分析等）は無改修のまま、
+      対象アカウントのデータを返すようになる。
+    - トークンが不正・期限切れ・管理者資格の喪失等で解決できなければ 401（サイレントに
+      管理者自身のデータへフォールバックしない。フロントが「閲覧セッションが切れました」
+      と案内できるようにするため）。
+    - 管理者自身の管理系エンドポイント（/api/admin/*。セッションの発行・終了・履歴）は
+      この上書きの対象外にする。閲覧モード中でも「閲覧を終了」操作自体がブロックされる
+      デッドロックを避けるため（フロントの X-Admin-View-Session ヘッダは自動付与のため、
+      対象を絞らないと自分自身の管理操作まで読み取り専用扱いになってしまう）。
     """
 
     def __init__(self, app):
@@ -163,12 +182,14 @@ class UserContextMiddleware:
         user: Optional[AuthUser] = None
         error = "認証が必要です。ログインしてください。"
 
-        raw = b""
+        raw_auth = b""
+        raw_view_session = b""
         for key, value in scope.get("headers") or []:
             if key == b"authorization":
-                raw = value
-                break
-        header = raw.decode("latin-1")
+                raw_auth = value
+            elif key == b"x-admin-view-session":
+                raw_view_session = value
+        header = raw_auth.decode("latin-1")
         if header.startswith("Bearer "):
             token = header[7:].strip()
             try:
@@ -183,7 +204,44 @@ class UserContextMiddleware:
         state["auth_user"] = user
         state["auth_error"] = None if user else error
 
-        ctx_token = current_user_id.set(user.id if user else None)
+        effective_user_id = user.id if user else None
+
+        view_token = raw_view_session.decode("latin-1").strip()
+        path = scope.get("path", "")
+        if view_token and not path.startswith("/api/admin"):
+            from admin_guard import is_admin_user_id  # 循環import回避（admin_guardはauthに依存）
+
+            if user is None or not is_admin_user_id(user.id):
+                # 管理者資格を偽ってヘッダだけ付けても通さない。サイレントに
+                # 通常ユーザーとしてフォールバックもしない（意図が読み取れないため401）。
+                await JSONResponse(
+                    {"detail": "認証が必要です。ログインしてください。" if user is None
+                               else "管理者権限がありません。"},
+                    status_code=401 if user is None else 403,
+                )(scope, receive, send)
+                return
+
+            target_user_id = await run_in_threadpool(
+                admin_view.resolve_target_user_id, user.id, view_token
+            )
+            if target_user_id is None:
+                await JSONResponse(
+                    {"detail": "閲覧セッションが無効です。再度開始してください。"},
+                    status_code=401,
+                )(scope, receive, send)
+                return
+
+            method = scope.get("method", "GET")
+            if method not in ("GET", "HEAD", "OPTIONS"):
+                await JSONResponse(
+                    {"detail": "閲覧モードは読み取り専用です。保存・削除はできません。"},
+                    status_code=403,
+                )(scope, receive, send)
+                return
+
+            effective_user_id = target_user_id
+
+        ctx_token = current_user_id.set(effective_user_id)
         try:
             await self.app(scope, receive, send)
         finally:
