@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from csv_utils import csv_safe_cell
 from database import get_db
 from models import GenreBenchmark, Product, ProductCategory, ProductCost, Shop
 from masters import (
@@ -391,7 +392,11 @@ def export_categories(db: Session = Depends(get_db)):
     writer = csv.writer(buf, lineterminator="\r\n")
     writer.writerow(_CATEGORY_CSV_HEADER)
     for c in rows:
-        writer.writerow([c.genre_u1 or "", c.genre_u2 or "", c.genre_u3 or ""])
+        writer.writerow([
+            csv_safe_cell(c.genre_u1 or ""),
+            csv_safe_cell(c.genre_u2 or ""),
+            csv_safe_cell(c.genre_u3 or ""),
+        ])
     buf.seek(0)
     disposition = (
         "attachment; filename=\"category_master.csv\"; "
@@ -472,10 +477,10 @@ def export_master_products(db: Session = Depends(get_db)):
         rate = cost_map.get(p.management_no)
         rows.append([
             p.management_no,
-            p.product_name or "",
-            (cat.genre_u1 if cat else "") or "",
-            (cat.genre_u2 if cat else "") or "",
-            (cat.genre_u3 if cat else "") or "",
+            csv_safe_cell(p.product_name or ""),
+            csv_safe_cell((cat.genre_u1 if cat else "") or ""),
+            csv_safe_cell((cat.genre_u2 if cat else "") or ""),
+            csv_safe_cell((cat.genre_u3 if cat else "") or ""),
             round(rate * 100) if rate is not None else "",
             "稼働中" if p.is_active else "廃盤",
         ])

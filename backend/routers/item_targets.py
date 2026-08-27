@@ -16,6 +16,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from csv_utils import csv_safe_cell
 from database import get_db
 from models import ItemTarget, MonthlyItemSales, Product, ProductCategory
 from masters import inactive_management_nos
@@ -290,7 +291,7 @@ def export_item_targets(
         writer.writerow([
             ym,
             t.management_no,
-            (p.product_name if p else "") or "",
+            csv_safe_cell((p.product_name if p else "") or ""),
             t.target_sales,
             t.target_cvr if t.target_cvr is not None else "",
             t.target_av if t.target_av is not None else "",
