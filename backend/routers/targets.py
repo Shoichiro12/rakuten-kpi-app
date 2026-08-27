@@ -55,7 +55,11 @@ _TARGET_CSV_HEADER = ["年月", "目標売上", "目標アクセス(UU)", "目�
 
 @router.get("/export")
 def export_targets(db: Session = Depends(get_db)):
-    """目標マスタをCSV（BOM付きUTF-8）でエクスポートする。削除済みは含めない。"""
+    """目標マスタをCSV（BOM付きUTF-8）でエクスポートする。削除済みは含めない。
+
+    列はすべて数値のためCSVインジェクション対策（csv_safe_cell）は不要。
+    自由入力列を追加する場合は必ず csv_safe_cell() を通すこと（CLAUDE.md マスタCRUD規約参照）。
+    """
     rows = db.query(Target).filter(Target.archived_at.is_(None)).order_by(Target.year_month).all()
     buf = io.StringIO()
     buf.write("﻿")

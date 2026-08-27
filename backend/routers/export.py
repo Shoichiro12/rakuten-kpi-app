@@ -17,6 +17,7 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from csv_utils import csv_safe_cell
 from database import get_db
 from routers.dashboard import get_dashboard
 from routers.products import list_products
@@ -141,8 +142,8 @@ def export_products(
     for p in products:
         rows.append([
             p.get("management_no", ""),
-            p.get("product_name", ""),
-            p.get("genre", ""),
+            csv_safe_cell(p.get("product_name", "")),
+            csv_safe_cell(p.get("genre", "")),
             _fmt(p.get("gross")),
             _fmt(p.get("gp")),
             _fmt(p.get("gpr")),
