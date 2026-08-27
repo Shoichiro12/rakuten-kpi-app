@@ -272,7 +272,7 @@
 // ============================================================
 const STATUS = [
   {label:"領国", value:"安泰（本番稼働中）", cls:"ok"},
-  {label:"評定", value:"PR #58御裁可のこと", cls:""},
+  {label:"評定", value:"PR #61御裁可のこと", cls:""},
   {label:"守り", value:"8/24検分 高0", cls:"ok"},
   {label:"軍費", value:"月 約$33", cls:""},
 ];
@@ -302,7 +302,7 @@ const AGENTS = [
    stats:{知略:80, 武勇:60}, cmds:["/release-check"]},
   {floor:1, id:"security", name:"セキュリティ室", yaku:"御庭番", job:"security",
    gear:"ninja", kimono:"#3a3230",
-   talk:"七日ごとに城の守りを検め、security/ に書き残しており申す。\n八月二十四日の検分、「高」は無し。\nされどCSVインジェクションの手薄な口が広がったは気掛かり。\n油断は禁物にござる。",
+   talk:"七日ごとに城の守りを検め、security/ に書き残しており申す。\n八月二十四日の検分、「高」は無し。\n気掛かりであったCSVインジェクションの手薄な口は、\n二十七日に無害化を施し塞ぎ申した。次なる検分は三十一日。",
    stats:{知略:92, 武勇:45}, cmds:["/security-check"]},
   {floor:1, id:"designer", name:"デザイン部", yaku:"意匠奉行", job:"designer",
    gear:"hime", kimono:"#8f4a63",
@@ -328,7 +328,7 @@ const AGENTS = [
 
 const QUESTS = [
   {t:"lp/README.mdの陳腐化のこと", m:"優先度低 / 8/26急務へ昇格・実装まで可", stamp:"wait"},
-  {t:"管理者閲覧機能のこと", m:"区切り4・5はマージ済み（PR #53/#54） / 区切り1・2・3・6は未着手（対話セッションで実施予定）", stamp:"wait"},
+  {t:"管理者閲覧機能のこと", m:"区切り1・2・4・5はマージ済み（PR #59/#53/#54） / 区切り3はCowork委任指示書・区切り6は実機確認一覧を用意済み・ともに未着手", stamp:"wait"},
   {t:"四万SKU取込 実測のこと", m:"約定により資料入手は十月朔日以降", stamp:"later", sealed:true},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
