@@ -31,9 +31,10 @@ from database import engine, get_db, SessionLocal
 import models
 from models import RppWeekly, MonthlyItemSales, MonthlyAnalysis, Target, RppSales, InventoryStatus, Shop
 from sample_data import generate_sample_data, delete_sample_data
-from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account, rpp_diagnosis, recommendations, costs, masters, inventory, billing, consulting, feedback, item_targets, revenue_plan
+from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account, rpp_diagnosis, recommendations, costs, masters, inventory, billing, consulting, feedback, item_targets, revenue_plan, admin
 from auth import get_current_user, AuthUser, UserContextMiddleware
 from subscription_guard import require_active_subscription
+from admin_guard import require_admin
 from migrations import run_migrations
 
 models.Base.metadata.create_all(bind=engine)
@@ -178,6 +179,13 @@ app.include_router(consulting.router, dependencies=_auth)   # 問い合わせは
 app.include_router(feedback.router, dependencies=_auth)     # フィードバックも同様
 # Stripe Webhook は Stripe サーバーが叩くため認証を付けない（署名検証で正当性を担保）
 app.include_router(billing.webhook_router)
+
+# 管理者専用（_paid にも _auth 単体にも属さない第3のグループ。契約状態と無関係）。
+# require_admin は内部で get_current_user に依存するため実質 _auth と同じ検証を含むが、
+# 他のグループ（_paid 等）と同じ「_auth + 追加ガード」の形に揃えておく
+# （FastAPI は同一 callable への依存を1リクエスト内でキャッシュするため二重評価にはならない）。
+_admin = _auth + [Depends(require_admin)]
+app.include_router(admin.router, dependencies=_admin)
 
 
 # 例外の詳細をクライアントに返すかどうか（セキュリティ報告書 2026-08-03）。
