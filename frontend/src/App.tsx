@@ -19,6 +19,8 @@ import RppAnalysis from './pages/RppAnalysis'
 import Reports from './pages/Reports'
 import AccountSettings from './pages/AccountSettings'
 import ResetPassword from './pages/ResetPassword'
+import AdminAccounts from './pages/AdminAccounts'
+import AdminViewBanner from './components/layout/AdminViewBanner'
 import { supabase, authEnabled } from './lib/supabase'
 
 /**
@@ -47,6 +49,8 @@ function AppRoutes({ userEmail }: { userEmail: string | null }) {
         <Route path="/rpp" element={<RppAnalysis />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/account" element={<AccountSettings userEmail={userEmail} />} />
+        {/* 管理者専用（直接URLでアクセスする運用。サイドバーには載せない＝評定Q3） */}
+        <Route path="/admin" element={<AdminAccounts />} />
       </Routes>
     </ErrorBoundary>
   )
@@ -123,6 +127,13 @@ export default function App() {
 
   return (
     <BrowserRouter>
+      {/* 管理者閲覧モードのバナーはレイアウトの外側（この列コンテナ）に置く。
+          閲覧中だけ上に帯が出て、その分だけ下の枠（サイドバー＋本文）が縮む。
+          下の枠は h-screen → flex-1 min-h-0 に変えただけで、relative / overflow-hidden の
+          役割（下記コメント）はそのまま。fixed の帯で重ねる案は、サイドバーのロゴ行や
+          各ページの Header が帯の下に隠れるため採らなかった。 */}
+      <div className="flex h-screen flex-col">
+      <AdminViewBanner />
       {/* relative は必須。外すとページ自体にスクロールバーが出る。
           `sr-only`（Tailwind）は position:absolute なので、包含ブロックを持つ
           位置指定の祖先が無いと ICB（＝ビューポート）基準になり、この
@@ -130,7 +141,7 @@ export default function App() {
           実際 GAP分析では Delta.tsx の読み上げ用スパン（「減少」）が本文の奥にあるため
           静的位置が y=1329 まで下がり、h-screen なのに 530px ぶん本文がスクロールする
           ＝画面右端のスクロールバーが1本余分に見える状態になっていた（2026-08-05 実測）。 */}
-      <div className="relative flex h-screen overflow-hidden bg-gray-50">
+      <div className="relative flex flex-1 min-h-0 overflow-hidden bg-gray-50">
         {/* 本文へスキップ（キーボード操作の入口）。
             サイドバーのナビは項目が多く、Tabだけで本文（GAP分析の改善ボタン等）に
             届くまで十数回かかる。DOM上の最初のフォーカス可能要素をここに置くことで、
@@ -164,6 +175,7 @@ export default function App() {
           </div>
           <Footer />
         </main>
+      </div>
       </div>
 
       {showOnboarding && (

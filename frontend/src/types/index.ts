@@ -1058,3 +1058,41 @@ export interface OutcomesResponse {
   /** この件数未満は提案順位に反映しない（偶然を学習しないため） */
   min_sample_for_weight: number
 }
+
+/* ─── 管理者閲覧機能（計画書 docs/jisso_keikaku_admin_viewer_2026-08-26.md 区切り3） ───
+ * バックエンド（backend/routers/admin.py）は Python/snake_case のまま返す。フィールド名は
+ * 指示書 docs/cowork_shiji_admin_viewer_ku3_frontend_2026-08-28.md の APIコントラクト節が正。 */
+
+export interface AdminAccountRow {
+  user_id: string
+  email: string | null
+  created_at: string | null       // ISO8601
+  last_sign_in_at: string | null  // ISO8601 or null（未ログイン）
+  shop_name: string | null
+  subscription_status: string | null  // 'trialing' | 'active' | 'past_due' | 'unpaid' | 'canceled' | null
+  has_data: boolean
+  rpp_rows: number
+  monthly_rows: number
+}
+
+export interface AdminAccountsResponse {
+  accounts: AdminAccountRow[]
+  /** false = Supabase Admin API未設定（0件表示ではなく案内を出す。501ではなく200で返る設計） */
+  configured: boolean
+  count: number
+}
+
+export interface AdminViewSessionRecord {
+  id: number
+  admin_email: string | null
+  target_user_id: string
+  target_email: string | null
+  started_at: string | null   // ISO8601
+  ended_at: string | null     // ISO8601 or null（未終了）
+  expires_at: string          // ISO8601
+}
+
+export interface AdminViewSessionStart extends AdminViewSessionRecord {
+  /** セッション開始のレスポンスでのみ返る。他のどのAPIも生トークンは返さない */
+  session_token: string
+}
