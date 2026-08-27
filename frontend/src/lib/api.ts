@@ -1,11 +1,22 @@
 import { getAccessToken } from './supabase'
+import { getViewToken, clearViewSession } from './adminView'
 
 const BASE = '/api'
 
-/** ログイン中なら Authorization ヘッダを返す（未ログイン/認証無効なら空）。 */
+/**
+ * ログイン中なら Authorization ヘッダを返す（未ログイン/認証無効なら空）。
+ *
+ * 管理者閲覧モード中（lib/adminView.ts にセッションがある間）は X-Admin-View-Session も
+ * 付ける。サーバーはこのヘッダの有無だけで「対象アカウントのデータで処理する・GET以外は
+ * 403」を切り替える（backend/auth.py UserContextMiddleware）。request() と downloadCsv()
+ * の両方がここを通るので、個々のAPI呼び出し側は閲覧モードを意識しなくてよい。
+ */
 async function authHeaders(): Promise<Record<string, string>> {
   const token = await getAccessToken()
-  return token ? { Authorization: `Bearer ${token}` } : {}
+  const headers: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {}
+  const viewToken = getViewToken()
+  if (viewToken) headers['X-Admin-View-Session'] = viewToken
+  return headers
 }
 
 /* ─── RPP API パラメータ型 ────────────────────────────────── */
@@ -75,6 +86,13 @@ async function parseJson(
     if (res.status === 402 && !window.location.pathname.startsWith('/billing')) {
       console.warn('[API] 402 未契約のため /billing へ誘導:', msg)
       window.location.href = '/billing'
+    }
+    // 401「閲覧セッションが無効です」= 管理者閲覧モードのトークンが失効・終了済み
+    // （backend/auth.py UserContextMiddleware）。ローカルの閲覧状態を消してバナーを畳む。
+    // 消さないと以降のすべてのAPIが同じ401で止まり続ける。エラー自体は従来どおり throw する
+    if (res.status === 401 && typeof msg === 'string' && msg.startsWith('閲覧セッションが無効です')) {
+      console.warn('[API] 閲覧セッションが無効のため閲覧モードを解除します')
+      clearViewSession()
     }
     console.error(`[API] HTTPエラー ${res.status} ${res.url}:`, msg)
     throw new Error(msg)
@@ -647,5 +665,23 @@ export const api = {
       return request<import('../types').ActionSummaryResponse>(`/actions/summary?${q.toString()}`)
         .then((d) => d ?? { scope, genre: null, year_month: null, count: 0, items: [] })
     },
+  },
+  /* ─── 管理者閲覧機能（区切り1・2はバックエンド実装済み。PR #59） ─────── */
+  admin: {
+    /** 登録アカウント一覧 */
+    accounts: () =>
+      request<import('../types').AdminAccountsResponse>('/admin/accounts'),
+    /** 閲覧セッションを開始する */
+    startViewSession: (targetUserId: string) =>
+      request<import('../types').AdminViewSessionStart>('/admin/view-sessions', {
+        method: 'POST',
+        body: JSON.stringify({ target_user_id: targetUserId }),
+      }),
+    /** 閲覧セッションを終了する（閲覧モード中でも /api/admin/* は読み取り専用の対象外なので成功する） */
+    endViewSession: (sessionId: number) =>
+      request<import('../types').AdminViewSessionRecord>(`/admin/view-sessions/${sessionId}/end`, { method: 'POST' }),
+    /** 閲覧セッション履歴（監査ログの確認用） */
+    viewSessions: () =>
+      request<{ sessions: import('../types').AdminViewSessionRecord[] }>('/admin/view-sessions'),
   },
 }
