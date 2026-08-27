@@ -272,7 +272,7 @@
 // ============================================================
 const STATUS = [
   {label:"領国", value:"安泰（本番稼働中）", cls:"ok"},
-  {label:"評定", value:"議案なし", cls:"ok"},
+  {label:"評定", value:"PR #68御裁可のこと", cls:""},
   {label:"守り", value:"8/24検分 高0", cls:"ok"},
   {label:"軍費", value:"月 約$33", cls:""},
 ];
@@ -329,7 +329,6 @@ const AGENTS = [
 const QUESTS = [
   {t:"マスタ削除の一括化と未分類フローのこと", m:"評定確定・kpi-analystレビュー完了（実測追試済み）。区切り1(API)→区切り2(UI)→区切り3(未分類表示)の順で夜勤対象。計画書 docs/jisso_keikaku_master_bulk_delete_2026-08-28.md", stamp:"wait"},
   {t:"lp/README.mdの陳腐化のこと", m:"優先度低 / 8/26急務へ昇格・実装まで可", stamp:"wait"},
-  {t:"管理者閲覧機能のこと", m:"区切り1〜5はマージ済み（PR #59/#66/#53/#54）。残るは区切り6の本番実機確認のみ（docs/honban_kakunin_admin_viewer_ku6_2026-08-28.md）", stamp:"wait"},
   {t:"バックエンド日時レスポンスのnaive UTC文字列のこと", m:"管理者閲覧機能ku3受け入れ時に発見。フロントのparseServerDate()で個別対症済み、API側のISO8601 Z付き標準化は未検討", stamp:"kouho"},
   {t:"四万SKU取込 実測のこと", m:"約定により資料入手は十月朔日以降", stamp:"later", sealed:true},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
