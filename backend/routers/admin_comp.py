@@ -16,7 +16,7 @@ import logging
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
@@ -39,23 +39,7 @@ _STRIPE_LIVE_STATUSES = ("trialing", "active", "past_due", "unpaid")
 
 class CompGrantRequest(BaseModel):
     email: str
-    note: str = Field(min_length=1)
-
-    @field_validator("email")
-    @classmethod
-    def _normalize_email(cls, v: str) -> str:
-        v = (v or "").strip().lower()
-        if not v or "@" not in v:
-            raise ValueError("メールアドレスの形式が正しくありません。")
-        return v
-
-    @field_validator("note")
-    @classmethod
-    def _strip_note(cls, v: str) -> str:
-        v = (v or "").strip()
-        if not v:
-            raise ValueError("付与理由（note）を入力してください。")
-        return v
+    note: str
 
 
 def _grant_out(g: CompGrant) -> dict:
@@ -98,9 +82,20 @@ def create_comp_grant(
     既存アカウント（Supabase Auth に実在）なら即時に Subscription.status を
     "comp" へ書き換える（パターンA）。未登録メールなら CompGrant だけ保存し、
     本人の初回リクエストで確定させる（パターンB。billing.resolve_pending_comp_grant）。
+
+    email/note の検証は Pydantic の field_validator ではなく手動チェックで行う
+    （routers/consulting.py・feedback.py と同じ方式に統一）。field_validator が
+    ValueError を送出すると FastAPI は detail が配列のバリデーションエラー形式で
+    422 を返し、フロントの parseJson() がそのまま Error(msg) すると
+    「[object Object]」のような壊れた表示になる。手動チェックなら detail は
+    常に文字列で、他のAPIと同じエラー表示の扱いができる。
     """
-    email = body.email
-    note = body.note
+    email = (body.email or "").strip().lower()
+    note = (body.note or "").strip()
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="メールアドレスの形式が正しくありません。")
+    if not note:
+        raise HTTPException(status_code=400, detail="付与理由（note）を入力してください。")
 
     # 重複付与は冪等に扱う（新しい行を作らず、既存の有効な付与をそのまま返す）。
     existing = (
