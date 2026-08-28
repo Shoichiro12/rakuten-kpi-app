@@ -503,3 +503,37 @@ class AdminViewSession(Base, UserScopedMixin):
     expires_at = Column(DateTime, nullable=False)   # 自動失効（安全網）
     ip_address = Column(String, nullable=True)
     user_agent = Column(String, nullable=True)
+
+
+class CompGrant(Base, UserScopedMixin):
+    """無償提供（comp）の付与状態。メールをキーに管理者が付与・解除する。
+
+    計画書 docs/jisso_keikaku_comp_management_2026-08-28.md §5・評定Q6。
+
+    UserScopedMixin の user_id は「付与操作を行った管理者自身のID」を表す
+    （AdminViewSession と同じ意味）。対象は email 列で持つ（target_user_id では
+    なく email をキーにするのは、Supabase側にアカウントがまだ無い状態＝
+    先行登録でも保存できるようにするため）。実際に紐付く Supabase ユーザーが
+    判明した時点で target_user_id を埋める（解決タイミングは billing.py
+    resolve_pending_comp_grant 参照）。
+
+    1つの email につき複数回の 付与→解除→再付与 が起こり得るため、行を
+    使い回さず、都度 INSERT する（マスタCRUD規約の archived_at 復活方式とは
+    異なる。あちらは「削除済み行の復元」だが、こちらは「独立した1回の意思
+    決定の記録」を毎回積み重ねる監査ログの性質が強いため）。「現在有効な
+    付与」は revoked_at IS NULL の行で判定する。
+
+    sample_data.py の対象にはしない（AdminViewSession と同じ理由。評定Q7）。
+    """
+    __tablename__ = "comp_grants"
+
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, nullable=False, index=True)          # 正規化: strip().lower()
+    target_user_id = Column(String, index=True, nullable=True)  # 解決後に埋まる（先行登録は当面NULL）
+    granted_by_email = Column(String)              # 付与した管理者のメール（読みやすさのため保存）
+    granted_at = Column(DateTime, default=func.now())
+    revoked_at = Column(DateTime, nullable=True)    # 解除済みならセット
+    revoked_by_email = Column(String, nullable=True)
+    # 付与理由の自由記述。評定Q6で必須に確定（nullable=False）。短文でよいが、
+    # 「なぜ無償か」を後から追えなくする放置事故（EXEMPT_TEST_EMAILSと同じ教訓）を防ぐため。
+    note = Column(String, nullable=False)

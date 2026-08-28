@@ -31,7 +31,8 @@ router = APIRouter(prefix="/api/billing", tags=["billing"])
 # 認証なし（Stripe が叩く Webhook 専用）。main.py で _auth を付けずに登録する。
 webhook_router = APIRouter(prefix="/api/stripe", tags=["billing"])
 
-_ACTIVE_STATUSES = ("trialing", "active")
+# "comp" = 管理画面から付与する無償提供（計画書 docs/jisso_keikaku_comp_management_2026-08-28.md）。
+_ACTIVE_STATUSES = ("trialing", "active", "comp")
 
 _log = logging.getLogger("billing")
 
@@ -57,7 +58,13 @@ def _sub_dict(s) -> dict:
 
 @router.get("/status")
 def billing_status(db: Session = Depends(get_db), _u: AuthUser = Depends(get_current_user)):
-    """現在のユーザーの契約状態。未契約でも200で {is_active:false} を返す。"""
+    """現在のユーザーの契約状態。未契約でも200で {is_active:false} を返す。
+
+    先行登録された無償提供（comp）があれば、ここで確定させる
+    （Billing.tsx がマウント時に必ず呼ぶため、解決ポイントとして採用。
+    計画書 docs/jisso_keikaku_comp_management_2026-08-28.md §6-3）。
+    """
+    B.resolve_pending_comp_grant(db, _u)
     s = db.query(Subscription).first()
     return {"enabled": B.BILLING_ENABLED, **_sub_dict(s)}
 
@@ -122,6 +129,20 @@ def create_checkout(
     （Stripe停止中の一時措置）は Stripe Checkout を通さず trialing を直接作成する
     （下の分岐参照）。それ以外の通常ユーザーの流れは変えない。
     """
+    # 先行登録された無償提供（comp）があれば確定させる（billing_status() と同じ理由の
+    # 保険としての二重化。billing_status() で解決済みなら何もしない＝冪等）。
+    B.resolve_pending_comp_grant(db, user)
+
+    # 無償提供（comp）中は Checkout を作らせない（決済不要なため）。
+    # 計画書 docs/jisso_keikaku_comp_management_2026-08-28.md の追加検証②・
+    # オーナー確定（2026-08-28・選択肢2）: Stripe API を呼ぶ前に遮断する。
+    _comp_check = db.query(Subscription).first()
+    if _comp_check and _comp_check.status == "comp":
+        raise HTTPException(
+            status_code=409,
+            detail="無償提供の適用中のため、お支払い手続きは不要です。",
+        )
+
     # ── カード登録をスキップして trialing を直接作る分岐 ────────────────
     #   (1) EXEMPT_TEST_EMAILS（2026-07-30）… 社内の検証・デモ用アカウント。
     #       カード登録ができず、カード必須化以降ログイン後の画面を確認できなくなったため。

@@ -51,6 +51,9 @@ _USER_SCOPED_TABLES = {
     # 冪等付与とRLS対象化のため登録。session_token_hash のunique制約は
     # モデル定義のColumn(unique=True)がcreate_all時に作るので別途ここでは扱わない）
     "admin_view_sessions": [],
+    # 無償提供（comp）の付与・解除ログ（監査ログ。ユニーク制約なし。admin_view_sessions と
+    # 同じ理由でユニーク制約を設けない＝同一メールへの複数回の付与・解除サイクルを許すため）
+    "comp_grants": [],
 }
 
 

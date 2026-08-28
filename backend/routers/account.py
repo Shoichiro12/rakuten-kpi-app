@@ -10,8 +10,10 @@ SUPABASE_SERVICE_ROLE_KEY。Supabase: Settings → API → service_role）。
 """
 import logging
 import urllib.error
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 import supabase_admin
@@ -104,6 +106,24 @@ def delete_account(user: AuthUser = Depends(get_current_user), db: Session = Dep
     deleted = 0
     for model in _ALL_MODELS:
         deleted += db.query(model).filter(model.user_id == user.id).delete()
+
+    # 1.5 有効な無償提供（comp）があれば解除する（計画書
+    #    docs/jisso_keikaku_comp_management_2026-08-28.md §4-3・評定Q5）。
+    #    comp はStripe契約が存在しないため退会ブロックの対象にしていない
+    #    （_BLOCKING_SUB_STATUSES に含めていない）。そのため本人の意思だけで
+    #    退会できてしまい、放置すると CompGrant 台帳に「有効な付与」として残り続け、
+    #    同じメールで再サインアップした瞬間にcompが復活する事故になる。
+    #    CompGrant は付与した管理者の user_id でtenancyスコープされているため、
+    #    退会する本人のクエリでは通常のORMでは見えない＝生SQLでtenancyを迂回する。
+    db.execute(text(
+        "UPDATE comp_grants SET revoked_at = :now, revoked_by_email = :by "
+        "WHERE revoked_at IS NULL AND (target_user_id = :uid OR email = :email)"
+    ), {
+        "now": datetime.utcnow(),
+        "by": "system:account_deleted",
+        "uid": user.id,
+        "email": (user.email or "").strip().lower(),
+    })
     db.commit()
 
     # 2. Supabase Auth のユーザーを削除
