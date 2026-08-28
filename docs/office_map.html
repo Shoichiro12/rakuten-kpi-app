@@ -272,7 +272,7 @@
 // ============================================================
 const STATUS = [
   {label:"領国", value:"安泰（本番稼働中）", cls:"ok"},
-  {label:"評定", value:"PR #60御裁可のこと", cls:""},
+  {label:"評定", value:"議案なし", cls:"ok"},
   {label:"守り", value:"8/24検分 高0", cls:"ok"},
   {label:"軍費", value:"月 約$33", cls:""},
 ];
@@ -328,10 +328,12 @@ const AGENTS = [
 
 const QUESTS = [
   {t:"マスタ削除の一括化と未分類フローのこと", m:"評定確定・kpi-analystレビュー完了（実測追試済み）。区切り1(API)→区切り2(UI)→区切り3(未分類表示)の順で夜勤対象。計画書 docs/jisso_keikaku_master_bulk_delete_2026-08-28.md", stamp:"wait"},
-  {t:"無償提供（comp）管理のこと", m:"区切り1・2（バックエンドAPI・課金ロジック）実装・本番デプロイ確認完了（PR #70。マイグレーション正常・回帰なし・comp_grantsがsecurity-statusでprotected/ok:true）。区切り3（フロント）のCowork指示書を切り出し済み（docs/cowork_shiji_comp_management_ku3_frontend_2026-08-28.md）、実装待ち。demo@の移行は区切り3完成後に画面から実施する方針に変更。計画書 docs/jisso_keikaku_comp_management_2026-08-28.md", stamp:"wait"},
+  {t:"無償提供（comp）管理のこと", m:"区切り1〜3（バックエンドAPI・課金ロジック・フロント）すべてmainに反映済み（PR #70/#72/#73）。区切り3受け入れ中にtenancy誤帰属バグ発見→PR #72で修正、note/emailバリデーションも422→400へ設計復帰。残るは区切り5（本番検証・demo@のcomp移行。docs/honban_kakunin_comp_management_ku5_2026-08-28.md）と区切り4（運用文書更新・legal-financeレビュー）。計画書 docs/jisso_keikaku_comp_management_2026-08-28.md", stamp:"wait"},
   {t:"lp/README.mdの陳腐化のこと", m:"優先度低 / 8/26急務へ昇格・実装まで可", stamp:"wait"},
   {t:"バックエンド日時レスポンスのnaive UTC文字列のこと", m:"管理者閲覧機能ku3受け入れ時に発見。フロントのparseServerDate()で個別対症済み、API側のISO8601 Z付き標準化は未検討", stamp:"kouho"},
   {t:"フォーム入力欄id/name属性のこと", m:"優先度低 / 8/27候補（オーナー発見・軍令帳参照）", stamp:"kouho"},
+  {t:"SupabaseプランのCLAUDE.md記載と実態の食い違いのこと", m:"infra-ops.mdはPro（東京）$25と記載、実態はFREE/NANOの可能性。オーナー実プラン確認が先（軍令帳参照）", stamp:"kouho"},
+  {t:"デプロイ後定型確認のCowork委任化のこと", m:"優先度低・オーナー提案。読み取り専用の確認手順書整備が前提（軍令帳参照）", stamp:"kouho"},
   {t:"四万SKU取込 実測のこと", m:"約定により資料入手は十月朔日以降", stamp:"later", sealed:true},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
