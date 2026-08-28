@@ -141,7 +141,13 @@ def create_comp_grant(
         try:
             s = db.query(Subscription).first()
             if s is None:
-                s = Subscription()
+                # user_id を明示的に指定する（UserScopedMixin.before_flush の自動スタンプに
+                # 任せない）。自動スタンプは実際のflush/commit時点の current_user_id を見るが、
+                # このブロックの commit は下の CompGrant 挿入とまとめて finally より後で
+                # 行っており、その時点では current_user_id は既に管理者自身のIDへ戻っている。
+                # 任せると新規行が「対象ユーザー」ではなく「付与した管理者自身」のものとして
+                # 保存されてしまう（実際に本番デプロイ前の検証で再現した不具合）。
+                s = Subscription(user_id=target_user_id)
                 db.add(s)
             s.plan = B.STANDARD_PLAN
             s.status = "comp"
