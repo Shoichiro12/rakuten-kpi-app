@@ -1096,3 +1096,35 @@ export interface AdminViewSessionStart extends AdminViewSessionRecord {
   /** セッション開始のレスポンスでのみ返る。他のどのAPIも生トークンは返さない */
   session_token: string
 }
+
+/* ─── 無償提供（comp）管理（計画書 docs/jisso_keikaku_comp_management_2026-08-28.md 区切り3） ───
+ * バックエンド（backend/routers/admin_comp.py）は Python/snake_case のまま返す。フィールド名は
+ * 指示書 docs/cowork_shiji_comp_management_ku3_frontend_2026-08-28.md の APIコントラクト節が正。 */
+
+export interface CompGrant {
+  id: number
+  email: string
+  target_user_id: string | null
+  /** target_user_id が確定済みか（false = 先行登録でまだ未サインアップ） */
+  resolved: boolean
+  granted_by_email: string | null
+  granted_at: string // ISO8601
+  revoked_at: string | null
+  revoked_by_email: string | null
+  note: string
+}
+
+export interface CompGrantListResponse {
+  /** 有効な付与のみ（revoked_at が null の行） */
+  grants: CompGrant[]
+}
+
+export interface CompGrantCreateResponse extends CompGrant {
+  /** true = 既に有効な付与があり、新規作成せずそれを返した（冪等） */
+  already_granted: boolean
+}
+
+export interface CompGrantRevokeResponse extends CompGrant {
+  /** true = 対象の Subscription 行を実際に削除した（未契約状態に戻した） */
+  subscription_touched: boolean
+}

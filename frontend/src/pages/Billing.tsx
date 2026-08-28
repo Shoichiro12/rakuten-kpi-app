@@ -14,6 +14,7 @@ const STATUS_LABEL: Record<string, string> = {
   past_due: '支払い遅延',
   canceled: '解約済み',
   incomplete: '手続き未完了',
+  comp: '無償提供',
 }
 
 function fmtDate(iso: string | null): string {
@@ -197,9 +198,15 @@ export default function Billing() {
                   <p className="font-semibold text-gray-900">{status.plan_label ?? status.plan ?? '—'}</p>
                 </div>
                 <div className="bg-gray-50 rounded p-3">
-                  <p className="text-xs text-gray-500">{status.status === 'trialing' ? 'トライアル終了' : '次回更新'}</p>
+                  {/* comp（無償提供）は trial_end / current_period_end とも null のため、
+                      日付を出そうとすると「—」になり見た目がおかしくなる。分岐で防ぐ */}
+                  <p className="text-xs text-gray-500">
+                    {status.status === 'comp' ? '契約期間' : status.status === 'trialing' ? 'トライアル終了' : '次回更新'}
+                  </p>
                   <p className="font-semibold text-gray-900">
-                    {fmtDate(status.status === 'trialing' ? status.trial_end : status.current_period_end)}
+                    {status.status === 'comp'
+                      ? '無償提供中（期間の定めなし）'
+                      : fmtDate(status.status === 'trialing' ? status.trial_end : status.current_period_end)}
                   </p>
                 </div>
               </div>
@@ -242,8 +249,9 @@ export default function Billing() {
           )}
 
           {/* 解約の導線: ポータルではなく問い合わせ経由（受付後2〜3営業日以内に手続き完了）。
-              特商法ページ・利用規約第5条の記載と文言を整合させること。 */}
-          {active && status && (
+              特商法ページ・利用規約第5条の記載と文言を整合させること。
+              comp（無償提供）はStripe契約が存在せず「解約」の概念に当てはまらないため出さない */}
+          {active && status && status.status !== 'comp' && (
             <div className="bg-white rounded-xl border shadow-sm p-6">
               <h3 className="text-sm font-semibold text-gray-800 mb-2">解約をご希望の場合</h3>
               <p className="text-xs text-gray-500 mb-4">

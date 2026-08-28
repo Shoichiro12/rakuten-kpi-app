@@ -683,5 +683,22 @@ export const api = {
     /** 閲覧セッション履歴（監査ログの確認用） */
     viewSessions: () =>
       request<{ sessions: import('../types').AdminViewSessionRecord[] }>('/admin/view-sessions'),
+    /* ─── 無償提供（comp）管理（区切り1・2はバックエンド実装済み。PR #70） ─── */
+    comp: {
+      /** 有効な無償提供の一覧 */
+      list: () =>
+        request<import('../types').CompGrantListResponse>('/admin/comp-grants'),
+      /** 付与する（note必須。空のままの送信はフロント側でボタン無効化して防ぐ） */
+      grant: (email: string, note: string) =>
+        request<import('../types').CompGrantCreateResponse>('/admin/comp-grants', {
+          method: 'POST',
+          body: JSON.stringify({ email, note }),
+        }),
+      /** 解除する */
+      revoke: (grantId: number) =>
+        request<import('../types').CompGrantRevokeResponse>(`/admin/comp-grants/${grantId}/revoke`, {
+          method: 'POST',
+        }),
+    },
   },
 }
