@@ -31,7 +31,7 @@ from database import engine, get_db, SessionLocal
 import models
 from models import RppWeekly, MonthlyItemSales, MonthlyAnalysis, Target, RppSales, InventoryStatus, Shop
 from sample_data import generate_sample_data, delete_sample_data
-from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account, rpp_diagnosis, recommendations, costs, masters, inventory, billing, consulting, feedback, item_targets, revenue_plan, admin
+from routers import dashboard, import_csv, targets, gap_analysis, products, actions, evaluation, export, account, rpp_diagnosis, recommendations, costs, masters, inventory, billing, consulting, feedback, item_targets, revenue_plan, admin, admin_comp
 from auth import get_current_user, AuthUser, UserContextMiddleware
 from subscription_guard import require_active_subscription
 from admin_guard import require_admin
@@ -186,6 +186,7 @@ app.include_router(billing.webhook_router)
 # （FastAPI は同一 callable への依存を1リクエスト内でキャッシュするため二重評価にはならない）。
 _admin = _auth + [Depends(require_admin)]
 app.include_router(admin.router, dependencies=_admin)
+app.include_router(admin_comp.router, dependencies=_admin)
 
 
 # 例外の詳細をクライアントに返すかどうか（セキュリティ報告書 2026-08-03）。

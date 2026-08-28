@@ -21,7 +21,7 @@ subscription_guard.py / billing.py の EXEMPT_TEST_EMAILS と同じ「JWT検証�
 """
 import os
 
-from fastapi import Depends, HTTPException
+from fastapi import Depends, HTTPException, Request
 
 from auth import AUTH_ENABLED, AuthUser, get_current_user
 
@@ -45,3 +45,25 @@ def require_admin(user: AuthUser = Depends(get_current_user)) -> AuthUser:
     if not is_admin_user_id(user.id):
         raise HTTPException(status_code=403, detail="管理者権限がありません。")
     return user
+
+
+def require_admin_write(
+    request: Request,
+    admin: AuthUser = Depends(require_admin),
+) -> AuthUser:
+    """comp管理など、管理者の「書き込み」操作専用のガード。
+
+    計画書 docs/jisso_keikaku_comp_management_2026-08-28.md §2（評定Q4・案A）。
+
+    auth.py の UserContextMiddleware は /api/admin/* を読み取り専用強制の対象外に
+    している（閲覧セッション自体の終了APIがデッドロックしないための意図的な除外）。
+    この除外は「閲覧セッション管理そのもの」にだけ許されるもので、comp付与のような
+    別の書き込み操作まで免除する意図ではない。ここで明示的に閲覧モード中かを
+    再チェックする（ミドルウェアとは独立したレイヤーでの二段構え）。
+    """
+    if request.headers.get("x-admin-view-session"):
+        raise HTTPException(
+            status_code=403,
+            detail="閲覧モード中は無償提供の操作はできません。閲覧を終了してから操作してください。",
+        )
+    return admin

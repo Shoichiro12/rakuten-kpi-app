@@ -26,7 +26,8 @@ from database import get_db
 from models import Subscription
 
 # routers/billing.py の _ACTIVE_STATUSES と同義。循環importを避けるためここに持つ
-ACTIVE_STATUSES = ("trialing", "active")
+# "comp" = 管理画面から付与する無償提供（計画書 docs/jisso_keikaku_comp_management_2026-08-28.md）。
+ACTIVE_STATUSES = ("trialing", "active", "comp")
 
 
 def require_active_subscription(

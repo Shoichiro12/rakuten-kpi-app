@@ -9,6 +9,9 @@ Stripe SDK の初期化を1か所に集約する。秘密鍵はここ（バッ�
 import os
 from typing import Optional
 
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 _SECRET = os.environ.get("STRIPE_SECRET_KEY", "").strip()
 _WEBHOOK_SECRET = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
 _TRIAL_DAYS = int(os.environ.get("STRIPE_TRIAL_DAYS", "14") or 14)
@@ -223,3 +226,51 @@ def configured_plans() -> list:
         for p, price in _PLAN_PRICE.items()
         if price
     ]
+
+
+# ── 無償提供（comp）: 未登録メールへの先行登録を、本人の初回リクエストで確定させる ──
+# 計画書 docs/jisso_keikaku_comp_management_2026-08-28.md §6-3。
+#
+# 呼び出し元は billing_status()（Billing.tsx がマウント時に必ず呼ぶ）と
+# create_checkout()（保険としての二重化。billing_status() で解決済みなら何もしない＝冪等）。
+# require_active_subscription() には持たせない（全ユーザー・全リクエストへの負荷を
+# 避けるため。既存の 402 → /billing リダイレクト導線で十分間に合う）。
+def resolve_pending_comp_grant(db: Session, user) -> None:
+    """先行登録されたcomp付与を、本人の初回リクエストで確定させる。
+
+    対象は「まだ target_user_id が確定していない、有効な CompGrant」のみ。
+    見つからなければ何もしない（毎回のコストは email 完全一致のインデックス
+    付きSELECT 1本のみ）。
+
+    CompGrant テーブル自体への読み書きは生SQLで tenancy を迂回する
+    （この行は「付与した管理者」の所有物として保存されているため、本人からは
+    通常のORMクエリでは見えない）。Subscription 行への書き込みは、実行中の
+    リクエストが本人自身のコンテキストであるため tenancy が自動で本人の行に
+    絞り込む（§6-2のパターンAのような current_user_id.set() の切り替えは不要）。
+    """
+    if not getattr(user, "email", None):
+        return
+    email = user.email.strip().lower()
+    row = db.execute(text(
+        "SELECT id FROM comp_grants WHERE email = :email "
+        "AND revoked_at IS NULL AND target_user_id IS NULL "
+        "ORDER BY granted_at DESC LIMIT 1"
+    ), {"email": email}).fetchone()
+    if row is None:
+        return
+    grant_id = row[0]
+    db.execute(text(
+        "UPDATE comp_grants SET target_user_id = :uid WHERE id = :id"
+    ), {"uid": user.id, "id": grant_id})
+
+    from models import Subscription  # 遅延import（循環import回避）
+
+    s = db.query(Subscription).first()  # 本人自身のリクエストなので tenancy が自動で本人の行に絞込
+    if s is None:
+        s = Subscription()
+        db.add(s)
+    s.plan = STANDARD_PLAN
+    s.status = "comp"
+    s.trial_end = None
+    s.current_period_end = None
+    db.commit()

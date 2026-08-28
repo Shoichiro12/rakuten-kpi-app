@@ -75,6 +75,22 @@ def get_user(user_id: str) -> Optional[dict]:
     return body.get("user") or body
 
 
+def find_user_by_email(email: str) -> Optional[dict]:
+    """メールアドレス完全一致でユーザーを探す（無償提供＝comp管理で利用）。
+
+    Supabase Admin API はバージョンによりメールでの直接フィルタが使えないため、
+    list_users() で全件取得して Python 側で照合する（comp付与は低頻度の管理操作
+    のため、この程度のコストは許容する。account.py の退会と違い高頻度パスではない）。
+    """
+    target = (email or "").strip().lower()
+    if not target:
+        return None
+    for u in list_users():
+        if (u.get("email") or "").strip().lower() == target:
+            return u
+    return None
+
+
 def list_users(per_page: int = 1000) -> list:
     """Supabase Auth の全ユーザーを取得する（1000件超はページングして続ける）。
 
