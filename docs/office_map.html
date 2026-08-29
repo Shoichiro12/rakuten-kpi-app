@@ -327,7 +327,7 @@ const AGENTS = [
 ];
 
 const QUESTS = [
-  {t:"マスタ削除の一括化と未分類フローのこと", m:"区切り1（バックエンドAPI）・区切り2（フロントUIのチェックボックス・一括削除ボタン）実装済み（8/29夜勤）。次は区切り3（未分類アラート・未分類ラベル表示）が夜勤対象。区切り2はPR未マージ・本番未反映。計画書 docs/jisso_keikaku_master_bulk_delete_2026-08-28.md", stamp:"wait"},
+  {t:"マスタ削除の一括化と未分類フローのこと", m:"区切り1・2ともPR #77マージ・本番デプロイ確認完了（8/29、Chrome委任）。一括削除UIが本番稼働したことで、カテゴリ削除時に商品が無ラベル表示になる窓が開いた（区切り3=未分類バナー・ラベル未実装のため）。⚠️月曜夜勤の急務・最優先＝区切り3（未分類アラート・未分類ラベル表示、計画書§7.2・§7.3）で最短に閉じる。⚠️区切り3が入るまで、本番でのカテゴリ一括削除の試用はdemo@のデータでは行わないこと（顧客デモ画面が無ラベルだらけになるため）。計画書 docs/jisso_keikaku_master_bulk_delete_2026-08-28.md", stamp:"wait"},
   {t:"無償提供（comp）管理のこと", m:"区切り1〜3（バックエンドAPI・課金ロジック・フロント）すべてmainに反映済み（PR #70/#72/#73）。区切り3受け入れ中にtenancy誤帰属バグ発見→PR #72で修正、note/emailバリデーションも422→400へ設計復帰。区切り5はadmin@自身への付与で先行実施（8/29・パターンBの本番動作確認）。残るはdemo@のcomp移行とsecurity-status再確認（docs/honban_kakunin_comp_management_ku5_2026-08-28.md ⑤⑥）と区切り4（運用文書更新・legal-financeレビュー）。計画書 docs/jisso_keikaku_comp_management_2026-08-28.md", stamp:"wait"},
   {t:"lp/README.mdの陳腐化のこと", m:"優先度低 / 8/26急務へ昇格・実装まで可", stamp:"wait"},
   {t:"バックエンド日時レスポンスのnaive UTC文字列のこと", m:"管理者閲覧機能ku3受け入れ時に発見。フロントのparseServerDate()で個別対症済み、API側のISO8601 Z付き標準化は未検討", stamp:"kouho"},
