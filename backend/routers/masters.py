@@ -155,6 +155,35 @@ def delete_master_product(management_no: str, db: Session = Depends(get_db)):
     return {"deleted_management_no": mno}
 
 
+class BulkDeleteProductsPayload(BaseModel):
+    management_nos: list[str] = []
+
+
+@router.post("/products/bulk-delete")
+def bulk_delete_products(payload: BulkDeleteProductsPayload, db: Session = Depends(get_db)):
+    """商品マスタの一括ソフトデリート（1トランザクション。マスタ削除一括化計画書 §6.1）。
+
+    存在しない・既に削除済みの管理番号は黙ってスキップし、削除できた分だけ返す
+    （一括操作のUXとして、404で失敗にするより自然なため）。フロントは requested と
+    deleted_management_nos の件数差から「一部は既に削除済みでした」等の表示ができる。
+    """
+    mnos = [m.strip() for m in payload.management_nos if (m or "").strip()]
+    if not mnos:
+        raise HTTPException(status_code=400, detail="management_nos が空です")
+    prods = (
+        db.query(Product)
+        .filter(Product.management_no.in_(mnos), Product.archived_at.is_(None))
+        .all()
+    )
+    now = datetime.utcnow()
+    deleted: list[str] = []
+    for p in prods:
+        p.archived_at = now
+        deleted.append(p.management_no)
+    db.commit()
+    return {"requested": len(mnos), "deleted_management_nos": deleted}
+
+
 # ── 商品マスタ入力支援（自動提案キュー）────────────────────────────────────
 class ApprovePayload(BaseModel):
     approve_category: bool = False
@@ -375,6 +404,43 @@ def delete_category(category_id: int, db: Session = Depends(get_db)):
     cat.archived_at = datetime.utcnow()
     db.commit()
     return {"deleted_id": category_id, "detached_products": detached}
+
+
+class BulkDeleteCategoriesPayload(BaseModel):
+    ids: list[int] = []
+
+
+@router.post("/categories/bulk-delete")
+def bulk_delete_categories(payload: BulkDeleteCategoriesPayload, db: Session = Depends(get_db)):
+    """カテゴリの一括ソフトデリート（1トランザクション。マスタ削除一括化計画書 §6.1）。
+    参照している商品は先に未分類（category_id=None）へ戻してからカテゴリを削除する。
+
+    存在しない・既に削除済みのIDは黙ってスキップし、削除できた分だけ返す
+    （単件DELETEは404で失敗にするが、一括操作では「対象外」として扱う方が自然なため）。
+    """
+    if not payload.ids:
+        raise HTTPException(status_code=400, detail="ids が空です")
+    cats = (
+        db.query(ProductCategory)
+        .filter(ProductCategory.id.in_(payload.ids), ProductCategory.archived_at.is_(None))
+        .all()
+    )
+    now = datetime.utcnow()
+    deleted_ids: list[int] = []
+    detached_total = 0
+    for cat in cats:
+        detached = db.query(Product).filter(Product.category_id == cat.id).update(
+            {Product.category_id: None}
+        )
+        cat.archived_at = now
+        deleted_ids.append(cat.id)
+        detached_total += detached
+    db.commit()
+    return {
+        "requested": len(payload.ids),
+        "deleted_ids": deleted_ids,
+        "detached_products": detached_total,
+    }
 
 
 # ── カテゴリマスタ CSV 一括入出力（商品マスタと同じ作法。マスタCRUD規約2026-08-22）────

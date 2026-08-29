@@ -327,13 +327,14 @@ const AGENTS = [
 ];
 
 const QUESTS = [
-  {t:"マスタ削除の一括化と未分類フローのこと", m:"評定確定・kpi-analystレビュー完了（実測追試済み）。区切り1(API)→区切り2(UI)→区切り3(未分類表示)の順で夜勤対象。計画書 docs/jisso_keikaku_master_bulk_delete_2026-08-28.md", stamp:"wait"},
+  {t:"マスタ削除の一括化と未分類フローのこと", m:"区切り1（バックエンドAPI）実装済み・検証済み（8/28夜勤・1f8a2d6）。次は区切り2（フロントUIのチェックボックス・一括削除ボタン）が夜勤対象。計画書 docs/jisso_keikaku_master_bulk_delete_2026-08-28.md", stamp:"wait"},
   {t:"無償提供（comp）管理のこと", m:"区切り1〜3（バックエンドAPI・課金ロジック・フロント）すべてmainに反映済み（PR #70/#72/#73）。区切り3受け入れ中にtenancy誤帰属バグ発見→PR #72で修正、note/emailバリデーションも422→400へ設計復帰。残るは区切り5（本番検証・demo@のcomp移行。docs/honban_kakunin_comp_management_ku5_2026-08-28.md）と区切り4（運用文書更新・legal-financeレビュー）。計画書 docs/jisso_keikaku_comp_management_2026-08-28.md", stamp:"wait"},
   {t:"lp/README.mdの陳腐化のこと", m:"優先度低 / 8/26急務へ昇格・実装まで可", stamp:"wait"},
   {t:"バックエンド日時レスポンスのnaive UTC文字列のこと", m:"管理者閲覧機能ku3受け入れ時に発見。フロントのparseServerDate()で個別対症済み、API側のISO8601 Z付き標準化は未検討", stamp:"kouho"},
   {t:"フォーム入力欄id/name属性のこと", m:"優先度低 / 8/27候補（オーナー発見・軍令帳参照）", stamp:"kouho"},
   {t:"SupabaseプランのCLAUDE.md記載と実態の食い違いのこと", m:"infra-ops.mdはPro（東京）$25と記載、実態はFREE/NANOの可能性。オーナー実プラン確認が先（軍令帳参照）", stamp:"kouho"},
   {t:"デプロイ後定型確認のCowork委任化のこと", m:"優先度低・オーナー提案。読み取り専用の確認手順書整備が前提（軍令帳参照）", stamp:"kouho"},
+  {t:".env.exampleのADMIN_USER_ID説明が読取専用のみと誤解させること", m:"comp管理のPOST書き込みも同じUUIDで保護されているが、コメントはGETのみと記載（8/28巡回発見・軍令帳参照）", stamp:"kouho"},
   {t:"四万SKU取込 実測のこと", m:"約定により資料入手は十月朔日以降", stamp:"later", sealed:true},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
