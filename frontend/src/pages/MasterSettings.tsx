@@ -72,6 +72,11 @@ export default function MasterSettings() {
   const [deleteProductTarget, setDeleteProductTarget] = useState<Row | null>(null)
   const [deletingProduct, setDeletingProduct] = useState(false)
 
+  // 商品マスタの一括削除（マスタ削除一括化計画書2026-08-28 区切り2）
+  const [selectedProductNos, setSelectedProductNos] = useState<Set<string>>(new Set())
+  const [bulkProductConfirmOpen, setBulkProductConfirmOpen] = useState(false)
+  const [bulkDeletingProducts, setBulkDeletingProducts] = useState(false)
+
   // アイテム別目標（目標設定画面から移設。API・ロジックは無変更。区切り5）
   const [itemYearMonth, setItemYearMonth] = useState(getCurrentYearMonth())
   const [itemRows, setItemRows] = useState<ItemTargetListEntry[]>([])
@@ -228,6 +233,15 @@ export default function MasterSettings() {
 
   useEffect(() => { load() }, [load])
 
+  // 一覧が更新されたら、既に存在しない商品の選択状態を除去する（単件削除等との整合）
+  useEffect(() => {
+    setSelectedProductNos((prev) => {
+      const validNos = new Set(rows.map((r) => r.management_no))
+      const next = new Set(Array.from(prev).filter((no) => validNos.has(no)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [rows])
+
   const saveShop = async () => {
     try {
       await api.shops.update({
@@ -267,6 +281,52 @@ export default function MasterSettings() {
     } finally {
       setDeletingProduct(false)
       setDeleteProductTarget(null)
+    }
+  }
+
+  const toggleSelectProduct = (mno: string, checked: boolean) => {
+    setSelectedProductNos((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(mno)
+      else next.delete(mno)
+      return next
+    })
+  }
+
+  /** ヘッダーの「このページを全選択」（評定確定Q2: 対象は現在のページのみ）。 */
+  const toggleSelectPage = (pageRows: Row[], checked: boolean) => {
+    setSelectedProductNos((prev) => {
+      const next = new Set(prev)
+      for (const r of pageRows) {
+        if (checked) next.add(r.management_no)
+        else next.delete(r.management_no)
+      }
+      return next
+    })
+  }
+
+  /** 選択した商品の一括削除（評定確定: 要求件数と実削除件数が食い違う場合は実数を明示する） */
+  const confirmBulkDeleteProducts = async () => {
+    if (selectedProductNos.size === 0) return
+    setBulkDeletingProducts(true)
+    try {
+      const mnos = Array.from(selectedProductNos)
+      const res = await api.master.bulkDeleteProducts(mnos)
+      const requested = res.requested ?? mnos.length
+      const deletedCount = res.deleted_management_nos?.length ?? 0
+      setSelectedProductNos(new Set())
+      await load()
+      flash(
+        deletedCount === requested
+          ? `${deletedCount}件の商品を削除しました`
+          : `${requested}件中${deletedCount}件を削除しました（他のタブ等で先に削除されていた可能性があります）`,
+      )
+    } catch (e) {
+      console.error('[MasterSettings] 商品一括削除エラー:', e)
+      flash('一括削除に失敗しました')
+    } finally {
+      setBulkDeletingProducts(false)
+      setBulkProductConfirmOpen(false)
     }
   }
 
@@ -723,6 +783,14 @@ export default function MasterSettings() {
                 </span>
               </div>
               <div className="flex items-center gap-3">
+                {selectedProductNos.size > 0 && (
+                  <button
+                    onClick={() => setBulkProductConfirmOpen(true)}
+                    className="flex items-center gap-1.5 text-xs font-medium text-white bg-alert hover:opacity-90 rounded-lg px-3 py-1.5 transition-opacity"
+                  >
+                    <Trash2 size={13} />選択した{selectedProductNos.size}件を削除
+                  </button>
+                )}
                 <button
                   onClick={exportCsv}
                   className="flex items-center gap-1.5 text-xs text-sub border rounded-lg px-2.5 py-1.5 hover:bg-bg-alt transition-colors"
@@ -758,6 +826,17 @@ export default function MasterSettings() {
                 <table className="w-full text-sm">
                   <thead className="bg-bg-alt text-xs text-muted">
                     <tr>
+                      <th className="px-3 py-2.5 text-left w-8">
+                        <label className="flex items-center" title="このページを全選択">
+                          <input
+                            type="checkbox"
+                            checked={pagedRows.length > 0 && pagedRows.every((r) => selectedProductNos.has(r.management_no))}
+                            onChange={(e) => toggleSelectPage(pagedRows, e.target.checked)}
+                            className="rounded border-line"
+                            aria-label="このページを全選択"
+                          />
+                        </label>
+                      </th>
                       <SortableTh label="管理番号" sortKey="management_no" sort={masterSort} align="left" className="pl-1" />
                       <SortableTh label="商品名" sortKey="product_name" sort={masterSort} align="left" />
                       <SortableTh label="ジャンル" sortKey="genre_u1" sort={masterSort} align="left" />
@@ -770,6 +849,15 @@ export default function MasterSettings() {
                   <tbody className="divide-y divide-bg-alt">
                     {pagedRows.map((r) => (
                       <tr key={r.management_no} className={r.is_active ? '' : 'bg-bg-alt/60'}>
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={selectedProductNos.has(r.management_no)}
+                            onChange={(e) => toggleSelectProduct(r.management_no, e.target.checked)}
+                            className="rounded border-line"
+                            aria-label={`${r.product_name || r.management_no}を選択`}
+                          />
+                        </td>
                         <td className="px-4 py-2 text-muted font-mono text-xs whitespace-nowrap">{r.management_no}</td>
                         <td className="px-3 py-2">
                           <input
@@ -1189,6 +1277,15 @@ export default function MasterSettings() {
         onConfirm={confirmDeleteProduct}
         onCancel={() => setDeleteProductTarget(null)}
         loading={deletingProduct}
+      />
+
+      <ConfirmDeleteModal
+        open={bulkProductConfirmOpen}
+        title="選択した商品を削除しますか"
+        message={`「${selectedProductNos.size}件の商品」を商品マスタから削除します。一覧・診断・提案からは除外されますが、過去の実績データは保持されます。`}
+        onConfirm={confirmBulkDeleteProducts}
+        onCancel={() => setBulkProductConfirmOpen(false)}
+        loading={bulkDeletingProducts}
       />
     </div>
   )
