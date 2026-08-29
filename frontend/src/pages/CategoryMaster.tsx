@@ -26,6 +26,11 @@ export default function CategoryMaster() {
   const [deleteTarget, setDeleteTarget] = useState<Category | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  // 一括削除（マスタ削除一括化計画書2026-08-28 区切り2）
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [bulkConfirmOpen, setBulkConfirmOpen] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   const flash = (msg: string) => {
     setSavedMsg(msg)
     setTimeout(() => setSavedMsg(null), 2500)
@@ -45,6 +50,15 @@ export default function CategoryMaster() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  // 一覧が更新されたら、既に存在しないカテゴリの選択状態を除去する（単件削除等との整合）
+  useEffect(() => {
+    setSelectedIds((prev) => {
+      const validIds = new Set(categories.map((c) => c.id))
+      const next = new Set(Array.from(prev).filter((id) => validIds.has(id)))
+      return next.size === prev.size ? prev : next
+    })
+  }, [categories])
 
   const addCategory = async () => {
     if (!newCat.genre_u1.trim() && !newCat.genre_u2.trim() && !newCat.genre_u3.trim()) return
@@ -88,6 +102,44 @@ export default function CategoryMaster() {
     } finally {
       setDeleting(false)
       setDeleteTarget(null)
+    }
+  }
+
+  const toggleSelectOne = (id: number, checked: boolean) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (checked) next.add(id)
+      else next.delete(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = (checked: boolean) => {
+    setSelectedIds(checked ? new Set(categories.map((c) => c.id)) : new Set())
+  }
+
+  /** 選択したカテゴリの一括削除（評定確定: 要求件数と実削除件数が食い違う場合は実数を明示する） */
+  const confirmBulkDeleteCategories = async () => {
+    if (selectedIds.size === 0) return
+    setBulkDeleting(true)
+    try {
+      const ids = Array.from(selectedIds)
+      const res = await api.master.bulkDeleteCategories(ids)
+      const requested = res.requested ?? ids.length
+      const deletedCount = res.deleted_ids?.length ?? 0
+      setSelectedIds(new Set())
+      await load()
+      flash(
+        deletedCount === requested
+          ? `${deletedCount}件のカテゴリを削除しました（${res.detached_products}商品を未分類化）`
+          : `${requested}件中${deletedCount}件を削除しました（他のタブ等で先に削除されていた可能性があります。${res.detached_products}商品を未分類化）`,
+      )
+    } catch (e) {
+      console.error('[CategoryMaster] 一括削除エラー:', e)
+      flash('一括削除に失敗しました')
+    } finally {
+      setBulkDeleting(false)
+      setBulkConfirmOpen(false)
     }
   }
 
@@ -141,11 +193,21 @@ export default function CategoryMaster() {
 
       <div className="flex-1 overflow-auto p-6">
         <div className="bg-paper rounded-xl border border-line shadow-sm overflow-hidden">
-          <div className="px-4 py-3 border-b border-line">
-            <h3 className="text-sm font-semibold text-sub">カテゴリ一覧</h3>
-            <p className="text-xs text-muted mt-0.5">
-              取込みで自動生成されたカテゴリの整理や、手動追加ができます。削除したカテゴリに割り当てられていた商品は「未分類」に戻ります。
-            </p>
+          <div className="px-4 py-3 border-b border-line flex items-center justify-between gap-3 flex-wrap">
+            <div>
+              <h3 className="text-sm font-semibold text-sub">カテゴリ一覧</h3>
+              <p className="text-xs text-muted mt-0.5">
+                取込みで自動生成されたカテゴリの整理や、手動追加ができます。削除したカテゴリに割り当てられていた商品は「未分類」に戻ります。
+              </p>
+            </div>
+            {selectedIds.size > 0 && (
+              <button
+                onClick={() => setBulkConfirmOpen(true)}
+                className="flex items-center gap-1.5 text-xs font-medium text-white bg-alert hover:opacity-90 rounded-lg px-3 py-1.5 transition-opacity"
+              >
+                <Trash2 size={13} />選択した{selectedIds.size}件を削除
+              </button>
+            )}
           </div>
 
           {/* 新規作成フォーム（楽天ジャンルマスタから選択＋自由入力） */}
@@ -168,33 +230,53 @@ export default function CategoryMaster() {
           ) : categories.length === 0 ? (
             <div className="py-8 text-center text-sm text-muted">カテゴリがまだありません</div>
           ) : (
-            <ul className="divide-y divide-bg-alt">
-              {categories.map((c) => (
-                <li key={c.id} className="px-4 py-2.5 flex items-center gap-2">
-                  {editingCatId === c.id ? (
-                    <>
-                      <input value={editCat.genre_u1} onChange={(e) => setEditCat({ ...editCat, genre_u1: e.target.value })} placeholder="大分類" className="w-28 border border-line rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep" />
-                      <span className="text-line">&gt;</span>
-                      <input value={editCat.genre_u2} onChange={(e) => setEditCat({ ...editCat, genre_u2: e.target.value })} placeholder="中分類" className="w-28 border border-line rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep" />
-                      <span className="text-line">&gt;</span>
-                      <input value={editCat.genre_u3} onChange={(e) => setEditCat({ ...editCat, genre_u3: e.target.value })} placeholder="小分類" className="w-28 border border-line rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep" />
-                      <div className="ml-auto flex items-center gap-1">
-                        <button onClick={saveEditCat} className="p-1.5 text-green-600 hover:bg-green-50 rounded" title="保存"><Check size={15} /></button>
-                        <button onClick={() => setEditingCatId(null)} className="p-1.5 text-muted hover:bg-bg-alt rounded" title="取消"><X size={15} /></button>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <span className="text-sm text-ink">{categoryPath(c)}</span>
-                      <div className="ml-auto flex items-center gap-1">
-                        <button onClick={() => startEditCat(c)} className="p-1.5 text-muted hover:bg-bg-alt rounded" title="リネーム"><Pencil size={14} /></button>
-                        <button onClick={() => setDeleteTarget(c)} className="p-1.5 text-alert hover:bg-alert-bg rounded" title="削除"><Trash2 size={14} /></button>
-                      </div>
-                    </>
-                  )}
-                </li>
-              ))}
-            </ul>
+            <>
+              <div className="px-4 py-1.5 border-b border-line bg-bg-alt/60">
+                <label className="flex items-center gap-2 text-xs text-muted cursor-pointer select-none w-fit">
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.size > 0 && selectedIds.size === categories.length}
+                    onChange={(e) => toggleSelectAll(e.target.checked)}
+                    className="rounded border-line"
+                  />
+                  全選択
+                </label>
+              </div>
+              <ul className="divide-y divide-bg-alt">
+                {categories.map((c) => (
+                  <li key={c.id} className="px-4 py-2.5 flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(c.id)}
+                      onChange={(e) => toggleSelectOne(c.id, e.target.checked)}
+                      className="rounded border-line shrink-0"
+                      aria-label={`${categoryPath(c)}を選択`}
+                    />
+                    {editingCatId === c.id ? (
+                      <>
+                        <input value={editCat.genre_u1} onChange={(e) => setEditCat({ ...editCat, genre_u1: e.target.value })} placeholder="大分類" className="w-28 border border-line rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep" />
+                        <span className="text-line">&gt;</span>
+                        <input value={editCat.genre_u2} onChange={(e) => setEditCat({ ...editCat, genre_u2: e.target.value })} placeholder="中分類" className="w-28 border border-line rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep" />
+                        <span className="text-line">&gt;</span>
+                        <input value={editCat.genre_u3} onChange={(e) => setEditCat({ ...editCat, genre_u3: e.target.value })} placeholder="小分類" className="w-28 border border-line rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-sage-deep" />
+                        <div className="ml-auto flex items-center gap-1">
+                          <button onClick={saveEditCat} className="p-1.5 text-green-600 hover:bg-green-50 rounded" title="保存"><Check size={15} /></button>
+                          <button onClick={() => setEditingCatId(null)} className="p-1.5 text-muted hover:bg-bg-alt rounded" title="取消"><X size={15} /></button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <span className="text-sm text-ink">{categoryPath(c)}</span>
+                        <div className="ml-auto flex items-center gap-1">
+                          <button onClick={() => startEditCat(c)} className="p-1.5 text-muted hover:bg-bg-alt rounded" title="リネーム"><Pencil size={14} /></button>
+                          <button onClick={() => setDeleteTarget(c)} className="p-1.5 text-alert hover:bg-alert-bg rounded" title="削除"><Trash2 size={14} /></button>
+                        </div>
+                      </>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </div>
       </div>
@@ -206,6 +288,15 @@ export default function CategoryMaster() {
         onConfirm={confirmRemoveCategory}
         onCancel={() => setDeleteTarget(null)}
         loading={deleting}
+      />
+
+      <ConfirmDeleteModal
+        open={bulkConfirmOpen}
+        title="選択したカテゴリを削除しますか"
+        message={`「${selectedIds.size}件のカテゴリ」を削除します。割り当てられている商品は「未分類」に戻ります。`}
+        onConfirm={confirmBulkDeleteCategories}
+        onCancel={() => setBulkConfirmOpen(false)}
+        loading={bulkDeleting}
       />
     </div>
   )

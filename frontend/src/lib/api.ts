@@ -294,6 +294,12 @@ export const api = {
     /** 商品マスタから削除（ソフトデリート。一覧・診断・提案の母集団から除外。実績は保持） */
     deleteProduct: (managementNo: string) =>
       request<{ deleted_management_no: string }>(`/master/products/${encodeURIComponent(managementNo)}`, { method: 'DELETE' }),
+    /** 商品マスタの一括削除（存在しない/削除済みの管理番号は黙ってスキップされる） */
+    bulkDeleteProducts: (managementNos: string[]) =>
+      request<{ requested: number; deleted_management_nos: string[] }>(
+        '/master/products/bulk-delete',
+        { method: 'POST', body: JSON.stringify({ management_nos: managementNos }) },
+      ),
     /* ─── ジャンル別ベンチマーク手入力（アクション提案ロジック 3-B / 3-B'）─── */
     benchmarks: () =>
       request<{ count: number; items: import('../types').GenreBenchmarkItem[] }>('/master/benchmarks')
@@ -332,6 +338,12 @@ export const api = {
     /** カテゴリ削除（参照商品は未分類化） */
     deleteCategory: (id: number) =>
       request<{ deleted_id: number; detached_products: number }>(`/master/categories/${id}`, { method: 'DELETE' }),
+    /** カテゴリの一括削除（参照商品は未分類化。存在しない/削除済みIDは黙ってスキップされる） */
+    bulkDeleteCategories: (ids: number[]) =>
+      request<{ requested: number; deleted_ids: number[]; detached_products: number }>(
+        '/master/categories/bulk-delete',
+        { method: 'POST', body: JSON.stringify({ ids }) },
+      ),
     /** カテゴリマスタをCSV（BOM付きUTF-8）でダウンロード */
     exportCategoriesCsv: () => downloadCsv('/master/categories/export', 'category_master.csv'),
     /** カテゴリマスタCSVを一括取込み（大/中/小の階層キーにupsert） */
