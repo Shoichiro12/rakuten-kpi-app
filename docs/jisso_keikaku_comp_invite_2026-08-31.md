@@ -30,7 +30,7 @@ SMTP（`backend/notifications.py`）で送る**。
 - 呼び出しは `routers/account.py` の `_delete_supabase_user()` と同じ方式（urllib＋service_roleキー。
   `sb_secret_` 形式のヘッダー分岐もそのまま流用）。**共通化して `supabase_admin.py` に切り出す**
 - `redirect_to` は `APP_BASE_URL`（本番 `https://app.ureshiru.com`）。Supabase側の Redirect URLs に
-  このURLが入っていることが前提（確認事項Q4）
+  このURLが入っていることが前提（確認事項Q4。**2026-08-31確認済み**、§9参照）
 - リンクの有効期限はSupabaseの設定（既定1時間の想定。実測して報告）。期限切れに備えて
   **「再送」ボタン**を付ける（同じ `generate_link` を再発行して再送するだけ）
 
@@ -178,5 +178,5 @@ https://ureshiru.com
 | Q1 | 招待メールの差出人 | `info@ureshiru.com`（返信もここに集まる）。Gmailの送信者名義が期待どおりか区切り4で確認 |
 | Q2 | 既に登録済みのメールを招待したとき | 409で弾き、comp管理から付与してもらう。自動でcomp付与＋別文面のメール、は今回やらない |
 | Q3 | メール文面（§4） | 案のまま。直したい箇所があれば指定 |
-| Q4 | Supabase Redirect URLs に `https://app.ureshiru.com` が入っているか | オーナーがSupabaseダッシュボードで確認（2026-07-29の申し送りで未確認のまま）。入っていなければ追加 |
+| Q4 | Supabase Redirect URLs に `https://app.ureshiru.com` が入っているか | **確認済み（2026-08-31、オーナーがSupabaseダッシュボードで確認）。** Site URL = `https://app.ureshiru.com`、Redirect URLs に `https://app.ureshiru.com/**` と `https://rakuten-kpi-app.onrender.com/**` の2件が登録済み。2026-07-29の申し送りで未確認のまま残っていた項目はこれで解消（区切り4の残タスクから除外） |
 | Q5 | レーン | 区切り1・2を対話セッション、区切り3をCowork、区切り4をオーナー |
