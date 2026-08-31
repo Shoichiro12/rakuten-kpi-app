@@ -77,6 +77,11 @@ export default function MasterSettings() {
   const [bulkProductConfirmOpen, setBulkProductConfirmOpen] = useState(false)
   const [bulkDeletingProducts, setBulkDeletingProducts] = useState(false)
 
+  // 未分類アラート・絞り込み（マスタ削除一括化計画書2026-08-28 区切り3・§7.2）。
+  // 評定確定Q3=(b): 一度閉じたら画面滞在中は再表示しない（永続化しない。リロード・再訪問で復活）。
+  const [masterBannerDismissed, setMasterBannerDismissed] = useState(false)
+  const [masterUnsetOnly, setMasterUnsetOnly] = useState(false)
+
   // アイテム別目標（目標設定画面から移設。API・ロジックは無変更。区切り5）
   const [itemYearMonth, setItemYearMonth] = useState(getCurrentYearMonth())
   const [itemRows, setItemRows] = useState<ItemTargetListEntry[]>([])
@@ -528,8 +533,9 @@ export default function MasterSettings() {
   // 一覧の検索・ページング（2026-08-20 オーナー指摘: SKUが増えると縦スクロールが長すぎる）。
   // 全件描画はDOMも重くなるので、絞り込み → 列ソート → ページ切り出しの順で適用する。
   const activeFiltered = showInactive ? rows : rows.filter((r) => r.is_active)
+  const unsetFiltered = masterUnsetOnly ? activeFiltered.filter((r) => r.category_id == null) : activeFiltered
   const visibleRows = masterKw
-    ? activeFiltered.filter((r) => {
+    ? unsetFiltered.filter((r) => {
         const kw = masterKw.toLowerCase()
         return (
           r.management_no.toLowerCase().includes(kw) ||
@@ -537,12 +543,13 @@ export default function MasterSettings() {
           [r.genre_u1, r.genre_u2, r.genre_u3].filter(Boolean).join(' > ').toLowerCase().includes(kw)
         )
       })
-    : activeFiltered
+    : unsetFiltered
   const totalPages = Math.max(1, Math.ceil(visibleRows.length / MASTER_PAGE_SIZE))
   const safePage = Math.min(masterPage, totalPages)
   const sortedRows = masterSort.apply(visibleRows)
   const pagedRows = sortedRows.slice((safePage - 1) * MASTER_PAGE_SIZE, safePage * MASTER_PAGE_SIZE)
   const inactiveCount = rows.filter((r) => !r.is_active).length
+  const uncategorizedCount = rows.filter((r) => r.category_id == null).length
 
   return (
     <div className="flex flex-col h-full">
@@ -765,6 +772,29 @@ export default function MasterSettings() {
             </div>
           </div>
 
+          {/* 未分類アラート（非強制。マスタ削除一括化計画書2026-08-28 §7.2・評定確定Q3=(b)） */}
+          {uncategorizedCount > 0 && !masterBannerDismissed && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 flex items-center gap-3 flex-wrap">
+              <span className="text-sm text-amber-800">
+                未分類の商品が{uncategorizedCount.toLocaleString()}件あります。カテゴリを再設定しますか？
+              </span>
+              <button
+                onClick={() => { setMasterUnsetOnly(true); setMasterPage(1) }}
+                className="text-sm font-medium text-amber-800 underline hover:no-underline"
+              >
+                ジャンルで絞り込む
+              </button>
+              <button
+                onClick={() => setMasterBannerDismissed(true)}
+                className="ml-auto p-1 text-amber-500 hover:bg-amber-100 rounded"
+                title="閉じる（この画面にいる間は再表示しません）"
+                aria-label="未分類アラートを閉じる"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          )}
+
           {/* 商品マスタ一覧 */}
           <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b flex items-center justify-between gap-3 flex-wrap">
@@ -779,7 +809,7 @@ export default function MasterSettings() {
                   className="w-64 text-sm border border-line rounded px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-sage-deep"
                 />
                 <span className="text-xs text-muted tabular-nums">
-                  {visibleRows.length.toLocaleString()}件{masterKw ? `（全${activeFiltered.length.toLocaleString()}件から絞り込み）` : ''}
+                  {visibleRows.length.toLocaleString()}件{masterKw || masterUnsetOnly ? `（全${activeFiltered.length.toLocaleString()}件から絞り込み）` : ''}
                 </span>
               </div>
               <div className="flex items-center gap-3">
@@ -805,6 +835,15 @@ export default function MasterSettings() {
                     className="hidden"
                     onChange={(e) => { const f = e.target.files?.[0]; if (f) importCsv(f); e.target.value = '' }}
                   />
+                </label>
+                <label className="flex items-center gap-1.5 text-xs text-sub cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={masterUnsetOnly}
+                    onChange={(e) => { setMasterUnsetOnly(e.target.checked); setMasterPage(1) }}
+                    className="rounded border-line"
+                  />
+                  未設定のみ
                 </label>
                 <label className="flex items-center gap-1.5 text-xs text-sub cursor-pointer select-none">
                   <input type="checkbox" checked={showInactive} onChange={(e) => setShowInactive(e.target.checked)} className="rounded border-line" />
@@ -867,12 +906,17 @@ export default function MasterSettings() {
                           />
                         </td>
                         <td className="px-3 py-2">
-                          <GenrePicker
-                            tree={genreTree}
-                            value={{ genre_u1: r.genre_u1 ?? '', genre_u2: r.genre_u2 ?? '', genre_u3: r.genre_u3 ?? '' }}
-                            onChange={(g) => assignGenre(r, g)}
-                            compact
-                          />
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            {r.category_id == null && (
+                              <span className="text-xs px-1.5 py-0.5 rounded bg-bg-alt text-muted font-medium whitespace-nowrap">未分類</span>
+                            )}
+                            <GenrePicker
+                              tree={genreTree}
+                              value={{ genre_u1: r.genre_u1 ?? '', genre_u2: r.genre_u2 ?? '', genre_u3: r.genre_u3 ?? '' }}
+                              onChange={(g) => assignGenre(r, g)}
+                              compact
+                            />
+                          </div>
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums whitespace-nowrap">
                           <span className="inline-flex items-center gap-1.5">
@@ -1094,7 +1138,12 @@ export default function MasterSettings() {
                       return (
                         <tr key={r.management_no} className={dirty ? 'bg-amber-50/60' : undefined}>
                           <td className="px-4 py-2">
-                            <p className="text-ink-strong leading-tight">{r.product_name || r.management_no}</p>
+                            <p className="text-ink-strong leading-tight flex items-center gap-1.5 flex-wrap">
+                              {r.product_name || r.management_no}
+                              {r.genre_u1 == null && (
+                                <span className="text-xs px-1.5 py-0.5 rounded bg-bg-alt text-muted font-medium whitespace-nowrap">未分類</span>
+                              )}
+                            </p>
                             <p className="text-xs text-muted font-mono">{r.management_no}</p>
                             {r.latest_actual ? (
                               <p className="text-xs text-muted">
