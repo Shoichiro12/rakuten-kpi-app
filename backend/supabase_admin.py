@@ -101,9 +101,16 @@ def generate_link(email: str, type_: str = "invite", redirect_to: Optional[str] 
     で事前に find_user_by_email() による存在確認を必須とすること。
 
     レスポンスには action_link・email_otp・hashed_token・verification_type・
-    redirect_to・user（新規作成された Supabase User オブジェクト、id を含む）が
-    含まれる（Supabase の実バージョンにより多少の差異があり得るため、呼び出し側は
-    dict.get() で緩く読むこと）。
+    redirect_to に加えて、新規作成された Supabase User の属性（id・aud・role・email 等）が
+    含まれる。
+
+    ⚠️ 本番で判明（2026-09-01）: SDKのドキュメントには `{"user": {...}, "action_link": ...}`
+    のようにユーザー情報が "user" キーの下にネストされる形で説明されているが、実際の
+    Auth REST API（`/admin/generate_link`）はユーザーの属性を **トップレベルに平坦化**して
+    返す（`{"id": ..., "email": ..., ..., "action_link": ...}` のようにユーザー属性と
+    リンク属性が同じ階層に混在する）。呼び出し側（routers/admin_comp.py）は
+    `data.get("id")` をトップレベルで優先的に読み、`data.get("user", {}).get("id")`
+    （ネスト形）へのフォールバックも残すこと（Supabaseのバージョンにより形が変わり得るため）。
 
     ⚠️ action_link はそのまま踏めばログインできるリンクなので、呼び出し側は
     絶対にログに出さないこと（対象メールと結果だけをログに残す）。
