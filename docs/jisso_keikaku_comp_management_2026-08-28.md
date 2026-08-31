@@ -530,8 +530,8 @@ commitしていたため、新規`Subscription`行の`user_id`が対象ではな
 アカウント（特にadmin@自身）の課金状態が変わっていないこと」という項目が想定している検証はこれ）。
 次にadmin@以外への付与機会があれば、その際にこの項目を満たすことを推奨する。
 
-**区切り5の残り（2026-08-31時点）**: `GET /api/security-status`の再確認（チェックリスト⑥）のみ、
-別PR（週次セキュリティチェックPR #79）で対応中。demo@ureshiru.comのcomp移行・③の厳密な検証は
+**区切り5の残り（2026-08-31時点）**: なし。`GET /api/security-status`の再確認（チェックリスト⑥）は
+週次セキュリティチェックPR #79がマージ済みで完了、demo@ureshiru.comのcomp移行・③の厳密な検証は
 下記§16のとおり2026-08-31に完了した。
 
 ---
@@ -568,5 +568,7 @@ EXEMPT_TEST_EMAILS運用終了の注記）、`docs/office_map.html`（軍令帳�
 
 **残タスク**: 区切り4（`docs/unyou_exempt_test_emails.md`の正式なEXEMPT運用終了反映・
 legal-financeレビューの正式実施）は未着手のまま。優先度低・オーナー判断待ち。
-`GET /api/security-status`の再確認（チェックリスト⑥）は別PR（週次セキュリティチェックPR #79）
-で対応中。**それ以外は無償提供（comp）管理機能としてクローズする。**
+`GET /api/security-status`の再確認（チェックリスト⑥）は週次セキュリティチェックPR #79が
+マージ済みで完了（`200`・`applicable: true`・`ok: true`・`protected`が20テーブル（`comp_grants`・
+`admin_view_sessions`を含む）・`unprotected`空、を確認。詳細は`security/security_check_2026-08-31.md`
+「①」節）。**それ以外は無償提供（comp）管理機能としてクローズする。**
