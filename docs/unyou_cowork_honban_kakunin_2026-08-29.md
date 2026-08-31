@@ -18,7 +18,9 @@ Claude Codeセッション側で `curl` 等が本番URLへ疎通しない（プ�
 一切行わない。**
 
 - 許可: ページの表示確認、スクロール、コンソールログの確認、管理者閲覧モードの「閲覧を開始」
-  「閲覧を終了」ボタンのクリック（対象アカウントの画面を読み取り専用で見るために必要）
+  「閲覧を終了」ボタンのクリック（対象アカウントの画面を読み取り専用で見るために必要）、
+  DevToolsコンソールでの**読み取り専用GETのfetch実行**（下記「`security-status`の確認方法」参照。
+  書き込み系エンドポイントをコンソールから叩くことは禁止に含まれる）
 - 禁止: フォーム送信、削除ボタン、保存ボタン、CSVインポート、契約状態を変える操作（comp付与・解除等）、
   設定変更全般。管理者閲覧モードは「読み取り専用」を技術的に強制する仕組み（`backend/auth.py` の
   `UserContextMiddleware`。GET/HEAD/OPTIONS以外は403）だが、**管理者アカウント自身の操作
@@ -26,6 +28,28 @@ Claude Codeセッション側で `curl` 等が本番URLへ疎通しない（プ�
   意図的な除外。詳細はCLAUDE.md「管理者閲覧モード」節参照）なので、`/admin`画面上の削除・付与系
   ボタンは技術的にブロックされない。**したがって許可範囲はコード側の強制ではなく、委任時の指示で
   明示的に絞ること。**
+
+## `GET /api/security-status` の確認方法（画面が無いAPIの確認手順）
+
+`GET /api/security-status` は`_admin`/`_paid`グループではなく`_app.get`直付けのエンドポイントで、
+`get_current_user` のみを要求する＝**ログイン済みであれば誰でも呼べる**（管理者専用ではない）。
+対応する画面が無いため、Cowork/Chrome拡張で確認するにはDevToolsコンソールから直接fetchする必要がある。
+
+**手順**:
+1. `https://app.ureshiru.com` の任意のログイン後ページ（`/billing` 等）を開く
+2. DevToolsコンソールを開き、Supabaseクライアントが既定でlocalStorageに保存しているセッション
+   （キーは `sb-<プロジェクトref>-auth-token` 形式。`Object.keys(localStorage).find(k =>
+   k.includes('auth-token'))` で見つけられる）から `access_token` を取り出し、そのまま変数に
+   保持して `fetch('/api/security-status', { headers: { Authorization: 'Bearer ' + token } })`
+   を実行、`.then(r => r.json())` でJSONを取得する
+3. 結果のうち `ok` / `applicable` / `protected`（配列の長さ・対象テーブル名） / `unprotected`
+   の4点だけを報告に持ち帰る
+
+**⚠️ トークン値そのものは出力・保存・チャットへの貼り付けをしないこと。** コンソール内で
+fetchのAuthorizationヘッダに使うだけに留め、結果のJSON（トークンを含まない）だけを持ち帰る。
+2026-08-31、この手順でオーナー自身が`comp_grants`・`admin_view_sessions`を含む20テーブルの
+`protected`一覧・`unprotected`空・`ok: true`を確認した（詳細は`security/security_check_2026-08-31.md`
+「①」節参照）。
 
 ## 確認する項目（デプロイ後の簡易回帰）
 
