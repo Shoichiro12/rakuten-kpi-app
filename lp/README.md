@@ -18,7 +18,7 @@ GitHubリポジトリもローカルフォルダも存在しない状態だっ�
 
 ## 構成
 
-自己完結した静的HTML。ビルド不要、外部依存なし。
+自己完結した静的HTML。ビルド不要。外部依存は Google Fonts のみ（Figtree / Noto Sans JP / Zen Maru Gothic。2026-08-31 LPリニューアル2a確定版でセルフホストは見送り）。
 
 ```
 lp/
