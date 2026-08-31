@@ -10,5 +10,26 @@
     "enrichment": "none（実画面5枚を配置）",
     "brief": "ウレシル LP全面リニューアル — 楽天EC向けKPI管理。工程スパイン1.0〜5.0でVISIONの意思決定OSを表現し、Hallmark critical 3件（テンプレ骨格・AIナビ・3カラムグリッド×2）を解消",
     "notes": "設計は docs/LP_redesign_sekkei_2026-08-07.md。5.0の実画面は sample_data 調整後に追加予定（B案）"
+  },
+  {
+    "date": "2026-08-31",
+    "target": "lp/index.html",
+    "macrostructure": "Static Hero（静置ヒーロー 1b′、デザイン案2a確定版）",
+    "theme": "C案トーン（配色は維持。書体をアプリと同系統のFigtree+Noto Sans JPへ変更）",
+    "theme_axes": "light / neutral-sans(Figtree, Noto Sans JP) / rounded-sans(Zen Maru Gothic, ワードマークのみ) / chromatic-other(sage)",
+    "nav": "N9 Edge-aligned minimal（ロゴ+単独CTAのみ。塗りつぶし墨色ヘッダーへ変更、構成自体は不変）",
+    "footer": "Ft1 Mast-headed（不変）",
+    "enrichment": "interactive demo card（静止画スクリーンショットではなく、実データのインタラクティブなKGIカード。3クリックで深掘りできる既存ウィジェットをそのまま移植）",
+    "brief": "工程スパイン(Narrative Workflow)から静置ヒーロー構成へ全面組み替え。ヒーロー直下に事実バッジ3つ、本文は760/880/1040pxの3種コンテナを使い分ける不等分レイアウト（Record/Setup/Case/Pricing/FAQをすべて不等分の2カラムグリッドで構成）",
+    "critical_3_recheck": {
+      "date": "2026-08-31",
+      "result": "3件とも再発なし（実コード確認・07-30監査は原文喪失のためCLAUDE.md記載の3項目名で照合）",
+      "detail": [
+        "テンプレ骨格: 汎用SaaSテンプレ骨格ではなく、760/880/1040pxの可変コンテナ幅・英字eyebrowラベル・不等分グリッドによる独自の編集的レイアウトを維持",
+        "AIナビ: ヘッダーは単独CTAのみでナビ項目リストなし（08-07のN9構成を継承、変更なし）",
+        "3カラムグリッド: grep grid-template-columns で全箇所確認、1fr 1fr / 4fr 7fr / 5fr 6fr / 96px 1fr のみ。3等分(repeat(3,...))は0件"
+      ]
+    },
+    "notes": "計画書は docs/jisso_keikaku_lp_renewal_2026-08-31_2.md。確定デザインソースは docs/design/LP_Variations_2a_2026-08-31.dc.html（2aブロックのみ抽出）。作業報告は docs/作業報告_2026-08-31.md。PR #81（マージ済み、本番反映確認済み）"
   }
 ]
