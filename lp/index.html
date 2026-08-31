@@ -176,6 +176,9 @@
   /* ヒーロー */
   .hero{ padding:128px 0 72px; }
   h1{ font-weight:700; font-size:44px; line-height:1.5; letter-spacing:-0.03em; color:var(--ink-strong); margin:0 0 0; }
+  /* 「CSVを」の間で改行が入らないようにする（375px幅で「を」だけ行頭に来る崩れの対策。
+     コピー文字列は不変・改行位置だけをこのspanで制御する） */
+  h1 .nb{ white-space:nowrap; }
 
   /* デモの帯（薄面フルブリード）。中の .demo/.card 以下は現行のHTML/JS/CSSをそのまま移植し、ここでは触らない */
   .demo-band{ background:var(--bg-alt); border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:64px 0 56px; }
@@ -336,7 +339,7 @@
 
   <section class="hero">
     <div class="col">
-      <h1>月曜の朝、RMSからCSVを落として、<br>そのまま放り込む。<br>見るのは、これだけです。</h1>
+      <h1>月曜の朝、RMSから<span class="nb">CSVを</span>落として、<br>そのまま放り込む。<br>見るのは、これだけです。</h1>
       <div class="badges">
         <span>初期費用 0円</span><span class="bdiv" aria-hidden="true"></span>
         <span>14日間 無料トライアル</span><span class="bdiv" aria-hidden="true"></span>
