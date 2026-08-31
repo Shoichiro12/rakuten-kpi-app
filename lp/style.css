@@ -7,8 +7,11 @@
    このファイル内の生hexを全部洗い、旧トークンの値をvar()経由に統一した。
    ⚠️ index.html の :root と値がズレたら index.html 側が正（トークンの単一の真実はあちら） */
 :root {
-  --navy: #2e2d29;        /* 旧ネイビー → 墨色(ink-strong) */
-  --navy-dark: #2e2d29;
+  --navy: #2e2d29;        /* 見出し・本文リンク色として使用。about.html/help.htmlではink寄りの#383731に上書きされる */
+  --ink-strong: #2e2d29;  /* ヘッダー・フッターの塗りつぶし専用。--navyと値が分岐しても#2e2d29のまま固定する
+                              （2026-08-31: header/footerがvar(--navy)を参照していたため、about.html/help.htmlの
+                              独自:root上書き（--navy:#383731）でヘッダー背景だけ他ページと食い違う不具合が発生した。
+                              背景色は本文色から独立させ、このvarで統一する） */
   --accent: #4c6850;      /* 旧赤 → セージ濃(sage-deep)。赤はアラート専用に空ける */
   --text: #383731;        /* ink */
   --muted: #6b6559;
@@ -28,7 +31,7 @@ footer a:focus-visible { outline-color: var(--paper); }
 /* ヘッダー・フッターはLP本体(index.html)の墨色chromeに統一
    （2026-07-30: 生成り地の淡色ヘッダー → 2026-08-31: LPリニューアル2a確定版に合わせ墨色塗りつぶしへ変更。
    docs/jisso_keikaku_lp_renewal_2026-08-31_2.md 決定#8） */
-header { position: sticky; top: 0; background: var(--navy); z-index: 10; }
+header { position: sticky; top: 0; background: var(--ink-strong); z-index: 10; }
 .nav { max-width: 1120px; margin: 0 auto; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; height: 72px; }
 .logo-badge { color: var(--paper); font-family: "Zen Maru Gothic", sans-serif; font-weight: 700; font-size: 21px; letter-spacing: .06em; text-decoration: none; }
 .logo-badge .dot { color: var(--sage); }
@@ -44,7 +47,7 @@ table { width: 100%; border-collapse: collapse; font-size: 14.5px; }
 th, td { text-align: left; padding: 14px 16px; border: 1px solid var(--border); vertical-align: top; }
 th { background: var(--bg-alt); color: var(--navy); width: 32%; font-weight: 700; }
 .todo { background: #fff8e6; color: #8a6100; padding: 1px 8px; border-radius: 6px; font-weight: 700; }
-footer { background: var(--navy); color: #b8b2a6; font-size: 13px; padding: 44px 0; }
+footer { background: var(--ink-strong); color: #b8b2a6; font-size: 13px; padding: 44px 0; }
 footer .inner { max-width: 1120px; margin: 0 auto; padding: 0 24px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; align-items: center; }
 footer .links { display: flex; gap: 24px; flex-wrap: wrap; }
 footer a { color: #d9d4c9; text-decoration: none; }
