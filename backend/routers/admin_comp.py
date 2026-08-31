@@ -285,7 +285,9 @@ def _send_invite_mail(db: Session, grant: CompGrant, *, message: str, admin_emai
 
     # ⚠️ action_link はログに出さない（開けばログインできるリンクのため）。対象メールと
     # 結果だけをログに残す（supabase_admin.generate_link のdocstring参照）。
-    action_link = link_data.get("action_link")
+    # トップレベル優先、無ければ properties 配下（Supabaseのバージョンにより形が違う可能性が
+    # あるための保険。実際に本番で踏んだのは user_id 側の形違いだが、対称に対応しておく）。
+    action_link = link_data.get("action_link") or (link_data.get("properties") or {}).get("action_link")
     if not action_link:
         logger.error(
             "招待リンクのレスポンスに action_link がありません: target_email=%s keys=%s",
@@ -362,11 +364,15 @@ def create_invite(
             detail="招待リンクの発行に失敗しました。時間をおいて再度お試しください。",
         )
 
-    user = link_data.get("user") or {}
-    target_user_id = user.get("id")
+    # ⚠️ 本番で判明（2026-09-01）: Supabase Auth REST の generate_link はユーザー項目を
+    # トップレベルに平坦化して返す（{"id": ..., "email": ..., ..., "action_link": ...} のように
+    # ユーザーの属性とリンクの属性が同じ階層に混在する）。SDKのドキュメントに載っている
+    # {"user": {...}, "action_link": ...} というネスト形ではない。トップレベルの "id" を
+    # 優先し、無ければ従来想定していたネスト形（"user"."id"）にフォールバックする。
+    target_user_id = link_data.get("id") or (link_data.get("user") or {}).get("id")
     if not target_user_id:
         logger.error(
-            "招待リンクのレスポンスに user.id がありません: target_email=%s keys=%s",
+            "招待リンクのレスポンスに id がありません: target_email=%s keys=%s",
             email, list(link_data.keys()),
         )
         raise HTTPException(
