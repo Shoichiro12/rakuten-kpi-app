@@ -1112,6 +1112,10 @@ export interface CompGrant {
   revoked_at: string | null
   revoked_by_email: string | null
   note: string
+  /** 招待メールの最終送信日時（ISO8601）。null = 招待経由でない通常のcomp付与 */
+  invited_at: string | null
+  /** 'sent' | 'failed' | null（null = 招待経由でない） */
+  invite_status: 'sent' | 'failed' | null
 }
 
 export interface CompGrantListResponse {
@@ -1121,6 +1125,16 @@ export interface CompGrantListResponse {
 
 export interface CompGrantCreateResponse extends CompGrant {
   /** true = 既に有効な付与があり、新規作成せずそれを返した（冪等） */
+  already_granted: boolean
+}
+
+/**
+ * 招待（POST /admin/invites）とその再送（POST /admin/invites/{id}/resend）のレスポンス型。
+ * 2つのAPIは同じ形を返す（resend には already_granted が含まれないが、構造的型付けで
+ * 「余分なフィールドが無い」ことは許容されるため型は共用し、resend側では使わないフィールドとして無視する）
+ */
+export interface CompInviteResponse extends CompGrant {
+  /** true = 既に有効な付与があり、新規作成せずそれを返した（冪等）。招待では通常false */
   already_granted: boolean
 }
 
