@@ -266,14 +266,14 @@
 <script>
 // ============================================================
 // データはここだけ直せば更新できる（Claude Codeに編集させてOK）
-// 最終更新: 2026-08-24
+// 最終更新: 2026-08-31
 // gear: eboshi(烏帽子) / kabuto(兜) / zukin(頭巾) / hachimaki(鉢巻)
 //       / ninja(忍装束) / hime(束ね髪) / kasa(陣笠)
 // ============================================================
 const STATUS = [
   {label:"領国", value:"安泰（本番稼働中）", cls:"ok"},
   {label:"評定", value:"議案なし", cls:"ok"},
-  {label:"守り", value:"8/24検分 高0", cls:"ok"},
+  {label:"守り", value:"8/31検分 高0", cls:"ok"},
   {label:"軍費", value:"月 約$33", cls:""},
 ];
 
@@ -302,7 +302,7 @@ const AGENTS = [
    stats:{知略:80, 武勇:60}, cmds:["/release-check"]},
   {floor:1, id:"security", name:"セキュリティ室", yaku:"御庭番", job:"security",
    gear:"ninja", kimono:"#3a3230",
-   talk:"七日ごとに城の守りを検め、security/ に書き残しており申す。\n八月二十四日の検分、「高」は無し。\n気掛かりであったCSVインジェクションの手薄な口は、\n二十七日に無害化を施し塞ぎ申した。次なる検分は三十一日。",
+   talk:"七日ごとに城の守りを検め、security/ に書き残しており申す。\n八月三十一日の検分、「高」は無し。\n新たに設けし管理者の見廻り役・無償提供の御沙汰も、\n境界をすべて実地に試し、抜け穴無きを確かめ申した。\n次なる検分は九月七日。",
    stats:{知略:92, 武勇:45}, cmds:["/security-check"]},
   {floor:1, id:"designer", name:"デザイン部", yaku:"意匠奉行", job:"designer",
    gear:"hime", kimono:"#8f4a63",
