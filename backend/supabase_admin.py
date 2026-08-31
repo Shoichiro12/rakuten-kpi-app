@@ -91,6 +91,36 @@ def find_user_by_email(email: str) -> Optional[dict]:
     return None
 
 
+def generate_link(email: str, type_: str = "invite", redirect_to: Optional[str] = None) -> dict:
+    """Admin generate_link API を呼び、招待リンク（action_link）等を発行する。
+
+    管理画面からの無償アカウント招待（計画書 docs/jisso_keikaku_comp_invite_2026-08-31.md
+    §3-1）で使う。type="invite" のとき、対象メールのユーザーが Supabase 側に
+    存在しなければ Supabase がこの呼び出しの中で新規作成する（ドキュメント上の仕様）。
+    既に存在するメールに対して呼ぶとエラーになるため、呼び出し側（routers/admin_comp.py）
+    で事前に find_user_by_email() による存在確認を必須とすること。
+
+    レスポンスには action_link・email_otp・hashed_token・verification_type・
+    redirect_to・user（新規作成された Supabase User オブジェクト、id を含む）が
+    含まれる（Supabase の実バージョンにより多少の差異があり得るため、呼び出し側は
+    dict.get() で緩く読むこと）。
+
+    ⚠️ action_link はそのまま踏めばログインできるリンクなので、呼び出し側は
+    絶対にログに出さないこと（対象メールと結果だけをログに残す）。
+    """
+    body = {"type": type_, "email": email}
+    if redirect_to:
+        body["options"] = {"redirect_to": redirect_to}
+    req = urllib.request.Request(
+        f"{SUPABASE_URL}/auth/v1/admin/generate_link",
+        data=json.dumps(body).encode("utf-8"),
+        method="POST",
+        headers=_headers(),
+    )
+    with urllib.request.urlopen(req, timeout=15) as res:
+        return json.loads(res.read().decode("utf-8"))
+
+
 def list_users(per_page: int = 1000) -> list:
     """Supabase Auth の全ユーザーを取得する（1000件超はページングして続ける）。
 

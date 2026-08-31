@@ -19,7 +19,14 @@ from datetime import datetime, timedelta, timezone
 from email.mime.text import MIMEText
 from email.utils import formataddr
 
+import mail_templates
+
 logger = logging.getLogger("notifications")
+
+# 招待メールの差出人表示（計画書 docs/jisso_keikaku_comp_invite_2026-08-31.md Q1で確定）。
+# Gmail側で「名前を指定して送信」に登録済みであることが前提（_send のdocstring参照）。
+_INVITE_FROM_ADDR = "info@ureshiru.com"
+_INVITE_EXPIRES_LABEL_DEFAULT = "1時間"
 
 _JST = timezone(timedelta(hours=9))
 
@@ -48,17 +55,29 @@ def smtp_configured() -> bool:
     return all(_env(k) for k in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD", "NOTIFY_EMAIL"))
 
 
-def _send(subject: str, body: str) -> None:
-    """プレーンテキストメールを NOTIFY_EMAIL 宛に送る。例外は呼び出し元へ伝播する。"""
+def _send(subject: str, body: str, *, to: str = None, from_name: str = "ウレシル",
+          from_addr: str = None) -> None:
+    """プレーンテキストメールを送る。例外は呼び出し元へ伝播する。
+
+    to/from_name/from_addr を省略すると従来どおり NOTIFY_EMAIL 宛・SMTP_USER 名義
+    （表示名のみ「ウレシル」）で送る（問い合わせ・フィードバック通知はこの既定のまま）。
+    招待メール（send_invite）は to=対象メール・from_addr=info@ureshiru.com を指定する。
+
+    ⚠️ SMTP認証自体は常に SMTP_USER（Gmailの実アカウント）で行う（sendmail() の
+    エンベロープ送信者も user のまま）。from_addr はヘッダー上の表示 From のみを変える。
+    Gmail側で「名前を指定して送信」に登録済みのアドレスでないと、Gmailが実際の
+    差出人表示を SMTP_USER に書き換える（CLAUDE.md 申し送り参照）。
+    """
     host = _env("SMTP_HOST")
     port = int(_env("SMTP_PORT") or 587)
     user = _env("SMTP_USER")
     password = _env("SMTP_PASSWORD")
-    to = _env("NOTIFY_EMAIL")
+    to = to or _env("NOTIFY_EMAIL")
+    from_addr = from_addr or user
 
     msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = subject
-    msg["From"] = formataddr(("ウレシル", user))
+    msg["From"] = formataddr((from_name, from_addr))
     msg["To"] = to
 
     with smtplib.SMTP(host, port, timeout=20) as server:
@@ -175,3 +194,30 @@ def send_feedback_notification(feedback) -> None:
         )
     except Exception as e:
         logger.error("フィードバック通知メールの送信に失敗しました: %s", e, exc_info=True)
+
+
+def send_invite(*, email: str, action_link: str, message: str = "",
+                 expires_label: str = None) -> None:
+    """管理画面からの無償アカウント招待メールを送る（計画書§3-2・§4）。
+
+    ⚠️ 問い合わせ・フィードバック通知（send_inquiry_notification / send_feedback_notification）
+    と違い、例外を握りつぶさず呼び出し元へ伝播する。呼び出し元（routers/admin_comp.py）は
+    アカウント作成・comp付与は既に完了した状態でこの送信だけ失敗し得るため、
+    invite_status を "failed" にして 502 を返し、再送ボタンで送り直せるようにする
+    必要があるため（計画書§3-2 手順8）。
+    """
+    if not smtp_configured():
+        raise RuntimeError(
+            "SMTPが未設定のため招待メールを送信できません"
+            "（SMTP_HOST/SMTP_USER/SMTP_PASSWORD/NOTIFY_EMAIL）。"
+        )
+    subject = mail_templates.INVITE_SUBJECT
+    body = mail_templates.invite_body(
+        email=email,
+        action_link=action_link,
+        message=message,
+        expires_label=expires_label or _INVITE_EXPIRES_LABEL_DEFAULT,
+    )
+    # action_link 自体はログに出さない（開けばログインできるリンクのため）。
+    _send(subject, body, to=email, from_name="ウレシル", from_addr=_INVITE_FROM_ADDR)
+    logger.info("招待メールを送信しました: to=%s", email)

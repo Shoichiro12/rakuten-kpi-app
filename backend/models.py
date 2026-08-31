@@ -537,3 +537,7 @@ class CompGrant(Base, UserScopedMixin):
     # 付与理由の自由記述。評定Q6で必須に確定（nullable=False）。短文でよいが、
     # 「なぜ無償か」を後から追えなくする放置事故（EXEMPT_TEST_EMAILSと同じ教訓）を防ぐため。
     note = Column(String, nullable=False)
+    # 招待メール（計画書 docs/jisso_keikaku_comp_invite_2026-08-31.md §3-3）。
+    # NULL＝招待経由でない通常のcomp付与（既存アカウントへの直接付与）。
+    invited_at = Column(DateTime, nullable=True)      # 最終送信日時（再送で更新）
+    invite_status = Column(String, nullable=True)     # "sent" / "failed"
