@@ -530,7 +530,12 @@ commitしていたため、新規`Subscription`行の`user_id`が対象ではな
 アカウント（特にadmin@自身）の課金状態が変わっていないこと」という項目が想定している検証はこれ）。
 次にadmin@以外への付与機会があれば、その際にこの項目を満たすことを推奨する。
 
-**区切り5の残り**: demo@ureshiru.comのcomp移行（`EXEMPT_TEST_EMAILS`からの削除込み、チェックリスト⑤）と
-`GET /api/security-status`の再確認（チェックリスト⑥）が未実施。①②③④は今回のadmin@自己付与で
-実質的にカバーされた部分はあるが、上記の留保があるため③の「対象以外のアカウントが無傷であること」の
-厳密な検証はまだ残っていると考えるのが安全。
+**区切り5の残り**: demo@ureshiru.comのcomp移行（`EXEMPT_TEST_EMAILS`からの削除込み、チェックリスト⑤）が
+未実施。①②③④は今回のadmin@自己付与で実質的にカバーされた部分はあるが、上記の留保があるため③の
+「対象以外のアカウントが無傷であること」の厳密な検証はまだ残っていると考えるのが安全。
+
+**チェックリスト⑥（`GET /api/security-status`の再確認）は2026-08-31に完了。** オーナーが本番で
+ログイン済みブラウザのページ内fetch（手順は`docs/unyou_cowork_honban_kakunin_2026-08-29.md`に
+追記済み）で実施し、`200`・`applicable: true`・`ok: true`・`protected`が20テーブル（`comp_grants`・
+`admin_view_sessions`を含む）・`unprotected`空、を確認した。詳細は`security/security_check_2026-08-31.md`
+「①」節、および週次セキュリティチェックのPR（本行と同じPR）を参照。⑤（demo@移行）は引き続き未着手。

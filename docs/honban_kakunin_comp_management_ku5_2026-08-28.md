@@ -19,7 +19,11 @@ Renderダッシュボードでデプロイが緑（完了）になっている�
 ショットで新規`Subscription`行の作成・`comp`ステータス表示の正常動作を確認できたが、**付与者=対象が
 同一アカウントのため、③の「対象以外のアカウント（特にadmin@自身）が無傷であること」の検証としては
 成立しない**（詳細は計画書§15）。③のこの項目は、対象≠操作者となる別ユーザーへの付与機会があるときに
-改めて満たすこと。⑤（demo@移行）・⑥（security-status再確認）は未着手のまま。
+改めて満たすこと。⑤（demo@移行）は未着手のまま。
+
+**⚠️ 2026-08-31追記: ⑥（security-status再確認）は完了。** オーナーがログイン済みブラウザの
+ページ内fetch（手順は`docs/unyou_cowork_honban_kakunin_2026-08-29.md`）で実施し、下記⑥の
+チェック内容を満たした。
 
 ---
 
@@ -88,10 +92,16 @@ Renderダッシュボードでデプロイが緑（完了）になっている�
 
 ## ⑥ security-statusでcomp_grantsのok:true再確認
 
-- [ ] `GET /api/security-status`（管理者アカウントでログイン後にアクセス、または`curl`）で
+- [x] `GET /api/security-status`（管理者アカウントでログイン後にアクセス、または`curl`）で
       `comp_grants`が`protected`配列に含まれ、`ok: true`であることを再確認する
       （[PR #70](https://github.com/Shoichiro12/rakuten-kpi-app/pull/70)マージ直後に一度確認済みだが、
       ⑤のRender再デプロイ後に念のため再確認しておく）
+      **→ 2026-08-31完了。** ⑤（demo@移行・Render再デプロイ）に先行して実施したため「⑤の再デプロイ後」
+      という前提は満たしていないが、`comp_grants`テーブルのRLS保護は`EXEMPT_TEST_EMAILS`のenv変更（⑤）
+      とは無関係な独立した確認事項のため、今回の結果はそのまま有効。実測: `200`・`applicable: true`・
+      `ok: true`・`protected`20テーブル（`comp_grants`・`admin_view_sessions`を含む）・`unprotected`空
+      （ログイン済みブラウザのページ内fetchで実施。手順は`docs/unyou_cowork_honban_kakunin_2026-08-29.md`）。
+      ⑤実施後にenv変更に伴う再デプロイが走った場合は、念のためもう一度だけ確認しておくとよい。
 
 ---
 
