@@ -75,6 +75,11 @@ _EXTRA_COLUMNS = {
         ("page_ready", "BOOLEAN"),
         ("investment_intent", "BOOLEAN"),
     ],
+    # 管理画面からの無償アカウント招待（計画書 docs/jisso_keikaku_comp_invite_2026-08-31.md §3-3）
+    "comp_grants": [
+        ("invited_at", "TIMESTAMP"),
+        ("invite_status", "VARCHAR"),
+    ],
 }
 
 # マスタCRUD規約（2026-08-22）: ソフトデリート用 archived_at 列。
