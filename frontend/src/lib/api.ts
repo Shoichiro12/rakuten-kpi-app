@@ -711,6 +711,19 @@ export const api = {
         request<import('../types').CompGrantRevokeResponse>(`/admin/comp-grants/${grantId}/revoke`, {
           method: 'POST',
         }),
+      /* ─── 招待（アカウント作成＋comp付与＋メール送信を1回で行う。計画書
+         docs/jisso_keikaku_comp_invite_2026-08-31.md 区切り1・2はバックエンド実装済み。PR #84） ─── */
+      /** 招待する（email/note必須。message任意。既存アカウントは409） */
+      invite: (email: string, note: string, message: string) =>
+        request<import('../types').CompInviteResponse>('/admin/invites', {
+          method: 'POST',
+          body: JSON.stringify({ email, note, message: message || undefined }),
+        }),
+      /** 招待メールを再送する（同一アカウントへリンクを発行し直すだけ） */
+      resendInvite: (grantId: number) =>
+        request<import('../types').CompInviteResponse>(`/admin/invites/${grantId}/resend`, {
+          method: 'POST',
+        }),
     },
   },
 }

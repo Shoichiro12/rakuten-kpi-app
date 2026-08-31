@@ -82,6 +82,22 @@ export default function App() {
   const [authReady, setAuthReady] = useState(!authEnabled)
   // パスワード再設定メールのリンクから戻ってきた状態（PASSWORD_RECOVERY）
   const [recovering, setRecovering] = useState(false)
+  // 招待メールのリンク（type=invite）から来た状態。Supabaseは招待リンクで
+  // PASSWORD_RECOVERY イベントを発火しない（invite専用イベントも無い。SIGNED_IN相当の
+  // 扱いになる）ため、URLのハッシュ/クエリの type=invite を直接見て判定する。
+  // Supabaseクライアントがハッシュを消費する前に読む必要があるため、lazy initializerで
+  // マウント時の一度だけ読む。
+  const [isInviteLink] = useState(() => {
+    // ハッシュ形式（#access_token=...&type=invite）とクエリ形式（?type=invite）の両対応。
+    // Supabaseのバージョンやリダイレクト方式でどちらも起こり得るため両方見る。
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+    const searchParams = new URLSearchParams(window.location.search)
+    return hashParams.get('type') === 'invite' || searchParams.get('type') === 'invite'
+  })
+  // パスワード設定完了後にアプリ本体へ進むためのフラグ。isInviteLink は初期値のまま
+  // 更新されない（リロードしない限りtrueのまま）ので、onDone でこちらを立てて
+  // 表示条件から外す
+  const [inviteDone, setInviteDone] = useState(false)
 
   useEffect(() => {
     if (!supabase) return
@@ -116,9 +132,15 @@ export default function App() {
   if (!authReady) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-sm text-gray-400">読み込み中...</div>
   }
-  // パスワード再設定メールのリンク経由なら再設定画面を最優先で表示
-  if (recovering) {
-    return <ResetPassword onDone={() => setRecovering(false)} />
+  // パスワード再設定メール（PASSWORD_RECOVERY）または招待リンク（type=invite）経由なら
+  // パスワード設定画面を最優先で表示。招待は見出し等の文言だけ変える（処理は共通）
+  if (recovering || (isInviteLink && !inviteDone)) {
+    return (
+      <ResetPassword
+        onDone={() => { setRecovering(false); setInviteDone(true) }}
+        isInvite={isInviteLink && !recovering}
+      />
+    )
   }
   // 認証有効かつ未ログインならログイン画面
   if (authEnabled && !session) {

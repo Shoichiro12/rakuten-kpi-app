@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Eye, Gift, Loader2, RefreshCw, ShieldAlert } from 'lucide-react'
+import { Eye, Gift, Loader2, Mail, RefreshCw, ShieldAlert } from 'lucide-react'
 import Header from '../components/layout/Header'
 import ConfirmDeleteModal from '../components/ConfirmDeleteModal'
 import { api } from '../lib/api'
@@ -53,6 +53,45 @@ const INPUT_CLS =
   'w-full border border-line rounded-lg px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-ink-strong'
 
 /**
+ * 招待メールの送信前プレビュー（backend/mail_templates.py::invite_body() の移植。
+ * 文言は一言一句バックエンドと同じにすること。リンク部分だけは実際のリンクが
+ * まだ無いためプレースホルダにする）。バックエンドに文面生成のAPIは無い。
+ */
+function buildInvitePreview(email: string, message: string): string {
+  const trimmedMessage = message.trim()
+  const lines = [
+    `${email} 様`,
+    '',
+    '楽天市場向けの売上・広告KPI管理ツール「ウレシル」の中村です。',
+    `${email} 様のアカウントを無償でご用意しましたので、ご案内します。`,
+  ]
+  if (trimmedMessage) lines.push('', trimmedMessage)
+  lines.push(
+    '',
+    '■ はじめかた',
+    '1. 下のリンクを開く（有効期限: 発行から1時間）',
+    '   [実際のリンクはメール送信時に発行されます]',
+    '2. パスワードを決めて保存する',
+    '3. そのままダッシュボードが開きます',
+    '',
+    '■ ご利用について',
+    '・費用はかかりません。カード登録も不要です',
+    '・無償提供の終了時は、事前にこちらからご連絡します',
+    '・使い方はアプリ内の「使い方ガイド」か、こちらをご覧ください',
+    '  https://ureshiru.com/help.html',
+    '',
+    'ご不明な点はこのメールに返信いただくか、info@ureshiru.com までご連絡ください。',
+    '',
+    '--',
+    'ウレシル（運営: 中村祥一郎）',
+    'https://ureshiru.com',
+    '利用規約 https://ureshiru.com/terms.html',
+    'プライバシーポリシー https://ureshiru.com/privacy.html',
+  )
+  return lines.join('\n')
+}
+
+/**
  * 無償提供（comp）の管理セクション（計画書 docs/jisso_keikaku_comp_management_2026-08-28.md 区切り3）。
  *
  * 付与操作の起点になるため、閲覧履歴のような折りたたみにはせず常時表示のカードにする
@@ -74,6 +113,13 @@ function CompManagement({ onMutated }: { onMutated: () => void }) {
   // 確認ダイアログの対象。付与は入力値のスナップショット、解除は対象行
   const [confirmGrant, setConfirmGrant] = useState<{ email: string; note: string } | null>(null)
   const [confirmRevoke, setConfirmRevoke] = useState<CompGrant | null>(null)
+
+  // ── メールで招待（計画書 docs/jisso_keikaku_comp_invite_2026-08-31.md 区切り3） ──
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteNote, setInviteNote] = useState('')
+  const [inviteMessage, setInviteMessage] = useState('')
+  const [confirmInvite, setConfirmInvite] = useState<{ email: string; note: string; message: string } | null>(null)
+  const [resendingId, setResendingId] = useState<number | null>(null)
 
   const loadGrants = useCallback(async () => {
     setListError(null)
@@ -142,7 +188,58 @@ function CompManagement({ onMutated }: { onMutated: () => void }) {
     }
   }
 
+  const doInvite = async () => {
+    if (!confirmInvite) return
+    setBusy(true)
+    setMsg({})
+    try {
+      const res = await api.admin.comp.invite(confirmInvite.email, confirmInvite.note, confirmInvite.message)
+      if (res.already_granted) {
+        // 招待では通常falseだが、念のため両方に対応する（冪等成功はエラーにしない）
+        setMsg({ info: `${res.email} には既に有効な無償提供があります。招待メールを送信しました。` })
+      } else {
+        setMsg({ info: `${res.email} に招待メールを送信しました。` })
+      }
+      setInviteEmail('')
+      setInviteNote('')
+      setInviteMessage('')
+      await loadGrants()
+      onMutated()
+    } catch (e) {
+      // 409（既存アカウント→直接付与への案内）・502（メール送信失敗→再送への案内）とも
+      // バックエンドの detail が日本語の説明文字列なのでそのまま表示する
+      console.error('[CompManagement] 招待エラー:', e)
+      setMsg({ error: e instanceof Error ? e.message : '招待の送信に失敗しました' })
+      // 502（メール送信失敗）でもアカウント作成とcomp付与は完了している＝一覧に
+      // 「送信失敗」の行が増えているはずなので、エラー時も必ず一覧を再取得する
+      // （見えないとユーザーが「再送」ボタンに気づけない）
+      await loadGrants()
+      onMutated()
+    } finally {
+      setBusy(false)
+      setConfirmInvite(null)
+    }
+  }
+
+  const doResend = async (grantId: number) => {
+    setResendingId(grantId)
+    setMsg({})
+    try {
+      const res = await api.admin.comp.resendInvite(grantId)
+      setMsg({ info: `${res.email} に招待メールを再送しました。` })
+      await loadGrants()
+    } catch (e) {
+      // 429（60秒以内の連打防止）等。detail は日本語文字列なのでそのまま表示する
+      console.error('[CompManagement] 再送エラー:', e)
+      setMsg({ error: e instanceof Error ? e.message : '招待メールの再送に失敗しました' })
+      await loadGrants()
+    } finally {
+      setResendingId(null)
+    }
+  }
+
   const canSubmit = email.trim() !== '' && note.trim() !== '' && !busy
+  const canInvite = inviteEmail.trim() !== '' && inviteNote.trim() !== '' && !busy
 
   return (
     <section className="bg-paper rounded-xl border border-line p-5 space-y-4">
@@ -175,6 +272,7 @@ function CompManagement({ onMutated }: { onMutated: () => void }) {
               <tr>
                 <th className={TH}>メール</th>
                 <th className={TH}>状態</th>
+                <th className={TH}>招待</th>
                 <th className={TH}>付与した管理者</th>
                 <th className={TH}>付与日時</th>
                 <th className={TH}>理由</th>
@@ -189,6 +287,28 @@ function CompManagement({ onMutated }: { onMutated: () => void }) {
                     {g.resolved
                       ? <span className="rounded-full bg-up-bg px-2 py-0.5 text-xs font-bold text-up">サインアップ済み</span>
                       : <span className="rounded-full bg-bg-alt px-2 py-0.5 text-xs font-bold text-sub">先行登録中（未サインアップ）</span>}
+                  </td>
+                  {/* 招待列: invite_status で出し分け。「再送」は招待経由の行にだけ出す
+                      （直接付与の行に出すと400になるため）。再送は契約状態を変えない
+                      メール送信の再実行なので、確認ダイアログは付けない（解除とは性質が違う） */}
+                  <td className={`${TD} whitespace-nowrap text-xs`}>
+                    {g.invite_status === null ? (
+                      <span className="text-muted">—</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        {g.invite_status === 'failed'
+                          ? <span className="font-bold text-alert">送信失敗</span>
+                          : <span className="tabular-nums">{formatDateTime(g.invited_at)} 送信</span>}
+                        <button
+                          type="button"
+                          onClick={() => doResend(g.id)}
+                          disabled={busy || resendingId !== null}
+                          className="rounded-lg border border-line px-2 py-1 text-xs font-bold text-sub hover:bg-bg-alt disabled:opacity-50 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-strong"
+                        >
+                          {resendingId === g.id ? <Loader2 size={12} className="animate-spin" aria-hidden="true" /> : '再送'}
+                        </button>
+                      </span>
+                    )}
                   </td>
                   <td className={`${TD} break-all`}>{g.granted_by_email ?? <span className="text-muted">—</span>}</td>
                   <td className={`${TD} tabular-nums whitespace-nowrap`}>{formatDateTime(g.granted_at)}</td>
@@ -254,6 +374,75 @@ function CompManagement({ onMutated }: { onMutated: () => void }) {
         </button>
       </form>
 
+      {/* メールで招待（アカウント作成＋comp付与＋招待メール送信を1回で行う）。
+          既存の直接付与フォームとは別のフォーム＝「入口を2つにするだけで、付与のロジックは1つ」
+          という計画書の設計方針どおり並存させる。未登録メール専用（既存アカウントは409で
+          直接付与への案内が返る） */}
+      <form
+        className="border-t border-line pt-4 space-y-3"
+        onSubmit={(e) => {
+          e.preventDefault()
+          if (!canInvite) return
+          setConfirmInvite({ email: inviteEmail.trim(), note: inviteNote.trim(), message: inviteMessage })
+        }}
+      >
+        <p className="text-xs font-bold text-ink flex items-center gap-1.5">
+          <Mail size={13} className="text-sage-deep" aria-hidden="true" />
+          メールで招待する（未登録のメール向け。アカウント作成と招待メール送信まで行います）
+        </p>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div>
+            <label className="block text-xs font-medium text-sub mb-1" htmlFor="invite-email">メールアドレス</label>
+            <input
+              id="invite-email"
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              className={INPUT_CLS}
+              placeholder="user@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-sub mb-1" htmlFor="invite-note">理由（必須）</label>
+            <input
+              id="invite-note"
+              type="text"
+              value={inviteNote}
+              onChange={(e) => setInviteNote(e.target.value)}
+              className={INPUT_CLS}
+              placeholder="例: ◯◯社の導入検証用 / △△様のオンボーディング支援"
+            />
+          </div>
+        </div>
+        <div>
+          <label className="block text-xs font-medium text-sub mb-1" htmlFor="invite-message">メッセージ（任意・メール本文に差し込まれます）</label>
+          <textarea
+            id="invite-message"
+            value={inviteMessage}
+            onChange={(e) => setInviteMessage(e.target.value)}
+            maxLength={1000}
+            rows={3}
+            className={INPUT_CLS}
+            placeholder="例: 先日お話しした無償利用のご案内です。"
+          />
+        </div>
+        {/* 送信前プレビュー: 入力を変更するとリアルタイムに更新される（レンダリング時に毎回計算） */}
+        <div>
+          <p className="text-xs font-medium text-sub mb-1">送信されるメールのプレビュー</p>
+          <pre className="whitespace-pre-wrap rounded-lg border border-line bg-bg-alt px-3 py-2.5 text-xs leading-relaxed text-ink font-mono overflow-x-auto">
+            {buildInvitePreview(inviteEmail.trim() || 'user@example.com', inviteMessage)}
+          </pre>
+        </div>
+        <button
+          type="submit"
+          disabled={!canInvite}
+          className="inline-flex items-center gap-1.5 rounded-lg bg-ink-strong px-4 py-2 text-xs font-bold text-white hover:opacity-90 disabled:opacity-50 transition-opacity focus:outline-none focus-visible:ring-2 focus-visible:ring-ink-strong focus-visible:ring-offset-2"
+        >
+          {busy ? <Loader2 size={13} className="animate-spin" aria-hidden="true" /> : <Mail size={13} aria-hidden="true" />}
+          招待メールを送る
+        </button>
+      </form>
+
       {/* 確認ダイアログ（要件3・評定で必須）。ConfirmDeleteModal は汎用propsなのでそのまま流用 */}
       <ConfirmDeleteModal
         open={confirmGrant !== null}
@@ -263,6 +452,16 @@ function CompManagement({ onMutated }: { onMutated: () => void }) {
         checkboxLabel="内容を確認しました"
         onConfirm={doGrant}
         onCancel={() => setConfirmGrant(null)}
+        loading={busy}
+      />
+      <ConfirmDeleteModal
+        open={confirmInvite !== null}
+        title="招待メールを送信します"
+        message={`宛先: ${confirmInvite?.email ?? ''}\nこのメールアドレスでアカウントが作成され、無償提供が有効になります。\n上記のプレビューのとおりメールが送信されます。`}
+        confirmLabel="送信する"
+        checkboxLabel="内容を確認しました"
+        onConfirm={doInvite}
+        onCancel={() => setConfirmInvite(null)}
         loading={busy}
       />
       <ConfirmDeleteModal
