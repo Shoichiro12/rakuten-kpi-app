@@ -182,7 +182,7 @@ https://ureshiru.com
 1. **service_roleキーはバックエンドのみ**。`supabase_admin.py` をフロントから参照できる場所に置かない
 2. `generate_link` の `action_link` はログに出さない（開けばログインできるリンクなので）。ログは対象メールと結果だけ
 3. Gmail SMTPで `From: info@ureshiru.com` を出すには、Gmail側の「名前を指定して送信」に登録済みであることが条件
-   （2026-07-30に3アドレス登録済み。`docs/mail_ureshiru_addresses_2026-07-30.md`）。
+   （2026-07-30に3アドレス登録済み。記録はClaudeプロジェクト内の資料〈リポジトリ外〉）。
    未登録アドレスを From にするとGmailが SMTP_USER に書き換えるので、区切り4で差出人表示を必ず目視
 4. 招待は1件ずつ手動で送る前提。連打防止として同一メールへの再送は前回から60秒空ける（それ以上の制限は入れない）
 5. `_send` に from/to を足すとき、既存の通知メール（NOTIFY_EMAIL宛）の挙動を変えないこと

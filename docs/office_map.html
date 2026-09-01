@@ -327,6 +327,7 @@ const AGENTS = [
 ];
 
 const QUESTS = [
+  {t:"マルウェアスキャンの適用漏れを塞ぐこと（優先度高）", m:"9/2オーナーがRender環境変数を確認しCLOUDMERSIVE_API_KEYが未設定と判明＝本番で全エンドポイントのスキャンが無効だった（キーは9/2にオーナーが設定済み）。masters.py:485,581 / targets.py:90 / item_targets.py:313 の4エンドポイントにawait file.read()直後のscan_bytes()を追加、CLAUDE.mdに「CSV/ZIPを受け取るエンドポイントは必ずscan_bytesを呼ぶ」規約を明記、GET /api/security-statusにmalware_scan_active（キー設定有無）を追加。規模小・次の夜勤の普請に指定（軍令帳参照）", stamp:"wait"},
   {t:"課金設定の診断パネルが一般ユーザーにも見えること", m:"Billing.tsxの「課金設定の診断」パネルとGET /api/billing/diagnoseが管理者限定になっておらず一般ユーザーからも見える。require_admin相当に限定すること。無償提供ユーザーの画面で「DBにsubscription IDがありません」警告が出て混乱する。優先度中・夜勤候補・規模小", stamp:"wait"},
   {t:"招待メールをHTML化・自社ドメインリンク化すること", m:"招待メールをHTML＋テキストの2部構成にし、リンクは「アカウントを有効化する」ボタン＋予備のURL1行にする。URLは app.ureshiru.com/invite?t=<hashed_token> の自社ドメインにし、フロントの /invite で supabase.auth.verifyOtp({type:'invite', token_hash}) を呼ぶ（Supabaseのverifyを経由しない。バックエンドはgenerate_linkのhashed_tokenを使うだけ）。管理画面のプレビューはテキスト版のまま。優先度中・夜勤候補・規模小〜中", stamp:"wait"},
   {t:"バックエンド日時レスポンスのnaive UTC文字列のこと", m:"管理者閲覧機能ku3受け入れ時に発見。フロントのparseServerDate()で個別対症済み、API側のISO8601 Z付き標準化は未検討", stamp:"kouho"},
@@ -334,8 +335,6 @@ const QUESTS = [
   {t:"SupabaseプランのCLAUDE.md記載と実態の食い違いのこと", m:"infra-ops.mdはPro（東京）$25と記載、実態はFREE/NANOの可能性。オーナー実プラン確認が先（軍令帳参照）", stamp:"kouho"},
   {t:".env.exampleのADMIN_USER_ID説明が読取専用のみと誤解させること", m:"comp管理のPOST書き込みも同じUUIDで保護されているが、コメントはGETのみと記載（8/28巡回発見・軍令帳参照）", stamp:"kouho"},
   {t:"lp/style.cssのキャッシュバスターのこと", m:"優先度低・次にstyle.cssを触るときに同梱。LPリニューアル(2a)本番反映直後に旧style.cssキャッシュでヘッダー色が旧色に見える事象を確認（軍令帳参照）", stamp:"kouho"},
-  {t:"docs/mail_ureshiru_addresses_2026-07-30.mdへの幽霊参照のこと", m:"comp招待の計画書が引用するファイルが全ブランチ・全履歴に一度も存在しない（9/1巡回発見・軍令帳参照）", stamp:"kouho"},
-  {t:"マルウェアスキャンの記録漏れとカバレッジ漏れのこと", m:"backend/malware.py（8/22導入）がCLAUDE.mdに一切未記載。masters.py/targets.py/item_targets.pyの新設CSV取込4本がscan_bytes()未呼び出し（9/1巡回発見・軍令帳参照）", stamp:"kouho"},
   {t:"四万SKU取込 実測のこと", m:"約定により資料入手は十月朔日以降", stamp:"later", sealed:true},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
