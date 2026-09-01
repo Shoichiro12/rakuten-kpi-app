@@ -158,6 +158,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 | **招待メールと認証系メールで差出人アドレスが2つある（`info@ureshiru.com` / `sales@ureshiru.com`）**: 認証系メール（Confirm signup・Reset password・Change email・Password changed等。2026-08-03日本語化済み）はSupabase Auth側のカスタムSMTP設定により`sales@ureshiru.com`名義で送られる。一方、招待メール（本機能・`backend/notifications.py::send_invite()`）はアプリ自前のSMTPで`info@ureshiru.com`名義。**同じ「ウレシル」からのメールなのに差出人が2種類あり、受信者が混乱しうる**（統一されていない状態自体は今回の区切り4検証で問題にはならなかったが、認識のずれとして記録）。**統一するなら**、招待メール側を`sales@ureshiru.com`に寄せるのが最小の変更（`backend/notifications.py`の`_INVITE_FROM_ADDR`定数をenv化してあるので`INVITE_FROM_EMAIL`のような環境変数で上書きできるようにする程度で足りる。認証系側=Supabaseのカスタムテンプレート側を触る必要はない）。優先度低（実害なし・体験上の細部） | 2026-09-01 | 未対応（記録のみ・優先度低）。対応するなら`backend/notifications.py`の`_INVITE_FROM_ADDR`をenv化する変更が最小 |
 
+| **`lp/README.md`の陳腐化を解消（夜勤・巡回発見案件）**: 2026-08-25の巡回で発見・2026-08-26に急務へ昇格していた案件。(a) ファイル構成節が「shot-1〜5-*.jpg…掲載は主役工程の2.0・4.0のみ、1/3/5はファイルのみ保持」という2026-08-20時点の記述のままだったが、2026-08-24のLPエッセイ型全面刷新で「5つの工程」セクション自体が廃止され、`index.html`からの画像参照は`shot-hero.jpg`（og:image）のみになっていた＝shot-1〜5は全て未使用（`grep`で`index.html`に他のshot参照が無いことを確認）。(b) デプロイ節の「Vercelの旧プロジェクトはStripe審査完了後に削除する」という未来形の記述も、CLAUDE.md記載のとおり2026-08-24に旧Vercelプロジェクト（`ureshiru`/`ureshiru-lp`）は既に削除済みで古かった | 2026-08-31 | 実装済み（夜勤・`lp/README.md`のファイル構成節を実態に修正しshot-1〜5全未使用の注記を追加、デプロイ節を「削除済み」の過去形に修正。コード変更なし・ドキュメントのみ） |
+
 ## 🏢 社内体制（サブエージェントと定例）
 
 このリポジトリには `.claude/agents/` に部署ごとのサブエージェント、`.claude/skills/` に定例業務がある。

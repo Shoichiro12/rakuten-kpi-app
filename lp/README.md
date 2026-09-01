@@ -29,9 +29,12 @@ lp/
 ├── privacy.html      プライバシーポリシー
 ├── terms.html        利用規約
 ├── style.css         下層ページ用のスタイル（index.html は使わない）
-├── shot-hero.jpg     トップのヒーローで使う実画面
-└── shot-1〜5-*.jpg   工程画像。掲載は主役工程の 2.0・4.0 のみ（2026-08-20 の強弱決定）。1/3/5 はファイルのみ保持
+└── shot-hero.jpg     トップのヒーロー（og:image）で使う実画面。唯一使用中の画像
 ```
+
+`shot-1-intake.jpg`〜`shot-5-learn.jpg`（工程画像）は**2026-08-24のLPエッセイ型全面刷新で
+「5つの工程」セクション自体が廃止されたため、現在は全て未使用**（`index.html` からの参照なし）。
+ファイルは削除せず残置している（過去のデザイン案の実測物として）。
 
 `about.html` には**顔写真・実名・会社名を載せない**（匿名性を保つ・2026-08-09 オーナー決定）。
 JSON-LD の `Person` も意図的に入れていない。
@@ -76,5 +79,5 @@ JSON-LD の `Person` も意図的に入れていない。
 - 本番ドメイン: `https://ureshiru.com`（Cloudflare DNS・SSL自動）
 - プレビュー: `https://ureshiru-lp.pages.dev`
 - 拡張子なしURL（`/tokushoho` 等）はPagesが標準で解決する（vercel.json は不要になったため削除済み）
-- Vercel の旧プロジェクト（ureshiru.vercel.app）は Stripe審査完了までは残す。
-  審査完了後に Stripe の「ビジネスウェブサイト」を ureshiru.com へ変更し、Vercel側を削除する
+- Vercel の旧プロジェクト（`ureshiru` / `ureshiru-lp`）は**2026-08-24に削除済み**。
+  `ureshiru.com` / `app.ureshiru.com` の稼働に影響が無いことを確認済み（CLAUDE.md参照）
