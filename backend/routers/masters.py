@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from csv_utils import csv_safe_cell
 from database import get_db
+from malware import scan_bytes  # アップロードのマルウェアスキャン
 from models import GenreBenchmark, Product, ProductCategory, ProductCost, Shop
 from masters import (
     DEFAULT_COST_RATE,
@@ -483,6 +484,7 @@ async def import_categories(file: UploadFile = File(...), db: Session = Depends(
     削除済みの同一階層が見つかった場合は復活させる（create_category と同じ思想）。
     """
     content = await file.read()
+    scan_bytes(content, getattr(file, "filename", "upload") or "upload")
     if not content:
         raise HTTPException(status_code=400, detail="ファイルが空です")
     text = None
@@ -579,6 +581,7 @@ async def import_master_products(file: UploadFile = File(...), db: Session = Dep
     最後に現在の原価率でRppWeeklyを再計算する。
     """
     content = await file.read()
+    scan_bytes(content, getattr(file, "filename", "upload") or "upload")
     if not content:
         raise HTTPException(status_code=400, detail="ファイルが空です")
     text = None

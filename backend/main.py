@@ -248,12 +248,19 @@ def security_status(db: Session = Depends(get_db), _user: AuthUser = Depends(get
     起動時の migrations._enforce_rls_pg で自動適用しているが、万一失敗しても
     気付けるように可視化する。unprotected が空でなければ、Data API経由で
     そのテーブルのデータが外部から読み書きできる状態＝要即対応。
+
+    あわせて malware_scan_active（CLOUDMERSIVE_API_KEY 設定有無）も返す。
+    未設定だと CSV/ZIP アップロードのマルウェアスキャンが全エンドポイントで
+    無効なまま気付けない事故が実際に起きたため（2026-09-02）。
     """
     from sqlalchemy import text as _text
 
+    malware_scan_active = bool(os.environ.get("CLOUDMERSIVE_API_KEY"))
+
     if engine.dialect.name != "postgresql":
         return {"dialect": engine.dialect.name, "applicable": False,
-                "protected": [], "unprotected": [], "ok": True}
+                "protected": [], "unprotected": [], "ok": True,
+                "malware_scan_active": malware_scan_active}
 
     rows = db.execute(_text(
         "SELECT tablename, rowsecurity FROM pg_tables "
@@ -267,6 +274,7 @@ def security_status(db: Session = Depends(get_db), _user: AuthUser = Depends(get
         "protected": protected,
         "unprotected": unprotected,
         "ok": len(unprotected) == 0,
+        "malware_scan_active": malware_scan_active,
     }
 
 

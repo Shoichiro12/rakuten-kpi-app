@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from database import get_db
+from malware import scan_bytes  # アップロードのマルウェアスキャン
 from models import Target
 
 router = APIRouter(prefix="/api/targets", tags=["targets"])
@@ -94,6 +95,7 @@ async def import_targets(file: UploadFile = File(...), db: Session = Depends(get
     削除済みの年月が見つかった場合は復活させる（upsert_target と同じ思想）。
     """
     content = await file.read()
+    scan_bytes(content, getattr(file, "filename", "upload") or "upload")
     if not content:
         raise HTTPException(status_code=400, detail="ファイルが空です")
     text = None
