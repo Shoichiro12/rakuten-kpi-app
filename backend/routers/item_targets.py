@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session
 
 from csv_utils import csv_safe_cell
 from database import get_db
+from malware import scan_bytes  # アップロードのマルウェアスキャン
 from models import ItemTarget, MonthlyItemSales, Product, ProductCategory
 from masters import inactive_management_nos
 from target_calc import apply_calc, calc_item_target
@@ -319,6 +320,7 @@ async def import_item_targets(file: UploadFile = File(...), db: Session = Depend
     ファイル全体が巻き戻ると大きいCSVで実用的でない）。
     """
     content = await file.read()
+    scan_bytes(content, getattr(file, "filename", "upload") or "upload")
     if not content:
         raise HTTPException(status_code=400, detail="ファイルが空です")
     text = None

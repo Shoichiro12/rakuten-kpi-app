@@ -15,6 +15,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from database import get_db
+from malware import scan_bytes  # アップロードのマルウェアスキャン
 from models import Product, ProductCost
 from masters import (
     DEFAULT_COST_RATE,
@@ -153,6 +154,7 @@ def recalc(payload: Optional[RecalcPayload] = None, db: Session = Depends(get_db
 async def import_costs(file: UploadFile = File(...), db: Session = Depends(get_db)):
     """CSV一括登録（管理番号, 原価率 の2列）。ヘッダー有無どちらも許容する。"""
     content = await file.read()
+    scan_bytes(content, getattr(file, "filename", "upload") or "upload")
     if not content:
         raise HTTPException(status_code=400, detail="ファイルが空です")
 
