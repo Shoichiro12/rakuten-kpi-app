@@ -21,6 +21,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 import billing as B
+from admin_guard import is_admin_user_id, require_admin
 from auth import AuthUser, get_current_user
 from database import get_db
 from models import Subscription
@@ -66,7 +67,13 @@ def billing_status(db: Session = Depends(get_db), _u: AuthUser = Depends(get_cur
     """
     B.resolve_pending_comp_grant(db, _u)
     s = db.query(Subscription).first()
-    return {"enabled": B.BILLING_ENABLED, **_sub_dict(s)}
+    return {
+        "enabled": B.BILLING_ENABLED,
+        # フロントが「課金設定の診断」パネルの表示可否を決めるためだけの値（表示の出し分け）。
+        # 実際のアクセス制御は /diagnose 自体の require_admin が担う（単一の真実）。
+        "is_admin": is_admin_user_id(_u.id),
+        **_sub_dict(s),
+    }
 
 
 @router.post("/refresh")
@@ -296,8 +303,13 @@ def create_portal(db: Session = Depends(get_db), _u: AuthUser = Depends(get_curr
 
 
 @router.get("/diagnose")
-def diagnose(db: Session = Depends(get_db), _u: AuthUser = Depends(get_current_user)):
-    """【切り分け用】Stripe側の設定・契約状態とDBの状態を突き合わせて返す（判定つき）。"""
+def diagnose(db: Session = Depends(get_db), _u: AuthUser = Depends(require_admin)):
+    """【切り分け用・管理者専用】Stripe側の設定・契約状態とDBの状態を突き合わせて返す（判定つき）。
+
+    2026-09-03: 従来は一般ユーザーからも呼べており、無償提供（comp）ユーザーが開くと
+    「DBにsubscription IDがありません」等の内部診断向け警告が表示され混乱を招いていた
+    （夜勤の急務対応。docs/office_map.html QUESTS参照）。管理者限定に変更。
+    """
     out = _diagnose(db)
     # 途中 return する経路が多いので、ok の算出はここに集約する
     out["ok"] = "error" not in [c["level"] for c in out["checks"]]

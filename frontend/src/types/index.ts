@@ -347,6 +347,12 @@ export interface BillingStatus {
    * カスタマーポータルを開けないため「お支払い方法の変更」を出さない。
    */
   stripe_linked?: boolean
+  /**
+   * ログイン中のユーザーが管理者（ADMIN_USER_ID）か。
+   * 「課金設定の診断」パネルの表示可否のみに使う（アクセス制御そのものは
+   * バックエンドの GET /api/billing/diagnose が require_admin で行う）。
+   */
+  is_admin?: boolean
 }
 
 export interface BillingPlan {
