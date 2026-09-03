@@ -272,7 +272,7 @@
 // ============================================================
 const STATUS = [
   {label:"領国", value:"安泰（本番稼働中）", cls:"ok"},
-  {label:"評定", value:"議案なし", cls:"ok"},
+  {label:"評定", value:"PR #95 御裁可のこと", cls:"warn"},
   {label:"守り", value:"8/31検分 高0", cls:"ok"},
   {label:"軍費", value:"月 約$33", cls:""},
 ];
@@ -327,8 +327,8 @@ const AGENTS = [
 ];
 
 const QUESTS = [
-  {t:"課金設定の診断パネルが一般ユーザーにも見えること", m:"Billing.tsxの「課金設定の診断」パネルとGET /api/billing/diagnoseが管理者限定になっておらず一般ユーザーからも見える。require_admin相当に限定すること。無償提供ユーザーの画面で「DBにsubscription IDがありません」警告が出て混乱する。優先度中・夜勤候補・規模小", stamp:"wait"},
   {t:"招待メールをHTML化・自社ドメインリンク化すること", m:"招待メールをHTML＋テキストの2部構成にし、リンクは「アカウントを有効化する」ボタン＋予備のURL1行にする。URLは app.ureshiru.com/invite?t=<hashed_token> の自社ドメインにし、フロントの /invite で supabase.auth.verifyOtp({type:'invite', token_hash}) を呼ぶ（Supabaseのverifyを経由しない。バックエンドはgenerate_linkのhashed_tokenを使うだけ）。管理画面のプレビューはテキスト版のまま。優先度中・夜勤候補・規模小〜中", stamp:"wait"},
+  {t:"CLAUDE.mdの「5スキルはgitignoreで追跡除外」記載が実態と逆のこと", m:"実際は導入コミットe4363f3自体がgitignoreを書き換えて5スキルを追跡対象化済み（git ls-filesで確認）。都度コピーが必要という誤った前提が残っている（軍令帳参照）", stamp:"kouho"},
   {t:"バックエンド日時レスポンスのnaive UTC文字列のこと", m:"管理者閲覧機能ku3受け入れ時に発見。フロントのparseServerDate()で個別対症済み、API側のISO8601 Z付き標準化は未検討", stamp:"kouho"},
   {t:"フォーム入力欄id/name属性のこと", m:"優先度低 / 8/27候補（オーナー発見・軍令帳参照）", stamp:"kouho"},
   {t:"SupabaseプランのCLAUDE.md記載と実態の食い違いのこと", m:"infra-ops.mdはPro（東京）$25と記載、実態はFREE/NANOの可能性。オーナー実プラン確認が先（軍令帳参照）", stamp:"kouho"},

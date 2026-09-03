@@ -342,8 +342,11 @@ export default function Billing() {
           )}
 
           {/* 設定診断: Priceが月次か、トライアルが付いているか、DBとStripeが一致しているかを
-              まとめて確認する。「サブスクになっていない気がする」の切り分け用。 */}
-          {status?.enabled && (
+              まとめて確認する。「サブスクになっていない気がする」の切り分け用。
+              管理者専用（GET /api/billing/diagnose は require_admin）。一般・無償提供
+              ユーザーに見せると内部診断向けの警告文言（「DBにsubscription IDがありません」等）
+              で混乱を招くため、is_admin のときだけ表示する（2026-09-03）。 */}
+          {status?.enabled && status?.is_admin && (
             <div className="bg-white rounded-xl border shadow-sm p-5">
               <div className="flex items-center justify-between gap-3">
                 <div>
