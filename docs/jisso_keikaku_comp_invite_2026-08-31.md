@@ -132,6 +132,13 @@ https://ureshiru.com
 - 文面は `backend/mail_templates.py` に定数で置く。管理画面から本文全体を編集する機能は今回入れない
   （メッセージ差し込みで足りる想定。必要になったら別チケット）
 - プレーンテキストのみ（既存通知と同じ。HTMLメールは作らない）
+  **⚠️ 2026-09-04訂正: この方針は上書きされた。** 軍令帳2026-09-01（`docs/office_map.html`
+  QUESTS「招待メールをHTML化・自社ドメインリンク化すること」）により、招待メールはテキスト
+  ＋HTMLの2部構成（`mail_templates.invite_body_text`/`invite_body_html`）に変更済み。
+  リンクも本節の `{action_link}`（Supabaseホストのverifyエンドポイント）から自社ドメイン
+  （`{APP_BASE_URL}/invite?t=<hashed_token>`、フロントが`verifyOtp`で検証）へ切り替わった。
+  詳細はCLAUDE.md「📌 申し送り」台帳の2026-09-04行を参照。管理画面のプレビュー
+  （`buildInvitePreview()`）は今回もテキスト版のみを移植する方針を維持している。
 - 「無償提供の終了時は事前に連絡」と書くので、**解除するときは先にメールする**運用になる点に注意
 
 ## 5. 区切り

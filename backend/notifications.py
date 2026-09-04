@@ -16,6 +16,7 @@ import logging
 import os
 import smtplib
 from datetime import datetime, timedelta, timezone
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr
 
@@ -56,12 +57,16 @@ def smtp_configured() -> bool:
 
 
 def _send(subject: str, body: str, *, to: str = None, from_name: str = "ウレシル",
-          from_addr: str = None) -> None:
-    """プレーンテキストメールを送る。例外は呼び出し元へ伝播する。
+          from_addr: str = None, html_body: str = None) -> None:
+    """メールを送る。例外は呼び出し元へ伝播する。
 
     to/from_name/from_addr を省略すると従来どおり NOTIFY_EMAIL 宛・SMTP_USER 名義
     （表示名のみ「ウレシル」）で送る（問い合わせ・フィードバック通知はこの既定のまま）。
     招待メール（send_invite）は to=対象メール・from_addr=info@ureshiru.com を指定する。
+
+    html_body を渡すと multipart/alternative（テキスト＋HTML）で送る（招待メールのみ。
+    問い合わせ・フィードバック通知は従来どおりテキストのみ）。メールクライアントは
+    自分が描画できる最後のパートを選ぶ仕様のため、text→html の順で addする。
 
     ⚠️ SMTP認証自体は常に SMTP_USER（Gmailの実アカウント）で行う（sendmail() の
     エンベロープ送信者も user のまま）。from_addr はヘッダー上の表示 From のみを変える。
@@ -75,7 +80,12 @@ def _send(subject: str, body: str, *, to: str = None, from_name: str = "ウレ�
     to = to or _env("NOTIFY_EMAIL")
     from_addr = from_addr or user
 
-    msg = MIMEText(body, "plain", "utf-8")
+    if html_body:
+        msg = MIMEMultipart("alternative")
+        msg.attach(MIMEText(body, "plain", "utf-8"))
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
+    else:
+        msg = MIMEText(body, "plain", "utf-8")
     msg["Subject"] = subject
     msg["From"] = formataddr((from_name, from_addr))
     msg["To"] = to
@@ -196,9 +206,13 @@ def send_feedback_notification(feedback) -> None:
         logger.error("フィードバック通知メールの送信に失敗しました: %s", e, exc_info=True)
 
 
-def send_invite(*, email: str, action_link: str, message: str = "",
+def send_invite(*, email: str, invite_link: str, message: str = "",
                  expires_label: str = None) -> None:
     """管理画面からの無償アカウント招待メールを送る（計画書§3-2・§4）。
+
+    2026-09-01 の軍令により、テキスト＋HTMLの2部構成（`mail_templates.invite_body_text`/
+    `invite_body_html`）で送る。HTML版だけ「アカウントを有効化する」ボタンを持つ
+    （`docs/office_map.html` QUESTS「招待メールをHTML化・自社ドメインリンク化すること」）。
 
     ⚠️ 問い合わせ・フィードバック通知（send_inquiry_notification / send_feedback_notification）
     と違い、例外を握りつぶさず呼び出し元へ伝播する。呼び出し元（routers/admin_comp.py）は
@@ -212,12 +226,16 @@ def send_invite(*, email: str, action_link: str, message: str = "",
             "（SMTP_HOST/SMTP_USER/SMTP_PASSWORD/NOTIFY_EMAIL）。"
         )
     subject = mail_templates.INVITE_SUBJECT
-    body = mail_templates.invite_body(
-        email=email,
-        action_link=action_link,
-        message=message,
-        expires_label=expires_label or _INVITE_EXPIRES_LABEL_DEFAULT,
+    label = expires_label or _INVITE_EXPIRES_LABEL_DEFAULT
+    text_body = mail_templates.invite_body_text(
+        email=email, invite_link=invite_link, message=message, expires_label=label,
     )
-    # action_link 自体はログに出さない（開けばログインできるリンクのため）。
-    _send(subject, body, to=email, from_name="ウレシル", from_addr=_INVITE_FROM_ADDR)
+    html_body = mail_templates.invite_body_html(
+        email=email, invite_link=invite_link, message=message, expires_label=label,
+    )
+    # invite_link 自体はログに出さない（開けばログインできるリンクのため）。
+    _send(
+        subject, text_body, to=email, from_name="ウレシル", from_addr=_INVITE_FROM_ADDR,
+        html_body=html_body,
+    )
     logger.info("招待メールを送信しました: to=%s", email)
