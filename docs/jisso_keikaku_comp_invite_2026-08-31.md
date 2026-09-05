@@ -139,6 +139,9 @@ https://ureshiru.com
   （`{APP_BASE_URL}/invite?t=<hashed_token>`、フロントが`verifyOtp`で検証）へ切り替わった。
   詳細はCLAUDE.md「📌 申し送り」台帳の2026-09-04行を参照。管理画面のプレビュー
   （`buildInvitePreview()`）は今回もテキスト版のみを移植する方針を維持している。
+  **本番検証も完了（オーナー、2026-09-04）**: HTMLメールでボタン＋予備URL表示、リンクは
+  `app.ureshiru.com/invite?t=...`形式で本文に`supabase.co`ドメインが出ないこと、
+  ボタン→`/invite`→`verifyOtp`→パスワード設定→ダッシュボードまでの一気通貫を実機確認済み。
 - 「無償提供の終了時は事前に連絡」と書くので、**解除するときは先にメールする**運用になる点に注意
 
 ## 5. 区切り
