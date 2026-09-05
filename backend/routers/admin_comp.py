@@ -13,6 +13,7 @@
 `require_admin` のままでよい（閲覧モード中でも一覧が見えること自体は問題ない）。
 """
 import logging
+import urllib.parse
 from datetime import datetime, timedelta
 from typing import Optional
 
@@ -263,6 +264,26 @@ def revoke_comp_grant(
     return {**_grant_out(grant), "subscription_touched": subscription_touched}
 
 
+def _build_invite_link(link_data: dict) -> Optional[str]:
+    """generate_link のレスポンスから、自社ドメインの招待リンクを組み立てる。
+
+    2026-09-01 の軍令（`docs/office_map.html` QUESTS「招待メールをHTML化・
+    自社ドメインリンク化すること」）により、Supabase がホストする action_link
+    （supabase.co ドメインの verify エンドポイント）へ直接誘導するのをやめ、
+    `hashed_token` だけを使って自社ドメインのリンク（`{APP_BASE_URL}/invite?t=...`）
+    を組み立てる。フロント（App.tsx）はこのリンクを開いたら
+    `supabase.auth.verifyOtp({type:'invite', token_hash})` を自分で呼ぶ
+    （Supabaseの verify を経由しない）。
+
+    トップレベル優先、無ければ properties 配下（Supabaseのバージョンにより形が違う
+    可能性があるための保険。id の平坦化と同じ理由でこちらも対称に対応しておく）。
+    """
+    hashed_token = link_data.get("hashed_token") or (link_data.get("properties") or {}).get("hashed_token")
+    if not hashed_token:
+        return None
+    return f"{B.app_base_url()}/invite?t={urllib.parse.quote(hashed_token, safe='')}"
+
+
 def _send_invite_mail(db: Session, grant: CompGrant, *, message: str, admin_email: str, event: str) -> None:
     """招待リンクを発行し、メールを送って結果を grant に記録する。
 
@@ -283,14 +304,12 @@ def _send_invite_mail(db: Session, grant: CompGrant, *, message: str, admin_emai
             detail="招待リンクの発行に失敗しました。時間をおいて再度お試しください。",
         )
 
-    # ⚠️ action_link はログに出さない（開けばログインできるリンクのため）。対象メールと
+    # ⚠️ invite_link はログに出さない（開けばログインできるリンクのため）。対象メールと
     # 結果だけをログに残す（supabase_admin.generate_link のdocstring参照）。
-    # トップレベル優先、無ければ properties 配下（Supabaseのバージョンにより形が違う可能性が
-    # あるための保険。実際に本番で踏んだのは user_id 側の形違いだが、対称に対応しておく）。
-    action_link = link_data.get("action_link") or (link_data.get("properties") or {}).get("action_link")
-    if not action_link:
+    invite_link = _build_invite_link(link_data)
+    if not invite_link:
         logger.error(
-            "招待リンクのレスポンスに action_link がありません: target_email=%s keys=%s",
+            "招待リンクのレスポンスに hashed_token がありません: target_email=%s keys=%s",
             grant.email, list(link_data.keys()),
         )
         raise HTTPException(
@@ -299,7 +318,7 @@ def _send_invite_mail(db: Session, grant: CompGrant, *, message: str, admin_emai
         )
 
     try:
-        notifications.send_invite(email=grant.email, action_link=action_link, message=message)
+        notifications.send_invite(email=grant.email, invite_link=invite_link, message=message)
     except Exception as exc:
         grant.invite_status = "failed"
         db.commit()

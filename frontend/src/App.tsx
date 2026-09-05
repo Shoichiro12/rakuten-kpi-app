@@ -87,6 +87,12 @@ export default function App() {
   // 扱いになる）ため、URLのハッシュ/クエリの type=invite を直接見て判定する。
   // Supabaseクライアントがハッシュを消費する前に読む必要があるため、lazy initializerで
   // マウント時の一度だけ読む。
+  //
+  // ⚠️ 2026-09-04: これは Supabase がホストする action_link（旧経路）を踏んだ場合の
+  // 検知で、Supabase 側の verify → redirect_to への遷移後に付く type=invite パラメータを
+  // 見ている。2026-09-01の軍令（自社ドメインリンク化）以降に発行された招待メールは
+  // 下の inviteToken 経路（自社ドメイン /invite?t=<hashed_token>）を通るため、ここは
+  // 主に「軍令適用前に送信済みで、まだクリックされていない招待メール」との後方互換用。
   const [isInviteLink] = useState(() => {
     // ハッシュ形式（#access_token=...&type=invite）とクエリ形式（?type=invite）の両対応。
     // Supabaseのバージョンやリダイレクト方式でどちらも起こり得るため両方見る。
@@ -94,9 +100,21 @@ export default function App() {
     const searchParams = new URLSearchParams(window.location.search)
     return hashParams.get('type') === 'invite' || searchParams.get('type') === 'invite'
   })
-  // パスワード設定完了後にアプリ本体へ進むためのフラグ。isInviteLink は初期値のまま
-  // 更新されない（リロードしない限りtrueのまま）ので、onDone でこちらを立てて
-  // 表示条件から外す
+  // 自社ドメインの招待リンク（/invite?t=<hashed_token>）から来た状態。バックエンドの
+  // generate_link が返す hashed_token だけを使い、Supabase の verify エンドポイントを
+  // 経由しない（`docs/office_map.html` QUESTS「招待メールをHTML化・自社ドメインリンク化
+  // すること」）。BrowserRouter のマウント前に判定する必要があるため、こちらも
+  // lazy initializerで window.location を直接読む。
+  const [inviteToken] = useState(() => {
+    if (window.location.pathname !== '/invite') return null
+    return new URLSearchParams(window.location.search).get('t')
+  })
+  const [inviteVerifying, setInviteVerifying] = useState(!!inviteToken)
+  const [inviteVerified, setInviteVerified] = useState(false)
+  const [inviteError, setInviteError] = useState<string | null>(null)
+  // パスワード設定完了後にアプリ本体へ進むためのフラグ。isInviteLink/inviteToken は
+  // 初期値のまま更新されない（リロードしない限り変わらない）ので、onDone でこちらを
+  // 立てて表示条件から外す
   const [inviteDone, setInviteDone] = useState(false)
 
   useEffect(() => {
@@ -110,6 +128,27 @@ export default function App() {
       setSession(s)
     })
     return () => sub.subscription.unsubscribe()
+  }, [])
+
+  // 自社ドメインの招待リンクを検証する。token_hash は使い捨てのため、成功・失敗に
+  // かかわらず URL からは即座に消す（リロードでの再検証・ブラウザ履歴への残留を防ぐ）。
+  // このブロックの表示・非表示は state（inviteToken 等）だけで決まり React Router の
+  // 経路一致には依存しないため、URL を書き換えても表示中の画面には影響しない。
+  useEffect(() => {
+    if (!supabase || !inviteToken) return
+    let cancelled = false
+    supabase.auth.verifyOtp({ type: 'invite', token_hash: inviteToken }).then(({ error }) => {
+      if (cancelled) return
+      window.history.replaceState(null, '', '/')
+      if (error) {
+        setInviteError(error.message || 'リンクの有効期限が切れているか、既に使用されています。')
+      } else {
+        setInviteVerified(true)
+      }
+      setInviteVerifying(false)
+    })
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   useEffect(() => {
@@ -132,13 +171,37 @@ export default function App() {
   if (!authReady) {
     return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-sm text-gray-400">読み込み中...</div>
   }
-  // パスワード再設定メール（PASSWORD_RECOVERY）または招待リンク（type=invite）経由なら
-  // パスワード設定画面を最優先で表示。招待は見出し等の文言だけ変える（処理は共通）
-  if (recovering || (isInviteLink && !inviteDone)) {
+  // 自社ドメインの招待リンク（/invite?t=...）を検証している間・失敗した場合は
+  // 最優先でその状態を表示する（BrowserRouter配下のルーティングより先に処理する）
+  if (inviteToken && !inviteDone) {
+    if (inviteVerifying) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 text-sm text-gray-400">
+          招待リンクを確認しています...
+        </div>
+      )
+    }
+    if (inviteError) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+          <div className="w-full max-w-sm bg-white rounded-2xl border shadow-sm p-7 text-center space-y-3">
+            <p className="text-sm font-bold text-gray-900">招待リンクを確認できませんでした</p>
+            <p className="text-xs text-gray-500">
+              リンクの有効期限が切れているか、既に使用されています。お手数ですが、招待の再送を管理者にご依頼ください。
+            </p>
+          </div>
+        </div>
+      )
+    }
+  }
+  // パスワード再設定メール（PASSWORD_RECOVERY）・旧経路の招待リンク（type=invite）・
+  // 自社ドメインの招待リンク（検証成功済み）のいずれかならパスワード設定画面を最優先で
+  // 表示。招待は見出し等の文言だけ変える（処理は共通）
+  if (recovering || ((isInviteLink || inviteVerified) && !inviteDone)) {
     return (
       <ResetPassword
         onDone={() => { setRecovering(false); setInviteDone(true) }}
-        isInvite={isInviteLink && !recovering}
+        isInvite={(isInviteLink || inviteVerified) && !recovering}
       />
     )
   }
