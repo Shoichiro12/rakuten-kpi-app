@@ -327,6 +327,7 @@ const AGENTS = [
 ];
 
 const QUESTS = [
+  {t:"CORS許可オリジンの追加設定`ALLOW_ORIGINS`がどこにも書かれていないこと", m:"backend/main.py:137-139。CLAUDE.mdは「CORSはlocalhostのみ許可」と言い切るが、別ドメインfrontend向けの拡張env自体が未記載（軍令帳参照）", stamp:"kouho"},
   {t:"CLAUDE.mdの「5スキルはgitignoreで追跡除外」記載が実態と逆のこと", m:"実際は導入コミットe4363f3自体がgitignoreを書き換えて5スキルを追跡対象化済み（git ls-filesで確認）。都度コピーが必要という誤った前提が残っている（軍令帳参照）", stamp:"kouho"},
   {t:"バックエンド日時レスポンスのnaive UTC文字列のこと", m:"管理者閲覧機能ku3受け入れ時に発見。フロントのparseServerDate()で個別対症済み、API側のISO8601 Z付き標準化は未検討", stamp:"kouho"},
   {t:"フォーム入力欄id/name属性のこと", m:"優先度低 / 8/27候補（オーナー発見・軍令帳参照）", stamp:"kouho"},
