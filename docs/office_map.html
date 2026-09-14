@@ -336,6 +336,8 @@ const QUESTS = [
   {t:"lp/style.cssのキャッシュバスターのこと", m:"優先度低・次にstyle.cssを触るときに同梱。LPリニューアル(2a)本番反映直後に旧style.cssキャッシュでヘッダー色が旧色に見える事象を確認（軍令帳参照）", stamp:"kouho"},
   {t:"lp/index.htmlのog:image TODOコメントが旧デザイン前提のこと", m:"「ライブデモ主体のヒーロー」と書くが、2a(8/31)で hero は静止テキストのみに変わり、ライブデモは別の.demo-band節。撮影担当が誤読しうる（軍令帳参照）", stamp:"kouho"},
   {t:"招待リンク生成の`APP_BASE_URL`が未文書化・既定値がlocalhostのこと", m:"backend/billing.py:18。未設定ならinvite_linkが`http://localhost:5173/...`になり顧客の招待メールが無言で機能不全。.env.example・infra-ops.mdとも記載なし（軍令帳参照）", stamp:"kouho"},
+  {t:"招待メールの有効期限表示「1時間」が仮値のまま実測されていないこと", m:"backend/notifications.py:30。8/31に「仮の既定値、実測して調整」と記録されたまま、9/1・9/4の本番検証でも実際のSupabaseトークン有効期限とは突き合わせていない（軍令帳参照）", stamp:"kouho"},
+  {t:"CLAUDE.mdが招待メール文面の関数名`invite_body()`という無い名前を参照していること", m:"CLAUDE.md:153。9/4に`invite_body_text()`/`invite_body_html()`へ分割済みで単一の`invite_body()`は現存しない。「文面は2箇所」の記述も今は3箇所（軍令帳参照）", stamp:"kouho"},
   {t:"四万SKU取込 実測のこと", m:"約定により資料入手は十月朔日以降", stamp:"later", sealed:true},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
