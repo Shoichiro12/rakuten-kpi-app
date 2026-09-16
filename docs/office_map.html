@@ -340,6 +340,8 @@ const QUESTS = [
   {t:"CLAUDE.mdが招待メール文面の関数名`invite_body()`という無い名前を参照していること", m:"CLAUDE.md:153。9/4に`invite_body_text()`/`invite_body_html()`へ分割済みで単一の`invite_body()`は現存しない。「文面は2箇所」の記述も今は3箇所（軍令帳参照）", stamp:"kouho"},
   {t:"CLAUDE.mdのApp.tsxルーティング一覧が古いこと", m:"CLAUDE.md:366。6ルートのみ記載だが実際は11ルート（/master・/master/categories・/billing・/reports・/account・/adminが未記載。軍令帳参照）", stamp:"kouho"},
   {t:"CLAUDE.mdの法的文書LP参照先が`ureshiru.vercel.app`のままのこと", m:"CLAUDE.md:367。実コード（links.ts）は`https://ureshiru.com`使用、旧Vercelプロジェクトは8/24に削除済み（軍令帳参照）", stamp:"kouho"},
+  {t:"CLAUDE.mdのバックエンドルーター一覧が古いこと", m:"CLAUDE.md:321。9本のみ記載だが実際は21本（admin・billing・comp管理等12本が未記載。軍令帳参照）", stamp:"kouho"},
+  {t:"CLAUDE.mdのglobal_exception_handler説明がEXPOSE_ERROR_DETAILゲートを反映していないこと", m:"CLAUDE.md:320。既定は定型文を返すが「常にstr(exc)を返す」と読める記述のまま（軍令帳参照）", stamp:"kouho"},
   {t:"四万SKU取込 実測のこと", m:"約定により資料入手は十月朔日以降", stamp:"later", sealed:true},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
