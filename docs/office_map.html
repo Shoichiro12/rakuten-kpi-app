@@ -342,6 +342,8 @@ const QUESTS = [
   {t:"CLAUDE.mdの法的文書LP参照先が`ureshiru.vercel.app`のままのこと", m:"CLAUDE.md:367。実コード（links.ts）は`https://ureshiru.com`使用、旧Vercelプロジェクトは8/24に削除済み（軍令帳参照）", stamp:"kouho"},
   {t:"CLAUDE.mdのバックエンドルーター一覧が古いこと", m:"CLAUDE.md:321。9本のみ記載だが実際は21本（admin・billing・comp管理等12本が未記載。軍令帳参照）", stamp:"kouho"},
   {t:"CLAUDE.mdのglobal_exception_handler説明がEXPOSE_ERROR_DETAILゲートを反映していないこと", m:"CLAUDE.md:320。既定は定型文を返すが「常にstr(exc)を返す」と読める記述のまま（軍令帳参照）", stamp:"kouho"},
+  {t:".env.exampleにマルウェアスキャン関連env（CLOUDMERSIVE_API_KEY等）の記載が無いこと", m:"backend/.env.example。他の旗系env（EXEMPT_TEST_EMAILS等）は例つきで書かれているのに3変数だけ皆無。9/2のキー未設定インシデントと同型の再発リスク（軍令帳参照）", stamp:"kouho"},
+  {t:"migrations.pyのuser_id自動付与対象からaction_logs/rpp_action_checksが漏れていること", m:"backend/migrations.py:25-57 `_USER_SCOPED_TABLES`。どちらも実運用中のテナント分離テーブルだが未登録で、既存DBへのuser_id列・LEGACY_DATA_USER_ID割当が効かない（軍令帳参照）", stamp:"kouho"},
   {t:"四万SKU取込 実測のこと", m:"約定により資料入手は十月朔日以降", stamp:"later", sealed:true},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
