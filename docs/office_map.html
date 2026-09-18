@@ -344,6 +344,8 @@ const QUESTS = [
   {t:"CLAUDE.mdのglobal_exception_handler説明がEXPOSE_ERROR_DETAILゲートを反映していないこと", m:"CLAUDE.md:320。既定は定型文を返すが「常にstr(exc)を返す」と読める記述のまま（軍令帳参照）", stamp:"kouho"},
   {t:".env.exampleにマルウェアスキャン関連env（CLOUDMERSIVE_API_KEY等）の記載が無いこと", m:"backend/.env.example。他の旗系env（EXEMPT_TEST_EMAILS等）は例つきで書かれているのに3変数だけ皆無。9/2のキー未設定インシデントと同型の再発リスク（軍令帳参照）", stamp:"kouho"},
   {t:"migrations.pyのuser_id自動付与対象からaction_logs/rpp_action_checksが漏れていること", m:"backend/migrations.py:25-57 `_USER_SCOPED_TABLES`。どちらも実運用中のテナント分離テーブルだが未登録で、既存DBへのuser_id列・LEGACY_DATA_USER_ID割当が効かない（軍令帳参照）", stamp:"kouho"},
+  {t:"退会APIが「全データ削除」と謳いながら実際は7/20テーブルしか消していないこと", m:"backend/routers/account.py:37-38 `_ALL_MODELS`。Product/Shop/ItemTarget/ProductCost等10テーブルが削除対象から漏れ、退会後も事業データが残存する（軍令帳参照）", stamp:"kouho"},
+  {t:"costs.pyの原価率CSV一括登録にファイルサイズ上限が無いこと", m:"backend/routers/costs.py:154-159。2026-08-24セキュリティ指摘バックログの「新設CSVインポート3本+商品マスタ」一覧に含まれない5件目の同型欠陥（軍令帳参照）", stamp:"kouho"},
   {t:"四万SKU取込 実測のこと", m:"約定により資料入手は十月朔日以降", stamp:"later", sealed:true},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
