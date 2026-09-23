@@ -350,6 +350,9 @@ const QUESTS = [
   {t:"office_map.htmlの「最終更新」コメントが2週間以上前の日付のままのこと", m:"docs/office_map.html:269。中身は09-08〜09-21まで繰り返し更新済みだが鮮度表示だけ9/7で停止（軍令帳参照）", stamp:"kouho"},
   {t:"security-check SKILL.mdの二重管理指示がCLAUDE.md側の決着と噛み合っていないこと", m:".claude/skills/security-check/SKILL.md:14。「両方に書く」は実行不能かつ未達成、CLAUDE.mdは既に決着済み（軍令帳参照）", stamp:"kouho"},
   {t:"CLAUDE.mdの「モデル変更は手動でDB削除orALTER」記述がmigrations.pyの自動カラム追加機構と食い違うこと", m:"CLAUDE.md:320。backend/migrations.pyの`_EXTRA_COLUMNS`+`_add_extra_columns()`は2026-08-01以降4回使われてきた確立した自動ALTER手段だが、この行は依然「手動でDB削除 or ALTER」としか書いていない（軍令帳参照）", stamp:"kouho"},
+  {t:"infra-opsエージェントが旧Render/旧Vercel削除を「未実施」と誤記載していること", m:".claude/agents/infra-ops.md:27。CLAUDE.mdは2026-08-24に完了済みと記録（軍令帳参照）", stamp:"kouho"},
+  {t:"infra-opsエージェントがEXEMPT_TEST_EMAILSを本番demo@と誤記載していること", m:".claude/agents/infra-ops.md:26。当該env変数は2026-08-31に削除済み、demo@は/adminのcomp管理へ移行済み（軍令帳参照）", stamp:"kouho"},
+  {t:"DEPLOY.mdの冒頭説明がマルチテナント化前の「データ全員共有」のままのこと", m:"DEPLOY.md:7がステップ4(76行目)の「ユーザーごとに分離」と自己矛盾（軍令帳参照）", stamp:"kouho"},
   {t:"四万SKU取込 実測のこと", m:"約定により資料入手は十月朔日以降", stamp:"later", sealed:true},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
