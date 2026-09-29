@@ -361,6 +361,8 @@ const QUESTS = [
   {t:"lp/privacy.htmlの委託先一覧が旧Vercelのままのこと", m:"lp/privacy.html:64。2026-08-24にCloudflare Pagesへ移行済み（軍令帳参照）", stamp:"kouho"},
   {t:"/kickoffが直近1ヶ月分の作業報告を読めていないこと", m:".claude/skills/kickoff/SKILL.md:10・.claude/README.md:28。作業報告のファイル名が`作業報告_*.md`と`sagyou_houkoku_yakin_*.md`の2系統に分かれ、kickoffのglobは前者のみ（最新2026-08-31止まり。後者は2026-09-25まで26件）を拾う（軍令帳参照）", stamp:"kouho"},
   {t:"請求・プラン画面のトライアル終了日が最大1日ずれて表示されうること", m:"frontend/src/pages/Billing.tsx:20-23,209。バックエンドが返すtrial_end/current_period_endはタイムゾーン情報なしのUTC文字列で、ブラウザのnew Date()がローカル時刻として誤解釈する（軍令帳参照）", stamp:"kouho"},
+  {t:"legal-finance.mdが出典不明のインボイス登録番号を「台帳より」と書いていること", m:".claude/agents/legal-finance.md:32。「T8810793418184」はCLAUDE.md本文にも他のどのファイルにも登場せず、CLAUDE.md自身は登録番号をコードで扱わないと明記（軍令帳参照）", stamp:"kouho"},
+  {t:".claude/README.mdの「入れ方」が実在しないCLAUDE_md_追記.mdを指していること", m:".claude/README.md:8。導入(8/24)は完了済みなのに参照ファイルが全履歴に一度も存在しない（軍令帳参照）", stamp:"kouho"},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
 
