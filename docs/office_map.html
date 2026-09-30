@@ -363,6 +363,7 @@ const QUESTS = [
   {t:"請求・プラン画面のトライアル終了日が最大1日ずれて表示されうること", m:"frontend/src/pages/Billing.tsx:20-23,209。バックエンドが返すtrial_end/current_period_endはタイムゾーン情報なしのUTC文字列で、ブラウザのnew Date()がローカル時刻として誤解釈する（軍令帳参照）", stamp:"kouho"},
   {t:"legal-finance.mdが出典不明のインボイス登録番号を「台帳より」と書いていること", m:".claude/agents/legal-finance.md:32。「T8810793418184」はCLAUDE.md本文にも他のどのファイルにも登場せず、CLAUDE.md自身は登録番号をコードで扱わないと明記（軍令帳参照）", stamp:"kouho"},
   {t:".claude/README.mdの「入れ方」が実在しないCLAUDE_md_追記.mdを指していること", m:".claude/README.md:8。導入(8/24)は完了済みなのに参照ファイルが全履歴に一度も存在しない（軍令帳参照）", stamp:"kouho"},
+  {t:"designer.mdのLP見出し書体規則が2回上書きされた古い決定のままのこと", m:".claude/agents/designer.md:23。「2026-08-20決定」は8/23・8/31に2度上書き済み（現在はFigtree+Noto Sans JP）、書体名も書かれていない（軍令帳参照）", stamp:"kouho"},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
 
