@@ -266,7 +266,7 @@
 <script>
 // ============================================================
 // データはここだけ直せば更新できる（Claude Codeに編集させてOK）
-// 最終更新: 2026-09-28
+// 最終更新: 2026-10-02
 // gear: eboshi(烏帽子) / kabuto(兜) / zukin(頭巾) / hachimaki(鉢巻)
 //       / ninja(忍装束) / hime(束ね髪) / kasa(陣笠)
 // ============================================================
@@ -366,6 +366,8 @@ const QUESTS = [
   {t:"designer.mdのLP見出し書体規則が2回上書きされた古い決定のままのこと", m:".claude/agents/designer.md:23。「2026-08-20決定」は8/23・8/31に2度上書き済み（現在はFigtree+Noto Sans JP）、書体名も書かれていない（軍令帳参照）", stamp:"kouho"},
   {t:"security.md/README.mdが実ファイル`security/index.md`を紛らわしい綴りで参照していること", m:".claude/agents/security.md:3,31・.claude/README.md:21。「security_index.md」はCLAUDE.mdで決着済みの別の遺物ファイルと紛らわしい綴り（軍令帳参照）", stamp:"kouho"},
   {t:".env.exampleにCSP_CONNECT_SRC・RMS_INBOX_DIRの記載が無いこと", m:"backend/main.py:94・routers/import_csv.py:1485。他の旗系envと同じ体裁のブロックが無い（軍令帳参照）", stamp:"kouho"},
+  {t:"kpi-analyst.mdのMIN_ACCESS_SAMPLE記載が週次100のみで月次430・年次5220が抜けていること", m:".claude/agents/kpi-analyst.md:14・backend/access_definitions.py:30-41。母数ゲートの期間別しきい値を取り違えうる（軍令帳参照）", stamp:"kouho"},
+  {t:"developer.md/reviewer.mdの規約にCSV/ZIPアップロードのマルウェアスキャン(scan_bytes)義務が無いこと", m:".claude/agents/developer.md:15-28・reviewer.md:1-12。CLAUDE.mdマスタCRUD規約には明記済みだが両エージェントの規約表に反映なし（軍令帳参照）", stamp:"kouho"},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
 
