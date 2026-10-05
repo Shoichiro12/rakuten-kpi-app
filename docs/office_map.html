@@ -369,6 +369,8 @@ const QUESTS = [
   {t:"kpi-analyst.mdのMIN_ACCESS_SAMPLE記載が週次100のみで月次430・年次5220が抜けていること", m:".claude/agents/kpi-analyst.md:14・backend/access_definitions.py:30-41。母数ゲートの期間別しきい値を取り違えうる（軍令帳参照）", stamp:"kouho"},
   {t:"developer.md/reviewer.mdの規約にCSV/ZIPアップロードのマルウェアスキャン(scan_bytes)義務が無いこと", m:".claude/agents/developer.md:15-28・reviewer.md:1-12。CLAUDE.mdマスタCRUD規約には明記済みだが両エージェントの規約表に反映なし（軍令帳参照）", stamp:"kouho"},
   {t:"npm auditでtailwindcssの依存チェーン(braces)に新規DoSアドバイザリが連鎖表示されていること", m:"frontend/package-lock.json。GHSA-vfj7-8cjw-p6xmの新規登録でhigh表示が1→6件に増加。コード変更は無く全てdevDependencies配下（本番配信物に含まれず実害は低い）。非破壊的な修正版は無く、根本解消にはtailwindcss v3→v4のメジャー移行が必要（10/5検分・security/security_check_2026-10-05.md参照）", stamp:"kouho"},
+  {t:".claude/README.mdの定例業務表に`/yakin`が載っていないこと", m:"README.md:30-38。5スキルのみ列挙、夜勤（40件超のPRを生む最頻出の定例）が組織図から欠落（軍令帳参照）", stamp:"kouho"},
+  {t:"kpi-analyst.mdのdescriptionに異物トリガー語「NATIONS」が混入していること", m:".claude/agents/kpi-analyst.md:3。日本語トリガー3つに英単語が1つ紛れ、ドメイン用語と対応しない（軍令帳参照）", stamp:"kouho"},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
 
