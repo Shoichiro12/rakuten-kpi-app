@@ -327,6 +327,8 @@ const AGENTS = [
 ];
 
 const QUESTS = [
+  {t:"designer.mdのLP『C案トークン』paper/bg-altの値がLPの現行値ではなくアプリ側ダッシュボードの値であること", m:".claude/agents/designer.md:22。paper #fdfcf9・bg-alt #f4f1eaはCLAUDE.md:429-430のアプリ側トークン表と一致、LPの現行値（lp/index.html :root）はpaper #ffffff・bg-alt #fafaf9（2026-08-31のLPリニューアル2aで変更済み。CLAUDE.md:147に記録あり）。他5値は一致（軍令帳参照）", stamp:"kouho"},
+  {t:"kpi-analyst.mdの評価ランク列挙が5つ目の「−」（判定不可）を欠いていること", m:".claude/agents/kpi-analyst.md:13。「17パターン + ◎○△×」と書くが、backend/evaluation.pyのdocstring（120-124行）はrankに'−'も含め5種類と明記、パターン17（判定不可）は実際に'−'を返す（軍令帳参照）", stamp:"kouho"},
   {t:"CORS許可オリジンの追加設定`ALLOW_ORIGINS`がどこにも書かれていないこと", m:"backend/main.py:137-139。CLAUDE.mdは「CORSはlocalhostのみ許可」と言い切るが、別ドメインfrontend向けの拡張env自体が未記載（軍令帳参照）", stamp:"kouho"},
   {t:"CLAUDE.mdの「5スキルはgitignoreで追跡除外」記載が実態と逆のこと", m:"実際は導入コミットe4363f3自体がgitignoreを書き換えて5スキルを追跡対象化済み（git ls-filesで確認）。都度コピーが必要という誤った前提が残っている（軍令帳参照）", stamp:"kouho"},
   {t:"バックエンド日時レスポンスのnaive UTC文字列のこと", m:"管理者閲覧機能ku3受け入れ時に発見。フロントのparseServerDate()で個別対症済み、API側のISO8601 Z付き標準化は未検討", stamp:"kouho"},
