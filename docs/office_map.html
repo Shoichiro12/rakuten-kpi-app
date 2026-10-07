@@ -373,6 +373,7 @@ const QUESTS = [
   {t:"npm auditでtailwindcssの依存チェーン(braces)に新規DoSアドバイザリが連鎖表示されていること", m:"frontend/package-lock.json。GHSA-vfj7-8cjw-p6xmの新規登録でhigh表示が1→6件に増加。コード変更は無く全てdevDependencies配下（本番配信物に含まれず実害は低い）。非破壊的な修正版は無く、根本解消にはtailwindcss v3→v4のメジャー移行が必要（10/5検分・security/security_check_2026-10-05.md参照）", stamp:"kouho"},
   {t:".claude/README.mdの定例業務表に`/yakin`が載っていないこと", m:"README.md:30-38。5スキルのみ列挙、夜勤（40件超のPRを生む最頻出の定例）が組織図から欠落（軍令帳参照）", stamp:"kouho"},
   {t:"kpi-analyst.mdのdescriptionに異物トリガー語「NATIONS」が混入していること", m:".claude/agents/kpi-analyst.md:3。日本語トリガー3つに英単語が1つ紛れ、ドメイン用語と対応しない（軍令帳参照）", stamp:"kouho"},
+  {t:"docs/本番デプロイ_チェックリスト.mdが削除済み旧VercelのLP URLを法的文書の正として指していること", m:"docs/本番デプロイ_チェックリスト.md:10。`https://ureshiru.vercel.app`は8/24削除済み、現行は`ureshiru.com`。既存候補#35(CLAUDE.md:367)と同根だが別ファイルでの出現（軍令帳参照）", stamp:"kouho"},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
 
