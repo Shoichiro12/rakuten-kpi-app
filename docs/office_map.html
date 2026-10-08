@@ -266,7 +266,7 @@
 <script>
 // ============================================================
 // データはここだけ直せば更新できる（Claude Codeに編集させてOK）
-// 最終更新: 2026-10-05
+// 最終更新: 2026-10-08
 // gear: eboshi(烏帽子) / kabuto(兜) / zukin(頭巾) / hachimaki(鉢巻)
 //       / ninja(忍装束) / hime(束ね髪) / kasa(陣笠)
 // ============================================================
@@ -374,6 +374,9 @@ const QUESTS = [
   {t:".claude/README.mdの定例業務表に`/yakin`が載っていないこと", m:"README.md:30-38。5スキルのみ列挙、夜勤（40件超のPRを生む最頻出の定例）が組織図から欠落（軍令帳参照）", stamp:"kouho"},
   {t:"kpi-analyst.mdのdescriptionに異物トリガー語「NATIONS」が混入していること", m:".claude/agents/kpi-analyst.md:3。日本語トリガー3つに英単語が1つ紛れ、ドメイン用語と対応しない（軍令帳参照）", stamp:"kouho"},
   {t:"docs/本番デプロイ_チェックリスト.mdが削除済み旧VercelのLP URLを法的文書の正として指していること", m:"docs/本番デプロイ_チェックリスト.md:10。`https://ureshiru.vercel.app`は8/24削除済み、現行は`ureshiru.com`。既存候補#35(CLAUDE.md:367)と同根だが別ファイルでの出現（軍令帳参照）", stamp:"kouho"},
+  {t:"developer/reviewer/planner/security.mdが認証ガードを_paid/_authの二択で説明し_adminに触れていないこと", m:"4ファイルとも管理者専用グループ`_admin`（main.py:183-189、8/26・8/28導入）への言及が無い（軍令帳参照）", stamp:"kouho"},
+  {t:"security.mdが削除済みのEXEMPT_TEST_EMAILSを今も確認観点に挙げていること", m:".claude/agents/security.md:22。当該env変数は2026-08-31削除済み（/adminのcomp管理へ移行）、infra-ops.mdとは別ファイルでの出現（軍令帳参照）", stamp:"kouho"},
+  {t:"designer.mdの弾丸グラフ規則がHeroKgiの例外に触れていないこと", m:".claude/agents/designer.md:16。HeroKgiは2026-08-22に単純な進捗バーへ意図的に変更済み（HeroKgi.tsx:36-38。軍令帳参照）", stamp:"kouho"},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
 
