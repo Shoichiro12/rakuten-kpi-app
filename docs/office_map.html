@@ -382,6 +382,7 @@ const QUESTS = [
   {t:"kpi-analystの台詞「数式の誤り三箇条」の裏付けがどこにも無いこと", m:"office_map.html:313。「数式の誤り」「原本スプレッドシート」「三箇条」はこの1行のみで全文検索でも他に出現なし（軍令帳参照）", stamp:"kouho"},
   {t:"README.mdの組織図がsecurityのWrite権限を権限列から落としていること", m:".claude/README.md:21。「読み取り＋監査コマンド」と書くが実際はtools行にWriteを持ち security/配下へ書き込む（軍令帳参照）", stamp:"kouho"},
   {t:"kickoff.mdが決着済みの『プロジェクト側security_index.md』を代替確認先として案内していること", m:".claude/skills/kickoff/SKILL.md:11。CLAUDE.md本文で無効化済みCoworkルーチンの遺物・アクセス手段なしと決着済み（軍令帳参照）", stamp:"kouho"},
+  {t:"README.mdの組織図がreviewer・planner・kpi-analyst・infra-opsのBash保持を権限列から落としていること", m:".claude/README.md:17,19,23,26。4行とも「読み取り」「提案」等と書くが実tools行はBash保持（git diff/git log等を前提に動く）。qa行は「Bash含む」と明示、security行も「監査コマンド」と言及するのに他4行はコマンド実行能力に一切触れず（軍令帳参照）", stamp:"kouho"},
   {t:"他国の目利き（法務・税務）", m:"雛形のまま / 時期未定", stamp:"later", sealed:true},
 ];
 
